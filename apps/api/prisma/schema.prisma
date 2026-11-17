@@ -1,0 +1,484 @@
+// Evlog data model.
+// Money is stored as Decimal(12,2); every timestamp is UTC (timestamptz).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  sessions          AuthSession[]
+  ownedHomes        Home[]
+  tenancies         Tenancy[]
+  receipts          Receipt[]
+  ratings           Rating[]
+  conditionSessions ConditionSession[] @relation("ConditionSessionCreator")
+  conditionPhotos   ConditionPhoto[]
+  maintenanceLogs   MaintenanceLog[]
+}
+
+/// One row per logged-in device. Only a hash of the refresh token is stored.
+model AuthSession {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String
+  userAgent        String?
+  expiresAt        DateTime  @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ───────────────────────────── Homes & tenancies ─────────────────────────────
+
+model Home {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  ownerId      String   @db.Uuid
+  city         String
+  district     String
+  neighborhood String?
+  addressLine  String
+  roomLayout   String /// Turkish notation, e.g. "2+1"
+  areaM2       Int?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  owner             User               @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  tenancies         Tenancy[]
+  conditionSessions ConditionSession[]
+  receipts          Receipt[]
+  ratings           Rating[]
+  listings          Listing[]
+  pantryItems       PantryItem[]
+  shoppingItems     ShoppingListItem[]
+  appliances        Appliance[]
+
+  @@index([ownerId])
+}
+
+enum TenancyStatus {
+  INVITED
+  ACTIVE
+  ENDED
+}
+
+model Tenancy {
+  id         String        @id @default(uuid(7)) @db.Uuid
+  homeId     String        @db.Uuid
+  tenantId   String?       @db.Uuid
+  inviteCode String?       @unique
+  status     TenancyStatus @default(INVITED)
+  startDate  DateTime      @db.Date
+  endDate    DateTime?     @db.Date
+  /// Set once enough confirmed rent receipts for this address exist.
+  verifiedAt DateTime?     @db.Timestamptz(3)
+  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime      @updatedAt @db.Timestamptz(3)
+
+  home              Home               @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  tenant            User?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  conditionSessions ConditionSession[]
+  rating            Rating?
+
+  @@index([homeId, status])
+  @@index([tenantId])
+}
+
+// ───────────────────────────── Condition record ─────────────────────────────
+// Not a contract: a time-stamped, tamper-evident photo record both parties confirm.
+
+enum ConditionSessionType {
+  MOVE_IN
+  MOVE_OUT
+  PERIODIC
+}
+
+enum ConditionSessionStatus {
+  OPEN /// photos can be added
+  LOCKED /// photos frozen, waiting for confirmations
+  CONFIRMED /// owner and tenant both confirmed
+}
+
+enum Room {
+  LIVING_ROOM
+  KITCHEN
+  BEDROOM
+  BATHROOM
+  BALCONY
+  HALLWAY
+  METERS
+  OTHER
+}
+
+model ConditionSession {
+  id                String                 @id @default(uuid(7)) @db.Uuid
+  homeId            String                 @db.Uuid
+  tenancyId         String?                @db.Uuid
+  createdById       String                 @db.Uuid
+  type              ConditionSessionType
+  status            ConditionSessionStatus @default(OPEN)
+  startedAt         DateTime               @default(now()) @db.Timestamptz(3)
+  lockedAt          DateTime?              @db.Timestamptz(3)
+  /// SHA-256 over the ordered photo hashes, computed at lock time.
+  contentHash       String?
+  ownerConfirmedAt  DateTime?              @db.Timestamptz(3)
+  tenantConfirmedAt DateTime?              @db.Timestamptz(3)
+
+  home      Home             @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  tenancy   Tenancy?         @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
+  createdBy User             @relation("ConditionSessionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  photos    ConditionPhoto[]
+
+  @@index([homeId, startedAt(sort: Desc)])
+}
+
+model ConditionPhoto {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  sessionId    String   @db.Uuid
+  uploadedById String   @db.Uuid
+  room         Room
+  storageKey   String   @unique
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  /// Time reported by the device camera.
+  capturedAt   DateTime @db.Timestamptz(3)
+  /// Server time the file arrived; this is the trusted timestamp.
+  receivedAt   DateTime @default(now()) @db.Timestamptz(3)
+  latitude     Float?
+  longitude    Float?
+  note         String?
+
+  session    ConditionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  uploadedBy User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, sha256])
+  @@index([sessionId, room])
+}
+
+// ───────────────────────────── Receipts ─────────────────────────────
+
+enum ReceiptKind {
+  GROCERY
+  RENT
+  UTILITY_ELECTRICITY
+  UTILITY_WATER
+  UTILITY_GAS
+  UTILITY_INTERNET
+  RENOVATION
+  APPLIANCE
+  SERVICE
+  OTHER
+}
+
+enum ReceiptStatus {
+  PENDING /// stored, not yet sent to the reader
+  PROCESSING /// reader accepted it, waiting for the callback
+  PARSED /// fields filled, user has not confirmed yet
+  FAILED
+  CONFIRMED /// user reviewed the fields; usable as evidence
+}
+
+model Receipt {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  userId       String        @db.Uuid
+  homeId       String?       @db.Uuid
+  kind         ReceiptKind
+  status       ReceiptStatus @default(PENDING)
+  imageKey     String        @unique
+  mimeType     String
+  sha256       String
+  merchantName String?
+  issuedAt     DateTime?     @db.Timestamptz(3)
+  totalAmount  Decimal?      @db.Decimal(12, 2)
+  currency     String        @default("TRY") @db.Char(3)
+  ocrRaw       Json?
+  ocrError     String?
+  confirmedAt  DateTime?     @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  home            Home?            @relation(fields: [homeId], references: [id], onDelete: SetNull)
+  items           ReceiptItem[]
+  ratingEvidence  RatingEvidence[]
+  appliances      Appliance[]
+  maintenanceLogs MaintenanceLog[]
+
+  @@unique([userId, sha256])
+  @@index([homeId, kind, issuedAt])
+}
+
+model ReceiptItem {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  receiptId      String   @db.Uuid
+  position       Int
+  name           String
+  normalizedName String
+  quantity       Decimal  @default(1) @db.Decimal(10, 3)
+  unit           String? /// "kg", "L", "pcs"…
+  unitPrice      Decimal? @db.Decimal(12, 2)
+  totalPrice     Decimal  @db.Decimal(12, 2)
+
+  receipt     Receipt      @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  pricePoints PricePoint[]
+
+  @@unique([receiptId, position])
+  @@index([normalizedName])
+}
+
+// ───────────────────────────── Ratings ─────────────────────────────
+
+enum RatingCategory {
+  HOME_CONDITION
+  NEIGHBORHOOD
+  INFRASTRUCTURE
+  HEATING_EFFICIENCY
+  RENOVATIONS
+}
+
+/// One verified rating per tenancy.
+model Rating {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  homeId            String   @db.Uuid
+  tenancyId         String   @unique @db.Uuid
+  authorId          String   @db.Uuid
+  noteForNextTenant String?
+  submittedAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  home    Home          @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  tenancy Tenancy       @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  scores  RatingScore[]
+
+  @@index([homeId])
+}
+
+model RatingScore {
+  id       String         @id @default(uuid(7)) @db.Uuid
+  ratingId String         @db.Uuid
+  category RatingCategory
+  score    Int            @db.SmallInt
+
+  rating   Rating           @relation(fields: [ratingId], references: [id], onDelete: Cascade)
+  evidence RatingEvidence[]
+
+  @@unique([ratingId, category])
+}
+
+/// What backs a score: a confirmed receipt or a confirmed condition record.
+model RatingEvidence {
+  id                 String  @id @default(uuid(7)) @db.Uuid
+  scoreId            String  @db.Uuid
+  receiptId          String? @db.Uuid
+  conditionSessionId String? @db.Uuid
+
+  score   RatingScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  receipt Receipt?    @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+
+  @@index([scoreId])
+}
+
+// ───────────────────────────── Listings & brokers ─────────────────────────────
+
+enum ListingProvider {
+  SAHIBINDEN
+}
+
+enum ListingType {
+  RENT
+  SALE
+}
+
+model Listing {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  homeId            String          @db.Uuid
+  provider          ListingProvider
+  externalId        String
+  url               String
+  type              ListingType     @default(RENT)
+  title             String?
+  priceAmount       Decimal?        @db.Decimal(14, 2)
+  currency          String          @default("TRY") @db.Char(3)
+  coverPhotoId      String?         @db.Uuid
+  lastSyncedAt      DateTime?       @db.Timestamptz(3)
+  syncError         String?
+  sharePhotos       Boolean         @default(true)
+  shareRatings      Boolean         @default(true)
+  shareHeatingBills Boolean         @default(false)
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
+
+  home    Home            @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  brokers BrokerAccess[]
+  updates ListingUpdate[]
+
+  @@unique([provider, externalId])
+  @@index([homeId])
+}
+
+/// A real-estate agency given read-only access to the shared parts of a listing.
+model BrokerAccess {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  listingId   String    @db.Uuid
+  agencyName  String
+  contactName String?
+  email       String
+  /// Hash of the share token; the raw token is only shown once.
+  tokenHash   String    @unique
+  revokedAt   DateTime? @db.Timestamptz(3)
+  lastViewAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+/// Snapshot of what was shared each time the owner pressed "Send update".
+model ListingUpdate {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  listingId String   @db.Uuid
+  snapshot  Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, createdAt(sort: Desc)])
+}
+
+// ───────────────────────────── Kitchen & market data ─────────────────────────────
+
+model PantryItem {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  homeId            String    @db.Uuid
+  name              String
+  normalizedName    String
+  /// Learned from purchase history; used to predict "running low".
+  usualDurationDays Int?
+  packSize          Decimal?  @db.Decimal(10, 3)
+  unit              String?
+  lastPurchasedAt   DateTime? @db.Timestamptz(3)
+  purchaseCount     Int       @default(0)
+  trackLow          Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Cascade)
+
+  @@unique([homeId, normalizedName])
+}
+
+model ShoppingListItem {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  homeId    String    @db.Uuid
+  name      String
+  doneAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Cascade)
+
+  @@index([homeId, doneAt])
+}
+
+/// One observed shelf price. Feeds both "price watch" and anonymous market averages.
+model PricePoint {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  receiptItemId  String   @db.Uuid
+  homeId         String?  @db.Uuid
+  normalizedName String
+  merchantName   String?
+  unit           String?
+  unitPrice      Decimal  @db.Decimal(12, 2)
+  currency       String   @default("TRY") @db.Char(3)
+  city           String?
+  observedAt     DateTime @db.Timestamptz(3)
+
+  receiptItem ReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
+
+  @@index([normalizedName, observedAt(sort: Desc)])
+  @@index([homeId, normalizedName, observedAt(sort: Desc)])
+}
+
+// ───────────────────────────── Appliances & upkeep ─────────────────────────────
+
+enum ApplianceType {
+  COMBI_BOILER
+  DISHWASHER
+  WASHING_MACHINE
+  DRYER
+  AIR_CONDITIONER
+  REFRIGERATOR
+  OVEN
+  WATER_HEATER
+  WATER_PURIFIER
+  OTHER
+}
+
+model Appliance {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  homeId        String        @db.Uuid
+  type          ApplianceType
+  name          String
+  brand         String?
+  model         String?
+  purchasedAt   DateTime?     @db.Date
+  warrantyUntil DateTime?     @db.Date
+  receiptId     String?       @db.Uuid
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
+
+  home    Home              @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  receipt Receipt?          @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  tasks   MaintenanceTask[]
+
+  @@index([homeId])
+}
+
+model MaintenanceTask {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  applianceId  String    @db.Uuid
+  title        String /// e.g. "Clean filter", "Yearly service"
+  intervalDays Int
+  lastDoneAt   DateTime? @db.Timestamptz(3)
+  nextDueAt    DateTime  @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+
+  appliance Appliance        @relation(fields: [applianceId], references: [id], onDelete: Cascade)
+  logs      MaintenanceLog[]
+
+  @@index([nextDueAt])
+}
+
+model MaintenanceLog {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  taskId    String   @db.Uuid
+  doneById  String   @db.Uuid
+  doneAt    DateTime @db.Timestamptz(3)
+  note      String?
+  receiptId String?  @db.Uuid
+
+  task    MaintenanceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  doneBy  User            @relation(fields: [doneById], references: [id], onDelete: Restrict)
+  receipt Receipt?        @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, doneAt(sort: Desc)])
+}

@@ -1,0 +1,42 @@
+# Local development: Postgres + the API.
+#   docker compose up -d db          # just the database
+#   docker compose up --build        # database + API
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: evlog
+      POSTGRES_PASSWORD: evlog
+      POSTGRES_DB: evlog
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U evlog']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./apps/api
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://evlog:evlog@db:5432/evlog?schema=public
+      # The receipt reader runs on your host machine.
+      OCR_SERVICE_URL: http://host.docker.internal:8000
+      UPLOAD_DIR: /app/uploads
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    command: sh -c "npx prisma migrate deploy && node dist/main"
+    ports:
+      - '3000:3000'
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  pgdata:
+  uploads:
