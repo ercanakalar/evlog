@@ -2,12 +2,15 @@
 
 ```bash
 cp .env.example .env          # fill in secrets
-docker compose up -d db       # from the repo root, or use your own Postgres
+docker compose up -d db       # from the repo root, or use your own Postgres (database `evlog`)
 npm install                   # also runs `prisma generate`
 npx prisma migrate dev        # create tables
 npm run db:seed               # optional demo data (demo.owner@evlog.app / Demo1234)
 npm run start:dev
 ```
+
+To run it in Docker instead: `docker compose up -d --build api` from the repo root
+(see [Run with Docker](../../README.md#run-with-docker)).
 
 * API: `http://localhost:3000/api/v1` · Swagger UI: `http://localhost:3000/docs` (non-production) · Health: `/health`
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).

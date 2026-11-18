@@ -6,16 +6,19 @@ and count what you have at home.
 
 ```bash
 cp .env.example .env          # fill in secrets
-docker compose up -d raf-db   # from the repo root: Raf's own Postgres server on port 5433
+docker compose up -d raf-db   # from the repo root (port 5433), or use your own Postgres (database `raf`)
 npm install                   # also runs `prisma generate`
 npx prisma migrate dev        # create tables
 npm run db:seed               # shelf-life table + demo account (demo@raf.app / Demo1234)
 npm run start:dev
 ```
 
+To run it in Docker instead: `docker compose up -d --build raf-api` from the repo root
+(see [Run with Docker](../../README.md#run-with-docker)).
+
 * API: `http://localhost:3100/api/v1` · Swagger UI: `http://localhost:3100/docs` (non-production) · Health: `/health`
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
-* Raf has its **own database server** (`raf-db`); it shares nothing with the Evlog API
+* Raf has its **own database** (`raf`); it shares nothing with the Evlog API
   except the receipt reader in `services/receipt-reader`.
 * On first boot the API fills an empty shelf-life table itself; `SEED_DEMO=false npm run db:seed`
   updates the table without adding the demo account.

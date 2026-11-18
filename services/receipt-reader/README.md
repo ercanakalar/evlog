@@ -1,27 +1,44 @@
 # Receipt reader (runs on your computer)
 
-The Evlog API sends each receipt photo here and stores whatever comes back.
-`app.py` already implements the HTTP contract; put your YOLO pipeline inside
-`read_receipt()`.
+Both APIs (Evlog and Raf) send receipt photos here and store whatever comes
+back. Reading is free and offline: [RapidOCR](https://github.com/RapidAI/RapidOCR)
+runs PaddleOCR's Turkish models (`ocr.py`), and `receipt_parser.py` turns the
+words into items, merchant, date and total.
+
+## Run
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-OCR_SERVICE_TOKEN=change-me-ocr-token uvicorn app:app --host 0.0.0.0 --port 8000
+docker compose up -d --build receipt-reader    # from the repo root
+curl localhost:8000/health                     # {"status":"ok"}
+docker compose logs -f receipt-reader          # one line per receipt read
 ```
 
-Then set in `apps/api/.env`:
+`docker compose up api raf-api` starts it too. The first build downloads the
+OCR models into the image, so the reader needs no internet afterwards. The code is
+mounted into the container and reloads on save; rebuild only after changing
+`requirements.txt`. A receipt takes 15–30 seconds on a CPU.
+
+The APIs find it through their `.env`:
 
 ```
-OCR_SERVICE_URL=http://<this-computer>:8000
+OCR_SERVICE_URL=http://localhost:8000
 OCR_SERVICE_TOKEN=change-me-ocr-token
+OCR_TIMEOUT_MS=90000
 ```
 
-If the API runs in the cloud and this machine is at home, expose the reader
-through a tunnel (Cloudflare Tunnel, Tailscale) rather than opening a port.
+The port is only open to this computer. If an API runs elsewhere (in the cloud),
+expose the reader through a tunnel (Cloudflare Tunnel, Tailscale) rather than
+opening the port.
 
-**Sync vs. async.** Returning the result from `/v1/receipts/parse` (HTTP 200)
-is simplest: the phone gets the parsed receipt in the same request. If reading
-takes longer than `OCR_TIMEOUT_MS`, answer `202` immediately and later
-`POST` the result to the `callbackUrl` you were given, with header
-`X-Ocr-Secret: <OCR_CALLBACK_SECRET>`. The app polls until it arrives.
+## Contract
+
+`POST /v1/receipts/parse` (multipart: `file`, `receiptId`, `kind`, `callbackUrl`,
+header `Authorization: Bearer <OCR_SERVICE_TOKEN>`); see the docstring in `app.py`.
+
+**Sync vs. async.** Returning the result straight away (HTTP 200) is what this
+reader does: the phone gets the parsed receipt in the same request. A slower
+reader can answer `202` immediately and later `POST` the result to `callbackUrl`
+with header `X-Ocr-Secret: <OCR_CALLBACK_SECRET>`; the app polls until it arrives.
+
+To add a model that crops the receipt first (for example YOLO), do it in
+`read_receipt()` in `app.py`, before `ocr.recognize()`.
