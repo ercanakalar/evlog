@@ -20,13 +20,13 @@ jobs:
         image: postgres:18-alpine
         env:
           POSTGRES_USER: evlog
-          POSTGRES_PASSWORD: evlog
+          POSTGRES_PASSWORD: postgresql
           POSTGRES_DB: evlog
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://evlog:evlog@localhost:5432/evlog
+      TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5432/evlog
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -68,14 +68,14 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: raf
-          POSTGRES_PASSWORD: raf
+          POSTGRES_USER: evlog
+          POSTGRES_PASSWORD: postgresql
           POSTGRES_DB: raf
-        ports: ['5433:5432']
+        ports: ["5433:5432"]
         options: >-
-          --health-cmd "pg_isready -U raf" --health-interval 5s --health-timeout 3s --health-retries 10
+          --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://raf:raf@localhost:5433/raf
+      TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5433/raf
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
