@@ -1,5 +1,6 @@
 import type { ConditionPhoto, ConditionSession, ConditionSessionDetail } from '@/types/api/models';
 import type { AddPhotoRequest, SessionActionRequest, StartSessionRequest } from '@/types/api/requests';
+import { formDataFile } from '@/services/media/formDataFile';
 import { baseApi } from '../middlewares/createApi';
 
 export const conditionRecordService = baseApi.injectEndpoints({
@@ -22,8 +23,7 @@ export const conditionRecordService = baseApi.injectEndpoints({
     addPhoto: build.mutation<ConditionPhoto, AddPhotoRequest>({
       query: ({ sessionId, room, file }) => {
         const body = new FormData();
-        // React Native's FormData takes { uri, name, type } for files.
-        body.append('file', file as unknown as Blob);
+        body.append('file', formDataFile(file));
         body.append('room', room);
         body.append('capturedAt', new Date().toISOString());
         return { url: `/condition-sessions/${sessionId}/photos`, method: 'POST', body };

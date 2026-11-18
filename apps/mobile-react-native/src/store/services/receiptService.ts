@@ -1,4 +1,5 @@
 import { RECEIPTS_PAGE_SIZE } from '@/constants/domain';
+import { formDataFile } from '@/services/media/formDataFile';
 import type { Receipt } from '@/types/api/models';
 import type { ListReceiptsRequest, UpdateReceiptRequest, UploadReceiptRequest } from '@/types/api/requests';
 import { cursorPaging, pageQuery } from '../bases/paging';
@@ -22,7 +23,7 @@ export const receiptService = baseApi.injectEndpoints({
     uploadReceipt: build.mutation<Receipt, UploadReceiptRequest>({
       query: ({ file, kind, homeId }) => {
         const body = new FormData();
-        body.append('file', file as unknown as Blob);
+        body.append('file', formDataFile(file));
         body.append('kind', kind);
         if (homeId) body.append('homeId', homeId);
         return { url: '/receipts', method: 'POST', body };
