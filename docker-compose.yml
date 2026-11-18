@@ -1,6 +1,7 @@
 # Local development: Postgres + the API.
 #   docker compose up -d db          # just the database
 #   docker compose up --build        # database + API
+#   docker compose up -d receipt-reader  # just the receipt reader
 services:
   db:
     image: postgres:18-alpine
@@ -26,8 +27,7 @@ services:
     env_file: ./apps/api/.env
     environment:
       DATABASE_URL: postgresql://evlog:evlog@db:5432/evlog?schema=public
-      # The receipt reader runs on your host machine.
-      OCR_SERVICE_URL: http://host.docker.internal:8000
+      OCR_SERVICE_URL: http://receipt-reader:8000
       UPLOAD_DIR: /app/uploads
     extra_hosts:
       - 'host.docker.internal:host-gateway'
@@ -36,6 +36,20 @@ services:
       - '3000:3000'
     volumes:
       - uploads:/app/uploads
+
+  # Receipt reader. Code is mounted and reloaded on save, so edits to
+  # app.py apply without a rebuild; rebuild after changing requirements.txt.
+  receipt-reader:
+    build: ./services/receipt-reader
+    restart: unless-stopped
+    environment:
+      OCR_SERVICE_TOKEN: ${OCR_SERVICE_TOKEN:-change-me-ocr-token}
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./services/receipt-reader:/app
+    ports:
+      # Only this computer can reach it; the API calls http://localhost:8000.
+      - '127.0.0.1:8000:8000'
 
 volumes:
   pgdata:
