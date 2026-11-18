@@ -130,9 +130,9 @@ rebuild it only after changing `requirements.txt`:
 `docker compose up -d --build receipt-reader`.
 
 Notes:
-* Run each API either in Docker or with `npm run start:dev`, not both: they use the same port.
+* Run each API either in Docker or with npm, not both: they use the same port.
 * Photos uploaded through the containers are kept in Docker volumes
-  (`evlog_uploads`, `evlog_raf-uploads`), separate from `apps/*/uploads` used by `npm run start:dev`.
+  (`evlog_uploads`, `evlog_raf-uploads`), separate from `apps/*/uploads` used when the APIs run with npm.
 * `docker compose down -v` also deletes those volumes and the Postgres containers' data.
 
 ## Run without Docker
@@ -140,7 +140,7 @@ Notes:
 ```bash
 nvm use                                                # Node 24
 docker compose up -d receipt-reader                    # or see services/receipt-reader
-cd apps/api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm run start:dev
+cd apps/api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm start
 cd apps/raf-api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm run start:dev
 ```
 

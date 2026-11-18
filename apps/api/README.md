@@ -6,7 +6,7 @@ docker compose up -d db       # from the repo root, or use your own Postgres (da
 npm install                   # also runs `prisma generate`
 npx prisma migrate dev        # create tables
 npm run db:seed               # optional demo data (demo.owner@evlog.app / Demo1234)
-npm run start:dev
+npm start                     # watches for changes
 ```
 
 To run it in Docker instead: `docker compose up -d --build api` from the repo root

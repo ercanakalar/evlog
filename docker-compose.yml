@@ -8,7 +8,7 @@
 #   docker compose down
 #
 # The APIs use the host's network, so they read DATABASE_URL and
-# OCR_SERVICE_URL from apps/*/.env exactly like `npm run start:dev` does
+# OCR_SERVICE_URL from apps/*/.env exactly like running them with npm does
 # (localhost works) and phones reach them on this computer's LAN IP.
 services:
   # Postgres in Docker, for when you don't run your own. Only started when
