@@ -24,7 +24,7 @@ export const envSchema = z.object({
   OCR_SERVICE_URL: httpUrl,
   OCR_SERVICE_TOKEN: z.string().min(8),
   OCR_CALLBACK_SECRET: z.string().min(32),
-  OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).default(20000),
+  OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).default(90000),
   RENT_RECEIPTS_TO_VERIFY: z.coerce.number().int().min(1).max(12).default(2),
   SAHIBINDEN_API_URL: optionalString.pipe(httpUrl.optional()),
   SAHIBINDEN_API_KEY: optionalString,
