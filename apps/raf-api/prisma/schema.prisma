@@ -186,15 +186,23 @@ model ShoppingListItem {
   @@index([listId])
 }
 
+/// How an at-home product is counted.
+enum HomeUnit {
+  PIECE /// whole packs or pieces: 3 milks
+  KG /// by weight: 1.25 kg of bananas
+}
+
 /// A product the user keeps at home and counts.
 model HomeItem {
   id               String    @id @default(uuid(7)) @db.Uuid
   userId           String    @db.Uuid
   name             String
   normalizedName   String
-  count            Int       @default(0)
-  /// Last receipt that raised the count, and by how much.
-  lastMatchAdded   Int?
+  unit             HomeUnit  @default(PIECE)
+  /// Pieces, or kilograms for KG items.
+  count            Decimal   @default(0) @db.Decimal(10, 3)
+  /// Last receipt that raised the count, and by how much (in `unit`).
+  lastMatchAdded   Decimal?  @db.Decimal(10, 3)
   lastMatchMarket  String?
   lastMatchAt      DateTime? @db.Timestamptz(3)
   createdAt        DateTime  @default(now()) @db.Timestamptz(3)

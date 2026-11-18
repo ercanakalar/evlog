@@ -12,6 +12,28 @@ export const normalizeName = (name: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const weightKg = (text: string) => {
+  const match = /(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b/i.exec(text);
+  if (!match?.[1] || !match[2]) return null;
+  const amount = Number(match[1].replace(',', '.'));
+  return match[2].toLowerCase() === 'kg' ? amount : amount / 1000;
+};
+
+/** What one receipt line adds to an at-home item (same rules as the API's amountBought). */
+export const amountBought = (
+  line: { name: string; rawName: string; quantity: string; unit: string | null },
+  unit: 'PIECE' | 'KG',
+) => {
+  const quantity = Number(line.quantity);
+  const weighed = line.unit?.toLowerCase() === 'kg';
+  if (unit === 'KG') {
+    if (weighed) return Math.round(quantity * 1000) / 1000;
+    const perPack = weightKg(line.rawName) ?? weightKg(line.name);
+    return perPack ? Math.round(perPack * Math.max(1, Math.round(quantity)) * 1000) / 1000 : 0;
+  }
+  return weighed || (line.unit && line.unit !== 'pcs') ? 1 : Math.max(1, Math.round(quantity));
+};
+
 export const namesMatch = (homeItem: string, purchase: string) => {
   const words = normalizeName(homeItem).split(' ').filter(Boolean);
   if (words.length === 0) return false;

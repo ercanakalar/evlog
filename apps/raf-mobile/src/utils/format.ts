@@ -19,6 +19,10 @@ export const formatMoney = (
 };
 
 /** en-GB puts a comma after the weekday ("Mon, 16 Nov"); the receipt style drops it. */
+/** "1.25" / "1,25"; up to 3 decimals, no trailing zeros. */
+export const formatAmount = (value: number, language = 'en') =>
+  new Intl.NumberFormat(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 3 }).format(value);
+
 const fmt = (iso: string, language: string, options: Intl.DateTimeFormatOptions) =>
   new Date(iso).toLocaleDateString(toLocale(language), options).replace(/^(\p{L}+),/u, '$1');
 

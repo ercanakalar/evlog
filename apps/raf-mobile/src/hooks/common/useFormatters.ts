@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Category } from '@/types/api/models';
+import type { Category, HomeUnit } from '@/types/api/models';
 import {
+  formatAmount,
   formatDay,
   formatLongDate,
   formatMoney,
@@ -23,6 +24,11 @@ export function useFormatters() {
       time: (iso: string | null | undefined) => formatTime(iso, lang),
       month: (month: string, style?: 'long' | 'short') => formatMonth(month, lang, style),
       category: (category: Category) => t(`categories.${category}`),
+      /** At-home amount: "3" for pieces, "1.25 kg" by weight. */
+      homeAmount: (count: number, unit: HomeUnit) =>
+        unit === 'KG'
+          ? t('atHome.kgAmount', { amount: formatAmount(count, lang) })
+          : formatAmount(count, lang),
       /** Countdown label as printed on the bar: "TODAY", "1 DAY", "5 DAYS". */
       left: (daysLeft: number | null) =>
         daysLeft === null ? t('countdown.noExpiry') : daysLeft === 0 ? t('countdown.today') : t('countdown.days', { count: daysLeft }),

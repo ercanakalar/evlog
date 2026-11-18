@@ -116,7 +116,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
           key={item.id}
           item={item}
           currency={receipt.currency}
-          atHome={r.homeMatches.get(item.id) ?? false}
+          atHome={r.homeMatches.get(item.id)}
           editable={editable}
           onConfirm={() => r.confirmLine(item.id)}
           onFix={(name, category) => r.fixLine(item.id, name, category)}

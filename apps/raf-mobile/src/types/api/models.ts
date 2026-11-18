@@ -99,10 +99,16 @@ export interface PurchaseRecord {
 
 export type ShelfItemDetail = ShelfItem & { history: PurchaseRecord[] };
 
+/** How an at-home product is counted: whole pieces, or kilograms. */
+export type HomeUnit = 'PIECE' | 'KG';
+
 export interface HomeItem {
   id: string;
   name: string;
+  unit: HomeUnit;
+  /** Pieces, or kilograms (up to 3 decimals) for KG items. */
   count: number;
+  /** What the last matching receipt added, in `unit`. */
   lastMatchAdded: number | null;
   lastMatchMarket: string | null;
   lastMatchAt: string | null;
@@ -125,6 +131,7 @@ export interface ShoppingList {
 export interface RunningLowItem {
   homeItemId: string;
   name: string;
+  unit: HomeUnit;
   count: number;
   lastPrice: string | null;
 }

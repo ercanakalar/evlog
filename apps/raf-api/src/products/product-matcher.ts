@@ -39,6 +39,14 @@ export const packSize = (raw: string): string | null => {
   return unit === 'pack' ? `${amount} pack` : `${amount} ${unit}`;
 };
 
+/** Weight printed in a product name, in kg: "MAKARNA 500G" -> 0.5, "PIRINC 1KG" -> 1. */
+export const weightKg = (raw: string): number | null => {
+  const match = /(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b/i.exec(raw);
+  if (!match) return null;
+  const amount = Number(match[1].replace(',', '.'));
+  return match[2].toLowerCase() === 'kg' ? amount : amount / 1000;
+};
+
 const keywordMatches = (name: string, keyword: string): boolean => {
   const haystack = ` ${name} `;
   if (keyword.length < MIN_PREFIX_KEYWORD) return haystack.includes(` ${keyword} `);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { radius, space } from '@/constants/layout';
 import { useTheme } from '@/theme';
@@ -12,12 +12,15 @@ export function InlineAdd({
   action,
   onSubmit,
   tone = 'ink',
+  accessory,
 }: {
   label: string;
   placeholder: string;
   action: string;
   onSubmit: (value: string) => void | Promise<unknown>;
   tone?: 'ink' | 'accent';
+  /** Shown between the field and the button (e.g. a unit switch). */
+  accessory?: ReactNode;
 }) {
   const { colors } = useTheme();
   const [value, setValue] = useState('');
@@ -39,11 +42,12 @@ export function InlineAdd({
         returnKeyType="done"
         onSubmitEditing={submit}
       />
+      {accessory}
       <Pressable
         accessibilityRole="button"
         onPress={submit}
         style={({ pressed }) => ({
-          minWidth: 72,
+          minWidth: accessory ? 60 : 72,
           height: 46,
           paddingHorizontal: space.md,
           borderRadius: radius.md,

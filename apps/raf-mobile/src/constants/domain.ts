@@ -23,3 +23,6 @@ export const SPENDING_MONTHS = 6;
 export const REMINDER_LEAD_DAYS = [1, 2, 3] as const;
 /** Local hour at which expiry reminders fire. */
 export const REMINDER_HOUR = 9;
+
+/** Plus / minus step on the at-home counter. */
+export const HOME_STEP = { PIECE: 1, KG: 0.1 } as const;

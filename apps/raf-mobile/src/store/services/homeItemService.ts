@@ -1,14 +1,14 @@
-import type { HomeItem } from '@/types/api/models';
+import type { HomeItem, HomeUnit } from '@/types/api/models';
 import { baseApi } from '../middlewares/createApi';
 
-/** "At home": counted products; saved receipts raise matching counts. */
+/** "At home": products counted in pieces or kilograms; saved receipts raise matching counts. */
 export const homeItemService = baseApi.injectEndpoints({
   endpoints: (build) => ({
     listHomeItems: build.query<HomeItem[], void>({
       query: () => '/home-items',
       providesTags: ['HomeItem'],
     }),
-    addHomeItem: build.mutation<HomeItem, { name: string; count?: number }>({
+    addHomeItem: build.mutation<HomeItem, { name: string; unit: HomeUnit; count?: number }>({
       query: (body) => ({ url: '/home-items', method: 'POST', body }),
       invalidatesTags: ['HomeItem', 'List'],
     }),
@@ -26,6 +26,11 @@ export const homeItemService = baseApi.injectEndpoints({
         await queryFulfilled.catch(() => patch.undo());
       },
     }),
+    /** Switching to pieces rounds the amount on the server. */
+    setHomeItemUnit: build.mutation<HomeItem, { id: string; unit: HomeUnit }>({
+      query: ({ id, unit }) => ({ url: `/home-items/${id}`, method: 'PATCH', body: { unit } }),
+      invalidatesTags: ['HomeItem', 'List'],
+    }),
     removeHomeItem: build.mutation<void, string>({
       query: (id) => ({ url: `/home-items/${id}`, method: 'DELETE' }),
       invalidatesTags: ['HomeItem', 'List'],
@@ -37,5 +42,6 @@ export const {
   useListHomeItemsQuery,
   useAddHomeItemMutation,
   useSetHomeItemCountMutation,
+  useSetHomeItemUnitMutation,
   useRemoveHomeItemMutation,
 } = homeItemService;

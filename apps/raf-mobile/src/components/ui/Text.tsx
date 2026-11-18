@@ -2,11 +2,12 @@ import { StyleSheet, Text as RNText } from 'react-native';
 import { fonts, useTheme } from '@/theme';
 import type { TextProps } from '@/types/components/ui';
 
-export function Text({ children, variant = 'body', muted, color, style, numberOfLines, accessibilityRole }: TextProps) {
+export function Text({ children, variant = 'body', muted, color, style, numberOfLines, accessibilityRole, accessibilityLabel }: TextProps) {
   const { colors } = useTheme();
   return (
     <RNText
       accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
       numberOfLines={numberOfLines}
       style={[styles[variant], { color: color ?? (muted ? colors.textMuted : colors.text) }, style]}>
       {children}

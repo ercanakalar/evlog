@@ -14,9 +14,9 @@ import {
   useRescanReceiptMutation,
   useUpdateReceiptMutation,
 } from '@/store/services/receiptService';
-import type { Category, Receipt, ReceiptItem } from '@/types/api/models';
+import type { Category, HomeUnit, Receipt, ReceiptItem } from '@/types/api/models';
 import type { ReceiptLineInput } from '@/types/api/requests';
-import { namesMatch } from '@/utils/match';
+import { amountBought, namesMatch } from '@/utils/match';
 
 const toLine = (item: ReceiptItem, patch: Partial<ReceiptLineInput> = {}): ReceiptLineInput => ({
   name: item.name,
@@ -54,15 +54,14 @@ export function useReceiptReview(receiptId: string) {
   const [remove] = useDeleteReceiptMutation();
 
   const countsAtHome = me.data?.trackHomeItems && me.data.countFromReceipts;
-  /** Lines that will raise an at-home count when saved. */
+  /** What each line will add to a matching at-home item when saved. */
   const homeMatches = useMemo(() => {
-    const map = new Map<string, boolean>();
+    const map = new Map<string, { amount: number; unit: HomeUnit }>();
     if (!countsAtHome) return map;
     for (const item of receipt?.items ?? []) {
-      map.set(
-        item.id,
-        (homeItems.data ?? []).some((h) => namesMatch(h.name, item.name) || namesMatch(h.name, item.rawName)),
-      );
+      const home = (homeItems.data ?? []).find((h) => namesMatch(h.name, item.name) || namesMatch(h.name, item.rawName));
+      const amount = home ? amountBought(item, home.unit) : 0;
+      if (home && amount > 0) map.set(item.id, { amount, unit: home.unit });
     }
     return map;
   }, [countsAtHome, homeItems.data, receipt?.items]);

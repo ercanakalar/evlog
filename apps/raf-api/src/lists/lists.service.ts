@@ -46,6 +46,7 @@ export class ListsService {
       runningLow: low.map((item) => ({
         homeItemId: item.id,
         name: item.name,
+        unit: item.unit,
         count: item.count,
         lastPrice: lastPrice(prices, item.name),
       })),

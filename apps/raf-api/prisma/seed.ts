@@ -109,12 +109,19 @@ async function main() {
     });
   }
 
-  const home: [string, number][] = [
-    ['Whole milk', 3], ['Eggs', 1], ['Rice', 2], ['Pasta', 6],
+  const home: [string, number, ('PIECE' | 'KG')?][] = [
+    ['Whole milk', 3], ['Eggs', 1], ['Rice', 2, 'KG'], ['Pasta', 6],
+    ['Tomatoes', 1.5, 'KG'], ['Bananas', 0.4, 'KG'],
     ['Tomato paste', 3], ['Toilet paper', 2], ['Olive oil', 1], ['Dish soap', 1],
   ];
   await prisma.homeItem.createMany({
-    data: home.map(([name, count]) => ({ userId: user.id, name, normalizedName: normalizeProductName(name), count })),
+    data: home.map(([name, count, unit = 'PIECE']) => ({
+      userId: user.id,
+      name,
+      normalizedName: normalizeProductName(name),
+      unit,
+      count,
+    })),
   });
 
   await prisma.shoppingList.create({

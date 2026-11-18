@@ -1,60 +1,99 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
+import type { HomeUnit } from '../generated/prisma/enums';
 import { normalizeProductName } from '../common/utils/normalize';
-import { namesMatch } from '../products/product-matcher';
+import { namesMatch, weightKg } from '../products/product-matcher';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeItemDto, UpdateHomeItemDto } from './dto/home-item.dto';
 
-/** Packs bought on one line: weighed produce ("1.12 kg") counts as one. */
-const packs = (quantity: Prisma.Decimal, unit: string | null) => {
-  const n = quantity.toNumber();
-  return unit && unit !== 'pcs' ? 1 : Math.max(1, Math.round(n));
+type Line = { name: string; rawName: string; quantity: Prisma.Decimal; unit: string | null };
+type HomeItemRow = Prisma.HomeItemGetPayload<object>;
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** How much one receipt line adds to a home item, in that item's unit (0 = unknown). */
+export const amountBought = (line: Line, unit: HomeUnit): number => {
+  const quantity = line.quantity.toNumber();
+  const weighed = line.unit?.toLowerCase() === 'kg';
+  if (unit === 'KG') {
+    if (weighed) return round3(quantity);
+    // A pack with its weight in the name: "MAKARNA 500G" x 2 -> 1 kg.
+    const perPack = weightKg(line.rawName) ?? weightKg(line.name);
+    return perPack ? round3(perPack * Math.max(1, Math.round(quantity))) : 0;
+  }
+  // Pieces: weighed produce ("1.12 kg of bananas") counts as one bag.
+  return weighed || (line.unit && line.unit !== 'pcs') ? 1 : Math.max(1, Math.round(quantity));
 };
 
-/** Items at or below this count show as "running low". */
-export const RUNNING_LOW_AT = 1;
+/** At or below this, an item shows as "running low": 1 piece, or half a kilo. */
+export const RUNNING_LOW_AT: Record<HomeUnit, number> = { PIECE: 1, KG: 0.5 };
+
+/** Counts go out as plain numbers ("1.25"), not Decimal strings. */
+export const toHomeItem = (item: HomeItemRow) => ({
+  ...item,
+  count: item.count.toNumber(),
+  lastMatchAdded: item.lastMatchAdded?.toNumber() ?? null,
+});
 
 /**
- * Products the user keeps at home, with a count. When a saved receipt has a
- * line whose name matches one, its count goes up by the packs bought.
+ * Products the user keeps at home, counted in pieces or kilograms. When a
+ * saved receipt has a line whose name matches one, its count goes up by what
+ * was bought.
  */
 @Injectable()
 export class HomeItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(userId: string) {
-    return this.prisma.homeItem.findMany({
-      where: { userId },
-      orderBy: [{ createdAt: 'desc' }],
-    });
+  async list(userId: string) {
+    const items = await this.prisma.homeItem.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }] });
+    return items.map(toHomeItem);
   }
 
   /** Products that are nearly gone, for the market list suggestions. */
-  runningLow(userId: string) {
-    return this.prisma.homeItem.findMany({
-      where: { userId, count: { lte: RUNNING_LOW_AT } },
+  async runningLow(userId: string) {
+    const items = await this.prisma.homeItem.findMany({
+      where: {
+        userId,
+        OR: [
+          { unit: 'PIECE', count: { lte: RUNNING_LOW_AT.PIECE } },
+          { unit: 'KG', count: { lte: RUNNING_LOW_AT.KG } },
+        ],
+      },
       orderBy: { count: 'asc' },
     });
+    return items.map(toHomeItem);
   }
 
-  create(userId: string, dto: CreateHomeItemDto) {
+  async create(userId: string, dto: CreateHomeItemDto) {
     const normalizedName = normalizeProductName(dto.name);
     if (!normalizedName) throw new BadRequestException('Name is empty');
+    const unit = dto.unit ?? 'PIECE';
+    const count = dto.count ?? (unit === 'KG' ? 0 : 1);
+    this.checkCount(unit, count);
     // Duplicate names surface as 409 via PrismaExceptionFilter.
-    return this.prisma.homeItem.create({
-      data: { userId, name: dto.name, normalizedName, count: dto.count ?? 1 },
-    });
+    return toHomeItem(
+      await this.prisma.homeItem.create({ data: { userId, name: dto.name, normalizedName, unit, count } }),
+    );
   }
 
   async update(itemId: string, userId: string, dto: UpdateHomeItemDto) {
-    await this.own(itemId, userId);
-    return this.prisma.homeItem.update({
-      where: { id: itemId },
-      data: {
-        count: dto.count,
-        ...(dto.name ? { name: dto.name, normalizedName: normalizeProductName(dto.name) } : {}),
-      },
-    });
+    const item = await this.own(itemId, userId);
+    const unit = dto.unit ?? item.unit;
+    let count = dto.count ?? item.count.toNumber();
+    // Pieces are whole: switching from kg rounds the amount.
+    if (dto.count === undefined && unit === 'PIECE') count = Math.round(count);
+    this.checkCount(unit, count);
+    return toHomeItem(
+      await this.prisma.homeItem.update({
+        where: { id: itemId },
+        data: {
+          unit,
+          count,
+          ...(dto.unit && dto.unit !== item.unit ? { lastMatchAdded: null, lastMatchMarket: null, lastMatchAt: null } : {}),
+          ...(dto.name ? { name: dto.name, normalizedName: normalizeProductName(dto.name) } : {}),
+        },
+      }),
+    );
   }
 
   async remove(itemId: string, userId: string) {
@@ -82,9 +121,11 @@ export class HomeItemsService {
       }),
     ]);
     for (const home of homeItems) {
-      const added = receipt.items
-        .filter((line) => namesMatch(home.name, line.name) || namesMatch(home.name, line.rawName))
-        .reduce((sum, line) => sum + packs(line.quantity, line.unit), 0);
+      const added = round3(
+        receipt.items
+          .filter((line) => namesMatch(home.name, line.name) || namesMatch(home.name, line.rawName))
+          .reduce((sum, line) => sum + amountBought(line, home.unit), 0),
+      );
       if (added === 0) continue;
       await tx.homeItem.update({
         where: { id: home.id },
@@ -95,6 +136,12 @@ export class HomeItemsService {
           lastMatchAt: receipt.issuedAt,
         },
       });
+    }
+  }
+
+  private checkCount(unit: HomeUnit, count: number) {
+    if (unit === 'PIECE' && !Number.isInteger(count)) {
+      throw new BadRequestException('Pieces are counted in whole numbers');
     }
   }
 

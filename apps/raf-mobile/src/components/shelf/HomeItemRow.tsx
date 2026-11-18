@@ -5,38 +5,50 @@ import { Tag, Text } from '@/components/ui';
 import { HIT, radius } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useTheme } from '@/theme';
-import type { HomeItem } from '@/types/api/models';
+import type { HomeItem, HomeUnit } from '@/types/api/models';
 
-/** "Whole milk  [+2 from Migros, 16 Nov]   − 3 +". Long-press to remove. */
+/**
+ * "Whole milk  [+2 from Migros, 16 Nov]   − 3 +", or "− 1.2 kg +" for a
+ * product counted by weight. Long-press to switch piece / kg or remove.
+ */
 export function HomeItemRow({
   item,
-  onChange,
+  onStep,
+  onUnit,
   onRemove,
 }: {
   item: HomeItem;
-  onChange: (count: number) => void;
+  onStep: (direction: 1 | -1) => void;
+  onUnit: (unit: HomeUnit) => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
+  const amount = f.homeAmount(item.count, item.unit);
   const match =
     item.lastMatchAdded && item.lastMatchAt
       ? t('atHome.matched', {
-          count: item.lastMatchAdded,
+          amount: f.homeAmount(item.lastMatchAdded, item.unit),
           market: item.lastMatchMarket ?? t('trips.unknownMarket'),
           date: f.shortDate(item.lastMatchAt),
         })
       : null;
+  const other: HomeUnit = item.unit === 'KG' ? 'PIECE' : 'KG';
+
+  const openMenu = () =>
+    Alert.alert(item.name, t(item.unit === 'KG' ? 'atHome.countedKg' : 'atHome.countedPieces'), [
+      { text: t(other === 'KG' ? 'atHome.useKg' : 'atHome.usePieces'), onPress: () => onUnit(other) },
+      { text: t('atHome.remove'), style: 'destructive', onPress: onRemove },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+
   return (
     <Pressable
-      onLongPress={() =>
-        Alert.alert(t('atHome.removeTitle', { name: item.name }), undefined, [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('atHome.remove'), style: 'destructive', onPress: onRemove },
-        ])
-      }
-      accessibilityHint={t('atHome.removeHint')}
+      onLongPress={openMenu}
+      accessibilityHint={t('atHome.menuHint')}
+      accessibilityActions={[{ name: 'longpress', label: t('atHome.options') }]}
+      onAccessibilityAction={openMenu}
       style={[styles.row, { backgroundColor: colors.card }]}>
       <View style={{ flexShrink: 1, gap: 3, alignItems: 'flex-start' }}>
         <Text variant="bodyStrong">{item.name}</Text>
@@ -45,19 +57,22 @@ export function HomeItemRow({
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('atHome.less', { name: item.name })}
+          accessibilityLabel={t(item.unit === 'KG' ? 'atHome.lessKg' : 'atHome.less', { name: item.name })}
           disabled={item.count === 0}
-          onPress={() => onChange(item.count - 1)}
+          onPress={() => onStep(-1)}
           style={[styles.step, { opacity: item.count === 0 ? 0.35 : 1 }]}>
           <Feather name="minus" size={20} color={colors.text} />
         </Pressable>
-        <Text variant="amount" style={{ width: 28, textAlign: 'center', fontSize: 17 }}>
-          {item.count}
+        <Text
+          variant="amount"
+          accessibilityLabel={t('atHome.amountLabel', { amount })}
+          style={{ minWidth: 28, textAlign: 'center', fontSize: item.unit === 'KG' ? 15 : 17 }}>
+          {amount}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('atHome.more', { name: item.name })}
-          onPress={() => onChange(item.count + 1)}
+          accessibilityLabel={t(item.unit === 'KG' ? 'atHome.moreKg' : 'atHome.more', { name: item.name })}
+          onPress={() => onStep(1)}
           style={styles.step}>
           <Feather name="plus" size={20} color={colors.text} />
         </Pressable>

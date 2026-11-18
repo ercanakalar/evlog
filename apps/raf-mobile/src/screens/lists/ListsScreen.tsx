@@ -128,7 +128,7 @@ export function ListsScreen() {
                   opacity: pressed ? 0.7 : 1,
                 })}>
                 <Text variant="smallMedium" style={{ fontSize: 13.5 }}>
-                  {t('lists.lowChip', { name: low.name, count: low.count })}
+                  {t('lists.lowChip', { name: low.name, amount: f.homeAmount(low.count, low.unit) })}
                 </Text>
               </Pressable>
             ))}

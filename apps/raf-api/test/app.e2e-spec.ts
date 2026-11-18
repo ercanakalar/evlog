@@ -69,6 +69,10 @@ describe('Raf API (e2e)', () => {
   it('reads a receipt, matches products, and on save starts countdowns and counts', async () => {
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Whole milk', count: 1 }).expect(201);
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta' }).expect(201);
+    // Counted by weight: the weighed bananas and the 500 g pasta pack add kilograms.
+    await api().post('/api/v1/home-items').set(auth()).send({ name: 'Bananas', unit: 'KG', count: 0.25 }).expect(201);
+    await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta 500', unit: 'KG' }).expect(201);
+    await api().post('/api/v1/home-items').set(auth()).send({ name: 'Eggs', count: 1.5 }).expect(400);
 
     ocr.respond = () => ({
       status: 200,
@@ -112,7 +116,11 @@ describe('Raf API (e2e)', () => {
     const counts = Object.fromEntries(
       home.body.map((h: { name: string; count: number }) => [h.name, h.count]),
     );
-    expect(counts).toEqual({ 'Whole milk': 3, Pasta: 2 });
+    expect(counts).toEqual({ 'Whole milk': 3, Pasta: 2, Bananas: 1.37, 'Pasta 500': 0.5 });
+    expect(home.body.find((h: { name: string }) => h.name === 'Bananas')).toMatchObject({
+      unit: 'KG',
+      lastMatchAdded: 1.12,
+    });
     expect(home.body.find((h: { name: string }) => h.name === 'Whole milk')).toMatchObject({
       lastMatchAdded: 2,
       lastMatchMarket: 'BİM',
@@ -211,7 +219,20 @@ describe('Raf API (e2e)', () => {
       expect.objectContaining({ name: 'Pasta', done: true, lastPrice: '34.50' }),
       expect.objectContaining({ name: 'Saffron', done: false, lastPrice: null }),
     ]);
-    expect(res.body.runningLow).toEqual([expect.objectContaining({ name: 'Olive oil', count: 1 })]);
+    expect(res.body.runningLow).toEqual([
+      expect.objectContaining({ name: 'Pasta 500', unit: 'KG', count: 0.5 }),
+      expect.objectContaining({ name: 'Olive oil', unit: 'PIECE', count: 1 }),
+    ]);
+
+    // Switching a kg item to pieces rounds its amount.
+    const items = await api().get('/api/v1/home-items').set(auth()).expect(200);
+    const bananas = items.body.find((h: { name: string }) => h.name === 'Bananas');
+    const switched = await api()
+      .patch(`/api/v1/home-items/${bananas.id}`)
+      .set(auth())
+      .send({ unit: 'PIECE' })
+      .expect(200);
+    expect(switched.body).toMatchObject({ unit: 'PIECE', count: 1, lastMatchAdded: null });
   });
 
   it('keeps users apart and deletes accounts', async () => {

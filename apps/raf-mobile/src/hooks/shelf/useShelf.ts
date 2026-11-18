@@ -2,15 +2,17 @@ import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useErrorAlert } from '@/hooks/common/useErrorAlert';
+import { HOME_STEP } from '@/constants/domain';
 import {
   useAddHomeItemMutation,
   useListHomeItemsQuery,
   useRemoveHomeItemMutation,
   useSetHomeItemCountMutation,
+  useSetHomeItemUnitMutation,
 } from '@/store/services/homeItemService';
 import { useListShelfQuery } from '@/store/services/itemService';
 import { useGetMeQuery } from '@/store/services/meService';
-import type { Category } from '@/types/api/models';
+import type { Category, HomeItem, HomeUnit } from '@/types/api/models';
 
 export type ShelfView = 'countdown' | 'atHome';
 
@@ -34,7 +36,7 @@ export function useCountdown() {
   };
 }
 
-/** Products kept at home with their counts. */
+/** Products kept at home, counted in pieces or kilograms. */
 export function useAtHome() {
   const { t } = useTranslation();
   const showError = useErrorAlert();
@@ -42,7 +44,11 @@ export function useAtHome() {
   const items = useListHomeItemsQuery(undefined, { skip: me.data?.trackHomeItems === false });
   const [add] = useAddHomeItemMutation();
   const [setCount] = useSetHomeItemCountMutation();
+  const [setUnit] = useSetHomeItemUnitMutation();
   const [remove] = useRemoveHomeItemMutation();
+  // Unit for the next product added; remembered while the screen is open.
+  const [newUnit, setNewUnit] = useState<HomeUnit>('PIECE');
+  const fail = (error: unknown) => showError(t('common.somethingWrong'), error);
   return {
     enabled: me.data?.trackHomeItems !== false,
     items: items.data ?? [],
@@ -50,8 +56,16 @@ export function useAtHome() {
     error: items.error,
     isRefreshing: items.isFetching && !items.isLoading,
     refresh: items.refetch,
-    add: (name: string) => add({ name }).unwrap().catch((error: unknown) => showError(t('atHome.addFailed'), error)),
-    change: (id: string, count: number) => void setCount({ id, count: Math.max(0, count) }),
-    remove: (id: string) => void remove(id).unwrap().catch((error: unknown) => showError(t('common.somethingWrong'), error)),
+    newUnit,
+    setNewUnit,
+    add: (name: string) =>
+      add({ name, unit: newUnit }).unwrap().catch((error: unknown) => showError(t('atHome.addFailed'), error)),
+    /** One step up or down: 1 piece, or 0.1 kg. */
+    step: (item: HomeItem, direction: 1 | -1) => {
+      const next = Math.round((item.count + direction * HOME_STEP[item.unit]) * 1000) / 1000;
+      void setCount({ id: item.id, count: Math.max(0, next) });
+    },
+    changeUnit: (id: string, unit: HomeUnit) => void setUnit({ id, unit }).unwrap().catch(fail),
+    remove: (id: string) => void remove(id).unwrap().catch(fail),
   };
 }

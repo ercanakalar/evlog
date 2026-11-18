@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { CountdownRow } from '@/components/shelf/CountdownRow';
 import { HomeItemRow } from '@/components/shelf/HomeItemRow';
+import { UnitToggle } from '@/components/shelf/UnitToggle';
 import { ChipRow, Empty, ErrorView, InlineAdd, Loading, Screen, ScreenHeader, Segmented, Text } from '@/components/ui';
 import { CATEGORIES } from '@/constants/domain';
 import { useFormatters } from '@/hooks/common/useFormatters';
@@ -88,6 +89,7 @@ function AtHome({ header, atHome }: { header: React.ReactNode; atHome: ReturnTyp
             placeholder={t('atHome.addPlaceholder')}
             action={t('common.add')}
             onSubmit={atHome.add}
+            accessory={<UnitToggle value={atHome.newUnit} onChange={atHome.setNewUnit} />}
           />
         </>
       }
@@ -102,7 +104,8 @@ function AtHome({ header, atHome }: { header: React.ReactNode; atHome: ReturnTyp
           <HomeItemRow
             key={item.id}
             item={item}
-            onChange={(count) => atHome.change(item.id, count)}
+            onStep={(direction) => atHome.step(item, direction)}
+            onUnit={(unit) => atHome.changeUnit(item.id, unit)}
             onRemove={() => atHome.remove(item.id)}
           />
         ))}

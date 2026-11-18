@@ -6,12 +6,13 @@ import { CATEGORIES } from '@/constants/domain';
 import { radius, space } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useTheme } from '@/theme';
-import type { Category, ReceiptItem } from '@/types/api/models';
+import type { Category, HomeUnit, ReceiptItem } from '@/types/api/models';
 
 interface Props {
   item: ReceiptItem;
   currency: string;
-  atHome: boolean;
+  /** What saving adds to a matching at-home item. */
+  atHome?: { amount: number; unit: HomeUnit };
   editable: boolean;
   onConfirm: () => void;
   onFix: (name: string, category: Category) => void;
@@ -50,7 +51,7 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix 
         <Row style={{ flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
           <Tag label={f.category(item.category)} />
           <Tag label={f.lasts(item.shelfLifeDays)} />
-          {atHome ? <Tag label={t('review.atHomePlus')} tone="accent" /> : null}
+          {atHome ? <Tag label={t('review.atHomePlus', { amount: f.homeAmount(atHome.amount, atHome.unit) })} tone="accent" /> : null}
         </Row>
       </Pressable>
 

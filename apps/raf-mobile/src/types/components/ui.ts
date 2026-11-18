@@ -19,6 +19,7 @@ export interface TextProps {
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   accessibilityRole?: AccessibilityRole;
+  accessibilityLabel?: string;
 }
 
 export interface CardProps {
