@@ -24,30 +24,54 @@ Result body (every field optional except items):
       "confidence": 0.93
     }
 or, when the image cannot be read:  {"error": "Image too blurry", "items": []}
+
+Reading is free and local: OCR (ocr.py) finds the words, receipt_parser.py
+turns them into items. To add a YOLO model later, crop the receipt in
+read_receipt() before calling recognize().
 """
 
 import hmac
+import logging
 import os
+import threading
+import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
+
+import ocr
+import receipt_parser
 
 TOKEN = os.environ.get("OCR_SERVICE_TOKEN", "change-me-ocr-token")
 MAX_BYTES = 15 * 1024 * 1024
 
-app = FastAPI(title="Evlog receipt reader")
+logger = logging.getLogger("uvicorn.error")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Load the models in the background so the first receipt isn't slow.
+    threading.Thread(target=ocr.warm_up, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Evlog receipt reader", lifespan=lifespan)
 
 
 def read_receipt(image: bytes, kind: str) -> dict:
-    """
-    Plug your YOLO + OCR pipeline in here.
-
-    Typical flow:
-      1. YOLO detects regions: merchant header, date, line items, total.
-      2. OCR (e.g. PaddleOCR / Tesseract with the Turkish model) reads each region.
-      3. Parse prices with Turkish formatting ("1.234,50" -> 1234.50).
-    Return a dict shaped like the result body in the module docstring.
-    """
-    raise NotImplementedError("Connect your YOLO model here")
+    started = time.monotonic()
+    try:
+        words = ocr.recognize(image)
+    except ValueError:
+        return {"error": "Unsupported image format, send a JPEG or PNG", "items": []}
+    result = receipt_parser.parse(words)
+    logger.info(
+        "Read %s receipt: %d words, %d items, total %s, confidence %s, %.1fs",
+        kind, len(words), len(result["items"]), result.get("total"),
+        result.get("confidence"), time.monotonic() - started,
+    )
+    return result
 
 
 @app.get("/health")
@@ -69,8 +93,7 @@ async def parse(
     if len(image) > MAX_BYTES:
         raise HTTPException(status_code=413)
     try:
-        return read_receipt(image, kind)
-    except NotImplementedError as error:
-        return {"error": str(error), "items": []}
+        return await run_in_threadpool(read_receipt, image, kind)
     except Exception:  # never leak a stack trace to the API
+        logger.exception("Failed to read receipt %s", receiptId)
         return {"error": "Could not read this receipt", "items": []}
