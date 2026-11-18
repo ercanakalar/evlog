@@ -21,7 +21,7 @@ A home app for **owners and tenants**.
 | Path | Stack |
 | --- | --- |
 | [`apps/api`](apps/api) | NestJS 12, Prisma 7 (`pg` driver adapter), PostgreSQL, class-validator, Zod-validated config, JWT |
-| [`apps/mobile`](apps/mobile) | Expo SDK 58, React Native 0.88, Expo Router, TanStack Query, react-hook-form + Zod |
+| [`apps/mobile-react-native`](apps/mobile-react-native) | Expo SDK 58, React Native 0.88, React Navigation 7, Redux Toolkit + RTK Query, i18next (EN/TR), react-hook-form + Zod |
 | [`services/receipt-reader`](services/receipt-reader) | FastAPI stub that runs on your computer; plug your YOLO model into `read_receipt()` |
 
 ```
@@ -39,7 +39,7 @@ nvm use                                  # Node 24
 docker compose up -d db
 cd apps/api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm run start:dev
 cd services/receipt-reader && pip install -r requirements.txt && uvicorn app:app --port 8000
-cd apps/mobile && cp .env.example .env && npm install && npm start
+cd apps/mobile-react-native && cp .env.example .env && npm install && npm start
 ```
 
 Each app keeps its own `package-lock.json` on purpose: the API and the React
