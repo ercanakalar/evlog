@@ -1,0 +1,182 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
+import type { Category } from '../generated/prisma/enums';
+import { addDays, DAY_MS } from '../common/utils/normalize';
+import { PrismaService } from '../prisma/prisma.service';
+import { ListItemsQueryDto, UpdateItemDto } from './dto/item.dto';
+
+type Tx = Prisma.TransactionClient;
+
+const itemSelect = {
+  id: true,
+  name: true,
+  rawName: true,
+  normalizedName: true,
+  quantity: true,
+  unit: true,
+  totalPrice: true,
+  category: true,
+  shelfLifeDays: true,
+  openedShelfLifeDays: true,
+  expiresAt: true,
+  packDate: true,
+  openedAt: true,
+  usedUpAt: true,
+  receipt: { select: { id: true, merchantName: true, issuedAt: true } },
+} satisfies Prisma.ReceiptItemSelect;
+
+type ItemRow = Prisma.ReceiptItemGetPayload<{ select: typeof itemSelect }>;
+
+/** Start of today in UTC; countdowns are whole days. */
+const today = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+};
+
+/**
+ * A product from a saved receipt, with its countdown. `daysLeft` is null for
+ * products that do not expire; `totalDays` is the full span the bar shows.
+ */
+export const withCountdown = (item: ItemRow) => {
+  const start = item.openedAt ?? item.receipt.issuedAt;
+  const daysLeft = item.expiresAt
+    ? Math.max(0, Math.floor((item.expiresAt.getTime() - today().getTime()) / DAY_MS))
+    : null;
+  const totalDays =
+    item.expiresAt && start
+      ? Math.max(1, Math.round((item.expiresAt.getTime() - start.getTime()) / DAY_MS))
+      : null;
+  return {
+    ...item,
+    boughtAt: item.receipt.issuedAt,
+    market: item.receipt.merchantName,
+    receiptId: item.receipt.id,
+    receipt: undefined,
+    daysLeft,
+    totalDays,
+  };
+};
+
+@Injectable()
+export class ItemsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** Called when a receipt is saved: every product gets its estimated expiry. */
+  async startCountdowns(tx: Tx, receiptId: string, boughtAt: Date) {
+    const items = await tx.receiptItem.findMany({
+      where: { receiptId, shelfLifeDays: { not: null } },
+      select: { id: true, shelfLifeDays: true },
+    });
+    for (const item of items) {
+      await tx.receiptItem.update({
+        where: { id: item.id },
+        data: { expiresAt: addDays(boughtAt, item.shelfLifeDays!) },
+      });
+    }
+  }
+
+  /**
+   * The shelf: products from saved receipts that are not used up, soonest
+   * first. Products that do not expire come last.
+   */
+  async shelf(userId: string, query: ListItemsQueryDto) {
+    const items = await this.prisma.receiptItem.findMany({
+      where: {
+        usedUpAt: null,
+        category: query.category,
+        receipt: { userId, status: 'CONFIRMED' },
+        ...(query.expiring ? { expiresAt: { not: null } } : {}),
+      },
+      select: itemSelect,
+      orderBy: [{ expiresAt: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
+      take: query.take,
+    });
+    return items.map(withCountdown);
+  }
+
+  /** One product with the times it was bought before (same normalised name). */
+  async get(itemId: string, userId: string) {
+    const item = await this.own(itemId, userId);
+    const history = await this.prisma.receiptItem.findMany({
+      where: {
+        normalizedName: item.normalizedName,
+        receipt: { userId, status: 'CONFIRMED' },
+      },
+      select: {
+        id: true,
+        quantity: true,
+        unitPrice: true,
+        totalPrice: true,
+        receipt: { select: { id: true, merchantName: true, issuedAt: true } },
+      },
+      orderBy: { receipt: { issuedAt: 'desc' } },
+      take: 10,
+    });
+    return {
+      ...withCountdown(item),
+      history: history.map((h) => ({
+        id: h.id,
+        quantity: h.quantity,
+        unitPrice: h.unitPrice,
+        totalPrice: h.totalPrice,
+        receiptId: h.receipt.id,
+        market: h.receipt.merchantName,
+        boughtAt: h.receipt.issuedAt,
+      })),
+    };
+  }
+
+  /** Mark opened (shorter countdown), set the pack date, or mark used up. */
+  async update(itemId: string, userId: string, dto: UpdateItemDto) {
+    const item = await this.own(itemId, userId);
+    const data: Prisma.ReceiptItemUpdateInput = {};
+
+    if (dto.category) data.category = dto.category as Category;
+    if (dto.usedUp !== undefined) data.usedUpAt = dto.usedUp ? new Date() : null;
+
+    if (dto.packExpiresAt !== undefined) {
+      if (dto.packExpiresAt === null) {
+        data.packDate = false;
+        data.expiresAt = this.estimate(item, item.openedAt);
+      } else {
+        data.packDate = true;
+        data.expiresAt = new Date(dto.packExpiresAt);
+      }
+    }
+
+    if (dto.opened !== undefined) {
+      const openedAt = dto.opened ? new Date() : null;
+      data.openedAt = openedAt;
+      if (!item.packDate || dto.opened) {
+        const estimate = this.estimate(item, openedAt);
+        // Opening never makes a product last longer than the pack says.
+        data.expiresAt =
+          item.packDate && item.expiresAt && estimate && estimate > item.expiresAt
+            ? item.expiresAt
+            : estimate;
+      }
+    }
+
+    if (Object.keys(data).length === 0) throw new BadRequestException('Nothing to change');
+    await this.prisma.receiptItem.update({ where: { id: itemId }, data });
+    return this.get(itemId, userId);
+  }
+
+  private estimate(item: ItemRow, openedAt: Date | null): Date | null {
+    const boughtAt = item.receipt.issuedAt;
+    if (!boughtAt || item.shelfLifeDays === null) return null;
+    const unopened = addDays(boughtAt, item.shelfLifeDays);
+    if (!openedAt) return unopened;
+    const opened = addDays(openedAt, item.openedShelfLifeDays ?? item.shelfLifeDays);
+    return opened < unopened ? opened : unopened;
+  }
+
+  private async own(itemId: string, userId: string) {
+    const item = await this.prisma.receiptItem.findFirst({
+      where: { id: itemId, receipt: { userId, status: 'CONFIRMED' } },
+      select: itemSelect,
+    });
+    if (!item) throw new NotFoundException('Product not found');
+    return item;
+  }
+}

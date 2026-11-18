@@ -1,7 +1,9 @@
-# Local development: Postgres + the API.
-#   docker compose up -d db          # just the database
-#   docker compose up --build        # database + API
-#   docker compose up -d receipt-reader  # just the receipt reader
+# Local development.
+#   docker compose up -d db              # Evlog's database
+#   docker compose up -d raf-db          # Raf's database (its own Postgres server)
+#   docker compose up --build api        # Evlog database + API
+#   docker compose up --build raf-api    # Raf database + API
+#   docker compose up -d receipt-reader  # the receipt reader both APIs use
 services:
   db:
     image: postgres:18-alpine
@@ -37,6 +39,40 @@ services:
     volumes:
       - uploads:/app/uploads
 
+  # Raf (grocery receipts) runs on its own Postgres server and port.
+  raf-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: raf
+      POSTGRES_PASSWORD: raf
+      POSTGRES_DB: raf
+    ports:
+      - '5433:5432'
+    volumes:
+      - raf-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U raf']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  raf-api:
+    build: ./apps/raf-api
+    depends_on:
+      raf-db:
+        condition: service_healthy
+    env_file: ./apps/raf-api/.env
+    environment:
+      PORT: 3100
+      DATABASE_URL: postgresql://raf:raf@raf-db:5432/raf?schema=public
+      OCR_SERVICE_URL: http://receipt-reader:8000
+      UPLOAD_DIR: /app/uploads
+    command: sh -c "npx prisma migrate deploy && node dist/main"
+    ports:
+      - '3100:3100'
+    volumes:
+      - raf-uploads:/app/uploads
+
   # Receipt reader. Code is mounted and reloaded on save, so edits to
   # app.py apply without a rebuild; rebuild after changing requirements.txt.
   receipt-reader:
@@ -54,3 +90,5 @@ services:
 volumes:
   pgdata:
   uploads:
+  raf-pgdata:
+  raf-uploads:
