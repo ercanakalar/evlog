@@ -1,4 +1,4 @@
-import { RECEIPTS_PAGE_SIZE } from '@/constants/domain';
+import { RECEIPTS_PAGE_SIZE, UPLOAD_RECEIPT_TIMEOUT_MS } from '@/constants/domain';
 import { formDataFile } from '@/services/media/formDataFile';
 import type { Receipt } from '@/types/api/models';
 import type { ListReceiptsRequest, UpdateReceiptRequest, UploadReceiptRequest } from '@/types/api/requests';
@@ -26,7 +26,8 @@ export const receiptService = baseApi.injectEndpoints({
         body.append('file', formDataFile(file));
         body.append('kind', kind);
         if (homeId) body.append('homeId', homeId);
-        return { url: '/receipts', method: 'POST', body };
+        // The API waits for the receipt reader (up to 90 s) before answering.
+        return { url: '/receipts', method: 'POST', body, timeout: UPLOAD_RECEIPT_TIMEOUT_MS };
       },
       invalidatesTags: [{ type: 'Receipt', id: 'LIST' }],
       // Seed the detail cache so the review screen opens instantly.

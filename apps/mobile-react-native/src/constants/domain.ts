@@ -27,3 +27,5 @@ export const ROOM_LAYOUT_PATTERN = /^\d{1,2}(\.5)?\+\d$/;
 /** Polling interval while the receipt reader is still working. */
 export const RECEIPT_POLL_MS = 2000;
 export const RECEIPTS_PAGE_SIZE = 20;
+/** The API waits up to 90 s for the receipt reader; allow for the upload too. */
+export const UPLOAD_RECEIPT_TIMEOUT_MS = 120_000;
