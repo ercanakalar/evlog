@@ -50,6 +50,10 @@ export interface ReceiptItem {
   /** Pack size printed in the line, as a decimal string ("1000") and unit ("ml"). */
   packAmount?: string | null;
   packUnit?: string | null;
+  /** The user keeps a countdown for it on the shelf. */
+  onShelf: boolean;
+  /** Count it at home: true adds it (creating the at-home product), false skips it, null only if it matches one. */
+  countAtHome: boolean | null;
   /** What this line added at home when the receipt was saved. */
   homeChanges?: { amount: string; homeItem: { id: string; name: string; unit: HomeUnit } }[];
 }

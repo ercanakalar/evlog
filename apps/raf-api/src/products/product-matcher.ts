@@ -72,6 +72,10 @@ export const findBrand = <B extends BrandEntry>(rawName: string, brands: readonl
   return best?.brand ?? null;
 };
 
+/** An at-home name from a clean product name: "Ayran 1000 ml" -> "Ayran", "Eggs 15 pack" -> "Eggs". */
+export const homeName = (name: string): string =>
+  name.replace(/\s+\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|pack)$/i, '').trim() || name.trim();
+
 /** Weight printed in a product name, in kg: "MAKARNA 500G" -> 0.5, "PIRINC 1KG" -> 1. */
 export const weightKg = (raw: string): number | null => {
   const match = /(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b/i.exec(raw);

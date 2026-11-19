@@ -372,6 +372,46 @@ describe('Raf API (e2e)', () => {
     await api().delete('/api/v1/me').set(auth(token)).expect(204);
   });
 
+  it('saves only the countdowns and at-home counts chosen per line', async () => {
+    const token = await register('choices@example.com');
+    await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Bread', count: 0 }).expect(201);
+    ocr.respond = () => ({
+      status: 200,
+      body: {
+        merchantName: 'Şok',
+        issuedAt: daysAgo(1),
+        total: 95,
+        items: [
+          { name: 'SUTAS AYRAN 1000ML', totalPrice: 45 },
+          { name: 'EKMEK', totalPrice: 20 },
+          { name: 'TAM YAGLI SUT 1L', totalPrice: 30 },
+        ],
+      },
+    });
+    const scanned = await scan(1, token).expect(201);
+    const lines = scanned.body.items.map((i: Record<string, unknown>) => ({
+      name: i.name, rawName: i.rawName, quantity: Number(i.quantity), totalPrice: Number(i.totalPrice), checked: true,
+    }));
+    // Ayran: counted at home (new at-home product). Bread: matches but switched off. Milk: no countdown.
+    lines[0].countAtHome = true;
+    lines[1].countAtHome = false;
+    lines[2].onShelf = false;
+    const edited = await api().patch(`/api/v1/receipts/${scanned.body.id}`).set(auth(token)).send({ items: lines }).expect(200);
+    expect(edited.body.items.map((i: { onShelf: boolean; countAtHome: boolean | null }) => [i.onShelf, i.countAtHome])).toEqual([
+      [true, true], [true, false], [false, null],
+    ]);
+    await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(token)).expect(200);
+
+    const home = await api().get('/api/v1/home-items').set(auth(token)).expect(200);
+    expect(Object.fromEntries(home.body.map((h: { name: string; count: number }) => [h.name, h.count]))).toEqual({ Ayran: 1, Bread: 0 });
+    const shelf = await api().get('/api/v1/items').set(auth(token)).expect(200);
+    expect(shelf.body.map((i: { name: string }) => i.name).sort()).toEqual(['Ayran 1000 ml', 'Bread']);
+    // Spending is still the whole receipt.
+    const trips = await api().get('/api/v1/receipts?status=CONFIRMED').set(auth(token)).expect(200);
+    expect(trips.body[0].totalAmount).toBe('95');
+    await api().delete('/api/v1/me').set(auth(token)).expect(204);
+  });
+
   it('keeps users apart and deletes accounts', async () => {
     const other = await register('other@example.com');
     const mine = await api().get('/api/v1/receipts').set(auth()).expect(200);

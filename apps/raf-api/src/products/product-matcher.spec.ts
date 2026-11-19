@@ -1,6 +1,6 @@
 import { BRANDS } from './brands.data';
 import { SHELF_LIFE } from './shelf-life.data';
-import { findBrand, matchProduct, namesMatch, packOf, packSize, type ShelfLifeEntry } from './product-matcher';
+import { findBrand, homeName, matchProduct, namesMatch, packOf, packSize, type ShelfLifeEntry } from './product-matcher';
 
 const catalog: ShelfLifeEntry[] = SHELF_LIFE.map(
   ([keyword, displayName, category, storage, shelfLifeDays, openedShelfLifeDays]) => ({
@@ -138,5 +138,17 @@ describe('packOf', () => {
     expect(packOf('TAM YAGLI SUT 1,5LT')).toEqual({ amount: 1.5, unit: 'L' });
     expect(packOf('YUMURTA 15LI')).toEqual({ amount: 15, unit: 'pack' });
     expect(packOf('EKMEK')).toBeNull();
+  });
+});
+
+describe('homeName', () => {
+  it.each([
+    ['Ayran 1000 ml', 'Ayran'],
+    ['Whole milk 1 L', 'Whole milk'],
+    ['Eggs 15 pack', 'Eggs'],
+    ['Bananas 1.12 kg', 'Bananas'],
+    ['Bread', 'Bread'],
+  ])('%s -> %s', (name, expected) => {
+    expect(homeName(name)).toBe(expected);
   });
 });

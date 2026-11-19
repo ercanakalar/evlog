@@ -31,8 +31,25 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
       : t('review.match', { count: items.length })
     : t('review.noMatch', { sum: f.money(r.itemsSum, receipt.currency) });
 
+  const selected = t('review.selected', {
+    sum: f.money(r.selection.sum, receipt.currency),
+    total: f.money(receipt.totalAmount ?? r.itemsSum, receipt.currency),
+  });
+  const counts =
+    r.selection.atHome === null
+      ? t('review.countdownCount', { count: r.selection.countdown })
+      : `${t('review.countdownCount', { count: r.selection.countdown })} · ${t('review.atHomeCount', { count: r.selection.atHome })}`;
+
   const footer = editable ? (
     <FooterBar>
+      <SpaceBetween style={{ gap: 8 }}>
+        <Text variant="smallMedium" style={{ flexShrink: 1 }}>
+          {counts}
+        </Text>
+        <Text variant="smallMedium" muted style={{ flexShrink: 1, textAlign: 'right' }}>
+          {selected}
+        </Text>
+      </SpaceBetween>
       <Row style={{ gap: 7 }}>
         <Feather name={r.matchesTotal ? 'check' : 'alert-circle'} size={16} color={r.matchesTotal ? colors.text : colors.urgentText} />
         <Text variant="smallMedium" color={r.matchesTotal ? colors.text : colors.urgentText} style={{ flexShrink: 1 }}>
@@ -116,8 +133,10 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
           key={item.id}
           item={item}
           currency={receipt.currency}
-          atHome={r.homeMatches.get(item.id)}
+          choice={r.choices.get(item.id)}
           editable={editable}
+          onCountdown={(on) => r.setCountdown(item.id, on)}
+          onAtHome={(on) => r.setAtHome(item.id, on)}
           onConfirm={() => r.confirmLine(item.id)}
           onFix={(name, category, quantity) => r.fixLine(item.id, name, category, quantity)}
           onRemove={() => r.removeLine(item.id, item.name)}

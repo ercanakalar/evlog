@@ -1,3 +1,4 @@
+import Feather from '@expo/vector-icons/Feather';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -6,14 +7,17 @@ import { CATEGORIES } from '@/constants/domain';
 import { radius, space } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useTheme } from '@/theme';
-import type { Category, HomeUnit, ReceiptItem } from '@/types/api/models';
+import type { LineChoice } from '@/hooks/receipts/useReceiptReview';
+import type { Category, ReceiptItem } from '@/types/api/models';
 
 interface Props {
   item: ReceiptItem;
   currency: string;
-  /** What saving adds to a matching at-home item. */
-  atHome?: { amount: number; unit: HomeUnit };
+  /** What saving does with the line: countdown, at home. */
+  choice?: LineChoice;
   editable: boolean;
+  onCountdown: (on: boolean) => void;
+  onAtHome: (on: boolean) => void;
   onConfirm: () => void;
   onFix: (name: string, category: Category, quantity: number) => void;
   onRemove: () => void;
@@ -22,9 +26,10 @@ interface Props {
 /**
  * One receipt line on the review screen: clean name, price, the text as
  * printed, and tags. Unsure matches get a red border and a "Yes" button;
- * tapping a line opens a small editor for its name and category.
+ * tapping a line opens a small editor for its name and category. Two
+ * switches choose whether saving keeps a countdown for it and counts it at home.
  */
-export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix, onRemove }: Props) {
+export function ReviewLine({ item, currency, choice, editable, onCountdown, onAtHome, onConfirm, onFix, onRemove }: Props) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
@@ -61,9 +66,21 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix,
         <Row style={{ flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
           <Tag label={f.category(item.category)} />
           <Tag label={f.lasts(item.shelfLifeDays)} />
-          {atHome ? <Tag label={t('review.atHomePlus', { amount: f.homeAmount(atHome.amount, atHome.unit) })} tone="accent" /> : null}
+          {choice?.adds ? (
+            <Tag label={t('review.atHomePlus', { amount: f.homeAmount(choice.adds.amount, choice.adds.unit) })} tone="accent" />
+          ) : null}
+          {choice?.newAtHome ? <Tag label={t('review.newAtHome', { name: choice.newAtHome })} tone="accent" /> : null}
         </Row>
       </Pressable>
+
+      {editable && choice ? (
+        <Row style={{ gap: 6, paddingTop: 2 }}>
+          <ChoiceToggle icon="clock" label={t('review.countdown')} on={choice.countdown} onChange={onCountdown} />
+          {choice.atHome !== null ? (
+            <ChoiceToggle icon="home" label={t('review.atHome')} on={choice.atHome} onChange={onAtHome} />
+          ) : null}
+        </Row>
+      ) : null}
 
       {item.needsReview && editable && !editing ? (
         <SpaceBetween style={{ paddingTop: 4 }}>
@@ -117,7 +134,41 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix,
   );
 }
 
+/** A pill switch: lime with a tick when on, plain when off. */
+function ChoiceToggle({
+  icon,
+  label,
+  on,
+  onChange,
+}: {
+  icon: 'clock' | 'home';
+  label: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  const { colors } = useTheme();
+  const fg = on ? colors.onAccent : colors.textMuted;
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: on }}
+      onPress={() => onChange(!on)}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.toggle,
+        { backgroundColor: on ? colors.accent : colors.tag, opacity: pressed ? 0.7 : 1 },
+      ]}>
+      <Feather name={on ? 'check' : icon} size={14} color={fg} />
+      <Text variant="smallMedium" color={fg} style={{ fontSize: 12.5 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 34, paddingHorizontal: 12, borderRadius: 17 },
   card: { borderRadius: radius.md, borderWidth: 1.5, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 11, gap: 5 },
   small: { minHeight: 44, paddingHorizontal: 16 },
 });

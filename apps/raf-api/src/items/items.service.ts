@@ -100,10 +100,10 @@ export class ItemsService {
     };
   }
 
-  /** Called when a receipt is saved: every product gets its estimated expiry. */
+  /** Called when a receipt is saved: every product kept on the shelf gets its estimated expiry. */
   async startCountdowns(tx: Tx, receiptId: string, boughtAt: Date) {
     const items = await tx.receiptItem.findMany({
-      where: { receiptId, shelfLifeDays: { not: null } },
+      where: { receiptId, onShelf: true, shelfLifeDays: { not: null } },
       select: { id: true, shelfLifeDays: true },
     });
     for (const item of items) {
@@ -115,13 +115,15 @@ export class ItemsService {
   }
 
   /**
-   * The shelf: products from saved receipts that are not used up, soonest
-   * first. Products that do not expire come last.
+   * The shelf: products from saved receipts that are kept on it (the user
+   * can leave some out when saving) and not used up, soonest first.
+   * Products that do not expire come last.
    */
   async shelf(userId: string, query: ListItemsQueryDto) {
     const items = await this.prisma.receiptItem.findMany({
       where: {
         usedUpAt: null,
+        onShelf: true,
         category: query.category,
         receipt: { userId, status: 'CONFIRMED' },
         ...(query.expiring ? { expiresAt: { not: null } } : {}),

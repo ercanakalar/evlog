@@ -17,6 +17,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Category, ReceiptStatus } from '../../generated/prisma/enums';
@@ -50,6 +51,14 @@ export class ReceiptLineDto {
   /** The user confirmed the matched product. */
   @IsOptional() @IsBoolean()
   checked?: boolean;
+
+  /** Keep a countdown for it on the shelf (default true). */
+  @IsOptional() @IsBoolean()
+  onShelf?: boolean;
+
+  /** Count it at home: true adds it, false skips it, null (default) only if it matches an at-home product. */
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsBoolean()
+  countAtHome?: boolean | null;
 
   /** Kept from the reader so pack scanning can match the line. */
   @IsOptional() @Matches(/^(\d{8}|\d{13})$/)

@@ -19,6 +19,10 @@ const weightKg = (text: string) => {
   return match[2].toLowerCase() === 'kg' ? amount : amount / 1000;
 };
 
+/** At-home name from a clean product name (same as the API's homeName): "Ayran 1000 ml" -> "Ayran". */
+export const homeName = (name: string) =>
+  name.replace(/\s+\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|pack)$/i, '').trim() || name.trim();
+
 /** What one receipt line adds to an at-home item (same rules as the API's amountBought). */
 export const amountBought = (
   line: { name: string; rawName: string; quantity: string; unit: string | null },

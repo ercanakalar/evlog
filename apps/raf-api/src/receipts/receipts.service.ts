@@ -339,6 +339,8 @@ export class ReceiptsService {
         shelfLifeDays: item.shelfLifeDays !== undefined ? item.shelfLifeDays : match.shelfLifeDays,
         openedShelfLifeDays: match.openedShelfLifeDays,
         needsReview: item.checked ? false : match.needsReview && !item.category,
+        onShelf: item.onShelf ?? true,
+        countAtHome: item.countAtHome ?? null,
         brandId: match.brandId,
         packAmount: match.packAmount,
         packUnit: match.packUnit,

@@ -26,6 +26,8 @@ export interface ReceiptLineInput {
   shelfLifeDays?: number | null;
   checked?: boolean;
   barcode?: string;
+  onShelf?: boolean;
+  countAtHome?: boolean | null;
 }
 
 export interface UpdateReceiptRequest {

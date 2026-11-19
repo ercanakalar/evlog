@@ -3,7 +3,7 @@ import { Prisma } from '../generated/prisma/client';
 import type { HomeUnit } from '../generated/prisma/enums';
 import { normalizeProductName } from '../common/utils/normalize';
 import { addRunOut } from '../lists/run-out';
-import { namesMatch, weightKg } from '../products/product-matcher';
+import { homeName, namesMatch, weightKg } from '../products/product-matcher';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeItemDto, UpdateHomeItemDto } from './dto/home-item.dto';
 
@@ -214,6 +214,9 @@ export class HomeItemsService {
   /**
    * Raises counts for every home item a saved receipt matches, and records
    * each line's share so deleting the receipt can take exactly that back.
+   * The user chose per line: lines switched off are skipped, and a line
+   * switched on that no home item matches gets one ("Ayran 1000 ml" adds
+   * "Ayran", starting at 0, so the receipt alone makes the count).
    */
   async countReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
     await tx.receipt.update({ where: { id: receiptId }, data: { homeCountsRecorded: true } });
@@ -224,7 +227,17 @@ export class HomeItemsService {
     if (!user.trackHomeItems || !user.countFromReceipts) return;
 
     const receipt = await this.receiptLines(tx, receiptId);
-    const matches = matchLines(await tx.homeItem.findMany({ where: { userId } }), receipt.items);
+    const lines = receipt.items.filter((line) => line.countAtHome !== false);
+    const homeItems = await tx.homeItem.findMany({ where: { userId } });
+    for (const line of lines.filter((l) => l.countAtHome === true)) {
+      if (homeItems.some((h) => namesMatch(h.name, line.name) || namesMatch(h.name, line.rawName))) continue;
+      const name = homeName(line.name);
+      const normalizedName = normalizeProductName(name);
+      if (!normalizedName || homeItems.some((h) => h.normalizedName === normalizedName)) continue;
+      const unit: HomeUnit = line.unit?.toLowerCase() === 'kg' ? 'KG' : 'PIECE';
+      homeItems.push(await tx.homeItem.create({ data: { userId, name, normalizedName, unit, count: 0 } }));
+    }
+    const matches = matchLines(homeItems, lines);
     for (const { home, line, amount } of matches) {
       await tx.homeItemChange.create({
         data: { homeItemId: home.id, receiptId, receiptItemId: line.id, amount },
@@ -336,7 +349,7 @@ export class HomeItemsService {
       select: {
         merchantName: true,
         issuedAt: true,
-        items: { select: { id: true, name: true, rawName: true, quantity: true, unit: true } },
+        items: { select: { id: true, name: true, rawName: true, quantity: true, unit: true, countAtHome: true } },
       },
     });
   }

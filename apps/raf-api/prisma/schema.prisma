@@ -163,6 +163,11 @@ model ReceiptItem {
   /// Pack size printed in the name: 1000 + "ml", 1 + "L", 15 + "pack".
   packAmount          Decimal?  @db.Decimal(10, 3)
   packUnit            String?
+  /// The user keeps a countdown for it: it is on the shelf and can expire.
+  onShelf             Boolean   @default(true)
+  /// Count it at home: true adds it (creating the at-home product if needed),
+  /// false skips it, null counts it only if it matches an at-home product.
+  countAtHome         Boolean?
 
   receipt     Receipt          @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   brand       Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)

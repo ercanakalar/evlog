@@ -61,6 +61,7 @@ export class InsightsService {
       this.prisma.receiptItem.count({
         where: {
           usedUpAt: null,
+          onShelf: true,
           expiresAt: { not: null },
           receipt: { userId, status: 'CONFIRMED' },
         },
