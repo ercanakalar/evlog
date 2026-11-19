@@ -1,16 +1,16 @@
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { SettingGroup, SwitchRow, ValueRow } from '@/components/settings/SettingRows';
+import { FontRow, PaletteRow, SettingGroup, SwitchRow, ValueRow } from '@/components/settings/SettingRows';
 import { Button, Card, ErrorView, Loading, Rule, Screen, ScreenHeader, Segmented, Text } from '@/components/ui';
 import { REMINDER_LEAD_DAYS } from '@/constants/domain';
 import { useSettings } from '@/hooks/settings/useSettings';
-import { fonts, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import { initials } from '@/utils/format';
 
 export function SettingsScreen() {
   const { t } = useTranslation();
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   const navigation = useNavigation();
   const s = useSettings();
 
@@ -89,6 +89,14 @@ export function SettingsScreen() {
       <SettingGroup title={t('settings.app')}>
         <ValueRow label={t('settings.language')} value={t(`settings.languages.${s.language}`)} onPress={s.pickLanguage} />
         <ValueRow divider label={t('settings.theme')} value={t(`settings.themes.${s.theme}`)} onPress={s.pickTheme} />
+        <PaletteRow
+          divider
+          label={t('settings.palette')}
+          value={s.palette}
+          onChange={s.setPalette}
+          nameOf={(p) => t(`settings.palettes.${p}`)}
+        />
+        <FontRow divider label={t('settings.font')} value={s.font} onChange={s.setFont} nameOf={(f) => t(`settings.fonts.${f}`)} />
         <SwitchRow divider label={t('settings.usage')} value={s.usageReporting} onChange={s.setUsageReporting} />
       </SettingGroup>
 

@@ -1,7 +1,7 @@
 import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui';
 import { useFormatters } from '@/hooks/common/useFormatters';
-import { fonts, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 
 const MAX_BAR = 84;
 
@@ -19,7 +19,7 @@ export function MonthBars({
   currency?: string;
   onSelect: (month: string) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   const f = useFormatters();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>

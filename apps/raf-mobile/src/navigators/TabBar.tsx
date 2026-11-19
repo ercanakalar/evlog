@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui';
 import { TAB_BAR_HEIGHT } from '@/constants/layout';
-import { fonts, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import type { IconName } from '@/types/components/ui';
 import type { TabParamList } from '@/types/screens/navigation';
 
@@ -24,7 +24,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   // The bar stays ink in both themes, like the mockups.
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   const bar = '#15181A';
 
   const tab = (index: number) => {

@@ -5,14 +5,14 @@ import { Button, ErrorView, Loading, ReceiptPaper, Rule, Screen, ScreenHeader, S
 import { HIT } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { daysUntil, useTripDetail } from '@/hooks/trips/useTripDetail';
-import { fonts, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import type { RootScreenProps } from '@/types/screens/navigation';
 import { countdownColors } from '@/utils/countdown';
 import { lineQuantity } from '@/utils/format';
 
 export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
   const { t } = useTranslation();
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   const f = useFormatters();
   const trip = useTripDetail(route.params.receiptId);
 

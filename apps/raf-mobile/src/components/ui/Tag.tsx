@@ -1,10 +1,10 @@
 import { View } from 'react-native';
-import { fonts, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import { Text } from './Text';
 
 /** Small label on a line: category, shelf life, "At home +1". */
 export function Tag({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'accent' }) {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   return (
     <View
       style={{

@@ -1,9 +1,9 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '@/types/store';
-import type { LanguagePreference, SettingsState, ThemePreference } from '@/types/store/state';
+import type { FontPreference, LanguagePreference, PalettePreference, SettingsState, ThemePreference } from '@/types/store/state';
 import { persistedStateHydrated } from '../actions/hydration';
 
-const initialState: SettingsState = { theme: 'system', language: 'system' };
+const initialState: SettingsState = { theme: 'system', palette: 'lime', font: 'receipt', language: 'system' };
 
 const settingsSlice = createSlice({
   name: 'settings',
@@ -11,6 +11,12 @@ const settingsSlice = createSlice({
   reducers: {
     themeChanged(state, action: PayloadAction<ThemePreference>) {
       state.theme = action.payload;
+    },
+    paletteChanged(state, action: PayloadAction<PalettePreference>) {
+      state.palette = action.payload;
+    },
+    fontChanged(state, action: PayloadAction<FontPreference>) {
+      state.font = action.payload;
     },
     languageChanged(state, action: PayloadAction<LanguagePreference>) {
       state.language = action.payload;
@@ -21,8 +27,10 @@ const settingsSlice = createSlice({
   },
 });
 
-export const { themeChanged, languageChanged } = settingsSlice.actions;
+export const { themeChanged, paletteChanged, fontChanged, languageChanged } = settingsSlice.actions;
 export default settingsSlice.reducer;
 
 export const selectThemePreference = (state: RootState) => state.settings.theme;
+export const selectPalettePreference = (state: RootState) => state.settings.palette;
+export const selectFontPreference = (state: RootState) => state.settings.font;
 export const selectLanguagePreference = (state: RootState) => state.settings.language;

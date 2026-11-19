@@ -5,10 +5,19 @@ import { signOut } from '@/store/actions/sessionActions';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useDeleteAccountMutation, useGetMeQuery, useUpdateSettingsMutation } from '@/store/services/meService';
 import { selectUsageReportingConsent, usageReportingDecided } from '@/store/slices/consentSlice';
-import { languageChanged, selectLanguagePreference, selectThemePreference, themeChanged } from '@/store/slices/settingsSlice';
+import {
+  fontChanged,
+  languageChanged,
+  paletteChanged,
+  selectFontPreference,
+  selectLanguagePreference,
+  selectPalettePreference,
+  selectThemePreference,
+  themeChanged,
+} from '@/store/slices/settingsSlice';
 import { signedOut } from '@/store/slices/authSlice';
 import type { UpdateSettingsRequest } from '@/types/api/requests';
-import type { LanguagePreference, ThemePreference } from '@/types/store/state';
+import type { FontPreference, LanguagePreference, PalettePreference, ThemePreference } from '@/types/store/state';
 
 const CURRENCIES = ['TRY', 'EUR', 'USD', 'GBP'] as const;
 
@@ -23,6 +32,8 @@ export function useSettings() {
   const [deleteAccount, deleteState] = useDeleteAccountMutation();
   const language = useAppSelector(selectLanguagePreference);
   const theme = useAppSelector(selectThemePreference);
+  const palette = useAppSelector(selectPalettePreference);
+  const font = useAppSelector(selectFontPreference);
   const usage = useAppSelector(selectUsageReportingConsent);
 
   const set = (changes: UpdateSettingsRequest) =>
@@ -48,6 +59,10 @@ export function useSettings() {
     set,
     language,
     theme,
+    palette,
+    setPalette: (p: PalettePreference) => dispatch(paletteChanged(p)),
+    font,
+    setFont: (f: FontPreference) => dispatch(fontChanged(f)),
     usageReporting: usage === 'granted',
     setUsageReporting: (on: boolean) => dispatch(usageReportingDecided(on ? 'granted' : 'denied')),
     pickCurrency: () =>

@@ -1,6 +1,6 @@
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { radius, space } from '@/constants/layout';
-import { fonts, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import { Text } from './Text';
 
 type FieldProps = TextInputProps & {
@@ -11,7 +11,7 @@ type FieldProps = TextInputProps & {
 };
 
 export function Field({ label, hideLabel, error, style, ...props }: FieldProps) {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   return (
     <View style={{ gap: 5, flex: hideLabel ? 1 : undefined }}>
       {hideLabel ? null : <Text variant="smallMedium">{label}</Text>}
@@ -22,6 +22,7 @@ export function Field({ label, hideLabel, error, style, ...props }: FieldProps) 
         style={[
           styles.input,
           {
+            fontFamily: fonts.body,
             backgroundColor: colors.card,
             color: colors.text,
             borderColor: error ? colors.urgentText : colors.inputBorder,
@@ -45,6 +46,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: space.md + 2,
     fontSize: 15,
-    fontFamily: fonts.body,
   },
 });
