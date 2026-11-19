@@ -88,7 +88,7 @@ const en = {
     close: 'Close scanner',
     flash: 'Flash',
     hint: 'Fit the whole receipt inside the frame.',
-    longHintFirst: 'Capture the top part first, then move down',
+    longHintFirst: 'Capture the top part first, then move down. From the gallery, pick one photo of the whole receipt, or its parts top first.',
     longHintNext_one: '{{count}} part captured. Move down and capture the next one',
     longHintNext_other: '{{count}} parts captured. Move down and capture the next one',
     doneParts: 'Done · read {{count}} of {{max}} parts',

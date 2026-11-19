@@ -42,8 +42,16 @@ export class ReceiptsService {
    * Stores the photo(s), sends them to the reader and returns the receipt.
    * A long receipt arrives as several photos, top to bottom.
    */
-  async upload(userId: string, files: Express.Multer.File[]) {
-    if (files.length === 0) throw new BadRequestException('Add a photo of the receipt');
+  async upload(userId: string, uploaded: Express.Multer.File[]) {
+    if (uploaded.length === 0) throw new BadRequestException('Add a photo of the receipt');
+    // The same photo sent twice as two parts would read every line twice.
+    const seen = new Set<string>();
+    const files = uploaded.filter((f) => {
+      const hash = sha256(f.buffer);
+      if (seen.has(hash)) return false;
+      seen.add(hash);
+      return true;
+    });
     const mimeTypes = new Set(files.map((f) => f.mimetype));
     if (mimeTypes.size > 1) throw new BadRequestException('Send every part in the same format');
     const hash = sha256(Buffer.concat(files.map((f) => f.buffer)));

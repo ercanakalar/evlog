@@ -5,7 +5,7 @@ import { useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
 import { MAX_RECEIPT_PARTS } from '@/constants/domain';
-import { PhotoPermissionError, pickImage, prepareImage } from '@/services/media/imageCapture';
+import { PhotoPermissionError, pickImages, prepareImage } from '@/services/media/imageCapture';
 import { uploadReceipt } from '@/store/actions/receiptActions';
 import { describeError } from '@/store/bases/errorMapping';
 import { useAppDispatch } from '@/store/hooks';
@@ -56,12 +56,17 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     }
   };
 
+  /**
+   * Gallery photos are sent straight away as one receipt: one photo is the
+   * whole receipt, several are its parts in the order picked. Parts already
+   * taken with the camera come first. Nothing is left waiting, so the same
+   * receipt cannot end up in one upload twice.
+   */
   const fromGallery = async () => {
     try {
-      const file = await pickImage();
-      if (!file) return;
-      if (long) setParts((p) => [...p, file]);
-      else void upload([file]);
+      const files = await pickImages(MAX_RECEIPT_PARTS - parts.length);
+      if (files.length === 0) return;
+      void upload([...parts, ...files]);
     } catch (error) {
       if (error instanceof PhotoPermissionError) modal.alert(t('scan.failed'), t('scan.photosDenied'));
     }

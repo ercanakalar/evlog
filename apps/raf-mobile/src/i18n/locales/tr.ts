@@ -90,7 +90,7 @@ const tr: Translation = {
     close: 'Tarayıcıyı kapat',
     flash: 'Flaş',
     hint: 'Fişin tamamını çerçeveye sığdır.',
-    longHintFirst: 'Önce üst kısmı çek, sonra aşağı in',
+    longHintFirst: 'Önce üst kısmı çek, sonra aşağı in. Galeriden fişin tamamının tek fotoğrafını ya da parçalarını üstten başlayarak seç.',
     longHintNext_one: '{{count}} parça çekildi. Aşağı in ve sonrakini çek',
     longHintNext_other: '{{count}} parça çekildi. Aşağı in ve sonrakini çek',
     doneParts: 'Tamam · {{max}} parçadan {{count}} tanesini oku',

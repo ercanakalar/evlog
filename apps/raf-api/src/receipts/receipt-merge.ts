@@ -41,15 +41,44 @@ export const sameLine = (a: OcrItemDto, b: OcrItemDto) => {
   return longest > 0 && distance(x, y) / longest <= MAX_NAME_DIFFERENCE;
 };
 
-/** Lines photographed twice where two parts overlap: longest suffix == prefix. */
+/** Share of lines that must agree for two stretches of a receipt to be the same stretch. */
+const AGREE = 0.8;
+
+/**
+ * Lines photographed twice where two parts overlap: the longest stretch
+ * where the end of the previous part reads like the start of the next one.
+ * A line or two misread differently in the two photos is tolerated, as long
+ * as the last line of the stretch matches.
+ */
 const overlap = (previous: OcrItemDto[], next: OcrItemDto[]): number => {
-  const max = Math.min(previous.length, next.length, 8);
-  for (let size = max; size > 0; size--) {
+  for (let size = Math.min(previous.length, next.length); size > 0; size--) {
     const tail = previous.slice(previous.length - size);
-    if (tail.every((item, i) => sameLine(item, next[i]))) return size;
+    if (!sameLine(tail[size - 1], next[size - 1])) continue;
+    const agreeing = tail.filter((item, i) => sameLine(item, next[i])).length;
+    if (agreeing >= Math.max(1, Math.ceil(size * AGREE))) return size;
   }
   return 0;
 };
+
+/** Longest run of lines that appear in both lists in the same order. */
+const commonLines = (a: OcrItemDto[], b: OcrItemDto[]): number => {
+  let row = Array.from({ length: b.length + 1 }, () => 0);
+  for (const x of a) {
+    const next = [0];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = sameLine(x, b[j - 1]) ? row[j - 1] + 1 : Math.max(row[j], next[j - 1]);
+    }
+    row = next;
+  }
+  return row[b.length];
+};
+
+/**
+ * A part that only repeats what was already read: the same receipt picked
+ * twice from the gallery, or a second photo of the whole thing.
+ */
+const isRepeat = (seen: OcrItemDto[], part: OcrItemDto[]) =>
+  part.length > 0 && commonLines(seen, part) >= Math.ceil(part.length * AGREE);
 
 const sum = (items: OcrItemDto[]) => Math.round(items.reduce((s, i) => s + i.totalPrice, 0) * 100) / 100;
 
@@ -59,12 +88,12 @@ const sum = (items: OcrItemDto[]) => Math.round(items.reduce((s, i) => s + i.tot
  * line near the end of the part before, when that makes the sum match.
  */
 const dropRepeatsAtSeams = (parts: OcrItemDto[][], total: number): OcrItemDto[] | null => {
-  const seams: number[] = []; // indexes in the joined list that repeat the previous part's tail
+  const seams: number[] = []; // indexes in the joined list that repeat a line of the previous part
   let joined: OcrItemDto[] = [];
   for (const part of parts) {
-    const tail = joined.slice(-8);
+    const before = joined.slice();
     part.forEach((item, i) => {
-      if (i < 8 && tail.some((t) => sameLine(t, item))) seams.push(joined.length + i);
+      if (before.some((t) => sameLine(t, item))) seams.push(joined.length + i);
     });
     joined = joined.concat(part);
   }
@@ -93,7 +122,10 @@ export function mergeReceiptParts(parts: OcrResultDto[]): OcrResultDto {
     merged.issuedAt ??= part.issuedAt;
     merged.currency ??= part.currency;
     if (part.total !== undefined) merged.total = part.total;
-    merged.items.push(...part.items.slice(overlap(merged.items, part.items)));
+    const seam = overlap(merged.items, part.items);
+    // No clean seam but most lines already read: the whole part is a repeat.
+    if (seam === 0 && merged.items.length > 0 && isRepeat(merged.items, part.items)) continue;
+    merged.items.push(...part.items.slice(seam));
     if (part.confidence !== undefined) {
       merged.confidence = Math.min(merged.confidence ?? 1, part.confidence);
     }

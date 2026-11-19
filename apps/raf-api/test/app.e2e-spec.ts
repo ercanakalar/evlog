@@ -294,6 +294,25 @@ describe('Raf API (e2e)', () => {
       expect(home.body.find((h: { name: string }) => h.name === 'Kefir').lastMatchAdded).toBeNull();
     });
 
+    it('counts a receipt once when the same photo is sent twice as long-receipt parts', async () => {
+      const before = await counts();
+      const calls = ocr.calls.length;
+      ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(12) } });
+      const photo = jpeg();
+      const scanned = await api()
+        .post('/api/v1/receipts')
+        .set(homeAuth())
+        .attach('files', photo, { filename: 'a.jpg', contentType: 'image/jpeg' })
+        .attach('files', photo, { filename: 'b.jpg', contentType: 'image/jpeg' })
+        .expect(201);
+      expect(ocr.calls.length - calls).toBe(1);
+      expect(scanned.body.items).toHaveLength(cityGross.items.length);
+      await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(homeAuth()).expect(200);
+      expect(await counts()).toEqual({ Kefir: before.Kefir + 1, Labneh: before.Labneh + 1 });
+      await api().delete(`/api/v1/receipts/${scanned.body.id}`).set(homeAuth()).expect(204);
+      expect(await counts()).toEqual(before);
+    });
+
     it('never goes below 0 when the count was already lowered by hand', async () => {
       const id = await saveReceipt();
       const home = await api().get('/api/v1/home-items').set(homeAuth()).expect(200);

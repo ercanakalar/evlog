@@ -20,11 +20,28 @@ export async function prepareImage(photo: { uri: string; width: number; height: 
   return { uri: saved.uri, name: 'receipt.jpg', type: 'image/jpeg' };
 }
 
-/** Picks a receipt photo from the library. Resolves to null when the user cancels. */
-export async function pickImage(): Promise<UploadFile | null> {
+/**
+ * Picks receipt photos from the library: one photo of a whole receipt, or
+ * several parts of a long one in the order they are tapped. The same photo
+ * picked twice is kept once. Resolves to [] when the user cancels.
+ */
+export async function pickImages(limit: number): Promise<UploadFile[]> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) throw new PhotoPermissionError();
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
-  const asset = result.canceled ? undefined : result.assets[0];
-  return asset ? prepareImage(asset) : null;
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 1,
+    allowsMultipleSelection: limit > 1,
+    selectionLimit: limit,
+    orderedSelection: true,
+  });
+  if (result.canceled) return [];
+  const seen = new Set<string>();
+  const assets = result.assets.filter((asset) => {
+    const id = asset.assetId ?? asset.uri;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  return Promise.all(assets.slice(0, limit).map(prepareImage));
 }

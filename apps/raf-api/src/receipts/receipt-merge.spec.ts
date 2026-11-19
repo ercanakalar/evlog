@@ -1,3 +1,4 @@
+import type { OcrItemDto } from './dto/ocr-result.dto';
 import { mergeReceiptParts } from './receipt-merge';
 
 describe('mergeReceiptParts', () => {
@@ -76,6 +77,32 @@ describe('mergeReceiptParts', () => {
       { items: [{ name: 'MASTER POTATO ACILI BAHARATLI CIPS', totalPrice: 84.5 }] },
     ]);
     expect(merged.items).toHaveLength(2);
+  });
+
+  // City Gross, picked from the gallery twice in long-receipt mode (reader output of the real photo).
+  const cityGross: OcrItemDto[] = (require('../../test/fixtures/city-gross.json') as { items: OcrItemDto[] }).items;
+
+  it('keeps a receipt picked twice once', () => {
+    const merged = mergeReceiptParts([{ items: cityGross }, { total: 4156.72, items: cityGross }]);
+    expect(merged.items).toHaveLength(cityGross.length);
+    expect(merged.items.filter((i) => i.name.includes('KEFIR'))).toHaveLength(1);
+  });
+
+  it('keeps two photos of the whole receipt, read a little differently, once', () => {
+    // Second photo: one line split differently, another misread, the bag line missing.
+    const again = cityGross
+      .slice(1)
+      .map((i, n) => (n === 4 ? Object.assign({}, i, { name: i.name.replace(' ', '') }) : n === 9 ? Object.assign({}, i, { name: `${i.name}X` }) : i));
+    const merged = mergeReceiptParts([{ items: cityGross }, { items: again }]);
+    expect(merged.items).toHaveLength(cityGross.length);
+  });
+
+  it('still adds the one new line of a last photo that is mostly overlap', () => {
+    const merged = mergeReceiptParts([
+      { items: cityGross.slice(0, 20) },
+      { items: [...cityGross.slice(16, 20), cityGross[20]] },
+    ]);
+    expect(merged.items).toEqual(cityGross.slice(0, 21));
   });
 });
 
