@@ -148,7 +148,7 @@ const en = {
     empty: 'Nothing on the shelf. Save a receipt to start the countdown.',
   },
   atHome: {
-    explain: 'New products start at 0. When a receipt has the same product name, what you bought is added. Count in pieces or kg.',
+    explain: 'New products start at 1. When a receipt has the same product name, what you bought is added. When one goes down to 0, you can add it to your market list. Count in pieces or kg.',
     productName: 'Product name',
     addPlaceholder: 'Add a product',
     addFailed: 'Could not add the product',
@@ -172,6 +172,10 @@ const en = {
     menuHint: 'Opens brands and pack sizes. Long-press to count in pieces or kilograms, or to remove',
     empty: 'Add the products you keep at home to count them.',
     remove: 'Remove',
+    addToListTitle: 'Add {{name}} to your shopping list?',
+    addToListBody: 'There are none left at home.',
+    addToList: 'Add to list',
+    addToListFailed: 'Could not add it to the list',
     noBrand: 'No brand',
     packOf_one: '{{count}} pack',
     packOf_other: '{{count}} pack',
@@ -208,6 +212,7 @@ const en = {
     updateFailed: 'Could not update the product',
   },
   lists: {
+    alreadyOn: '{{name}} is already on your list.',
     addedTo: 'Added to {{list}}',
     ranOut: 'Ran out at home: {{names}}.',
     title: 'Lists',

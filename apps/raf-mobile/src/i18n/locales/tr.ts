@@ -150,7 +150,7 @@ const tr: Translation = {
     empty: 'Rafta bir şey yok. Geri sayımı başlatmak için fiş kaydet.',
   },
   atHome: {
-    explain: 'Yeni ürünler 0’dan başlar. Bir fişte aynı adlı ürün olduğunda aldığın miktar eklenir. Adet ya da kg olarak say.',
+    explain: 'Yeni ürünler 1’den başlar. Bir fişte aynı adlı ürün olduğunda aldığın miktar eklenir. Sayı 0’a inince market listene ekleyebilirsin. Adet ya da kg olarak say.',
     productName: 'Ürün adı',
     addPlaceholder: 'Ürün ekle',
     addFailed: 'Ürün eklenemedi',
@@ -174,6 +174,10 @@ const tr: Translation = {
     menuHint: 'Marka ve paket boyutlarını açar. Adet ya da kilogram seçmek veya kaldırmak için basılı tut',
     empty: 'Evde bulundurduğun ürünleri saymak için ekle.',
     remove: 'Kaldır',
+    addToListTitle: '{{name}} alışveriş listene eklensin mi?',
+    addToListBody: 'Evde hiç kalmadı.',
+    addToList: 'Listeye ekle',
+    addToListFailed: 'Listeye eklenemedi',
     noBrand: 'Markasız',
     packOf_one: '{{count}} adet',
     packOf_other: '{{count}} adet',
@@ -210,6 +214,7 @@ const tr: Translation = {
     updateFailed: 'Ürün güncellenemedi',
   },
   lists: {
+    alreadyOn: '{{name}} zaten listende.',
     addedTo: 'Listeye eklendi: {{list}}',
     ranOut: 'Evde biten: {{names}}.',
     title: 'Listeler',

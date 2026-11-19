@@ -28,3 +28,9 @@ export class UpdateHomeItemDto {
   @IsOptional() @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) @Max(9999)
   count?: number;
 }
+
+export class AddToListDto {
+  /** Name for the market list made if the user has none (in the app's language). */
+  @IsOptional() @Transform(trim) @IsString() @IsNotEmpty() @MaxLength(60)
+  newListName?: string;
+}

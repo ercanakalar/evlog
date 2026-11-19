@@ -1,4 +1,4 @@
-import type { HomeItem, HomeUnit } from '@/types/api/models';
+import type { AddedToList, HomeItem, HomeUnit } from '@/types/api/models';
 import { baseApi } from '../middlewares/createApi';
 
 /** "At home": products counted in pieces or kilograms; saved receipts raise matching counts. */
@@ -44,6 +44,14 @@ export const homeItemService = baseApi.injectEndpoints({
       query: ({ id, unit }) => ({ url: `/home-items/${id}`, method: 'PATCH', body: { unit } }),
       invalidatesTags: ['HomeItem', 'List'],
     }),
+    /**
+     * Puts the product on the first market list (`newListName` names a new one
+     * if there is none). `addedToList` is null when it is already on a list.
+     */
+    addHomeItemToList: build.mutation<{ addedToList: AddedToList | null }, { id: string; newListName: string }>({
+      query: ({ id, newListName }) => ({ url: `/home-items/${id}/shopping-list`, method: 'POST', body: { newListName } }),
+      invalidatesTags: ['List'],
+    }),
     removeHomeItem: build.mutation<void, string>({
       query: (id) => ({ url: `/home-items/${id}`, method: 'DELETE' }),
       invalidatesTags: ['HomeItem', 'List'],
@@ -57,5 +65,6 @@ export const {
   useAddHomeItemMutation,
   useSetHomeItemCountMutation,
   useSetHomeItemUnitMutation,
+  useAddHomeItemToListMutation,
   useRemoveHomeItemMutation,
 } = homeItemService;

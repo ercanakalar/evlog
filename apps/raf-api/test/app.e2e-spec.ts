@@ -70,12 +70,12 @@ describe('Raf API (e2e)', () => {
 
   it('reads a receipt, matches products, and on save starts countdowns and counts', async () => {
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Whole milk', count: 1 }).expect(201);
-    // Added without a count: starts at 0, so the receipt alone makes it 1.
-    const pasta = await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta' }).expect(201);
+    // None at home yet: the receipt alone makes it 1.
+    const pasta = await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta', count: 0 }).expect(201);
     expect(pasta.body.count).toBe(0);
     // Counted by weight: the weighed bananas and the 500 g pasta pack add kilograms.
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Bananas', unit: 'KG', count: 0.25 }).expect(201);
-    await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta 500', unit: 'KG' }).expect(201);
+    await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta 500', unit: 'KG', count: 0 }).expect(201);
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Eggs', count: 1.5 }).expect(400);
 
     ocr.respond = () => ({
@@ -286,7 +286,7 @@ describe('Raf API (e2e)', () => {
 
   it('makes a list for products that run out when there is none', async () => {
     const token = await register('lists@example.com');
-    await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Whole milk' }).expect(201);
+    await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Whole milk', count: 0 }).expect(201);
     ocr.respond = () => ({
       status: 200,
       body: { merchantName: 'A101', issuedAt: daysAgo(1), total: 56, items: [{ name: 'TAM YAGLI SUT 1L', totalPrice: 56 }] },
@@ -309,9 +309,32 @@ describe('Raf API (e2e)', () => {
     await api().delete('/api/v1/me').set(auth(token)).expect(204);
   });
 
+  it('starts new products at 1 and adds one lowered to 0 to the list only when asked', async () => {
+    const token = await register('zero@example.com');
+    const kefir = await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Kefir' }).expect(201);
+    expect(kefir.body.count).toBe(1);
+    const rice = await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Rice', unit: 'KG' }).expect(201);
+    expect(rice.body).toMatchObject({ unit: 'KG', count: 1 });
+
+    // Lowering to 0 only changes the count; the app asks before adding.
+    await api().patch(`/api/v1/home-items/${kefir.body.id}`).set(auth(token)).send({ count: 0 }).expect(200);
+    expect((await api().get('/api/v1/lists').set(auth(token)).expect(200)).body.lists).toEqual([]);
+
+    const addToList = () =>
+      api().post(`/api/v1/home-items/${kefir.body.id}/shopping-list`).set(auth(token)).send({ newListName: 'Market' }).expect(200);
+    expect((await addToList()).body.addedToList).toMatchObject({ name: 'Market', added: ['Kefir'] });
+    // Already on the list and not bought yet: not added twice.
+    expect((await addToList()).body.addedToList).toBeNull();
+    const lists = await api().get('/api/v1/lists').set(auth(token)).expect(200);
+    expect(lists.body.lists).toEqual([
+      expect.objectContaining({ name: 'Market', items: [expect.objectContaining({ name: 'Kefir', done: false })] }),
+    ]);
+    await api().delete('/api/v1/me').set(auth(token)).expect(204);
+  });
+
   it('shows what is at home by brand and pack size', async () => {
     const token = await register('brands@example.com');
-    const ayran = await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Ayran' }).expect(201);
+    const ayran = await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Ayran', count: 0 }).expect(201);
     expect(ayran.body.variants).toEqual([]);
     ocr.respond = () => ({
       status: 200,

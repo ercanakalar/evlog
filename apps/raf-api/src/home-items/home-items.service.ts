@@ -124,7 +124,8 @@ export const toHomeItem = (item: HomeItemRow, variants: HomeVariant[] = []) => (
 /**
  * Products the user keeps at home, counted in pieces or kilograms. When a
  * saved receipt has a line whose name matches one, its count goes up by what
- * was bought.
+ * was bought. Using a product up puts what runs out on the market list; a
+ * count lowered to 0 by hand goes there when the user says so.
  */
 @Injectable()
 export class HomeItemsService {
@@ -166,9 +167,9 @@ export class HomeItemsService {
     const normalizedName = normalizeProductName(dto.name);
     if (!normalizedName) throw new BadRequestException('Name is empty');
     const unit = dto.unit ?? 'PIECE';
-    // A new product starts at 0: adding it only says "track this". Starting
-    // at 1 made the first receipt count it twice (1 kefir bought -> 2).
-    const count = dto.count ?? 0;
+    // A product is usually added because there is one at home, so it starts
+    // at 1. Adding one that is also on a receipt saved afterwards counts it twice.
+    const count = dto.count ?? 1;
     this.checkCount(unit, count);
     // Duplicate names surface as 409 via PrismaExceptionFilter.
     return toHomeItem(
@@ -193,6 +194,16 @@ export class HomeItemsService {
       },
     });
     return this.get(itemId, userId);
+  }
+
+  /**
+   * Puts the product on the market list, e.g. after the user lowered it to 0
+   * and said yes. `addedToList` is null when it is already on a list.
+   */
+  async addToList(itemId: string, userId: string, newListName?: string) {
+    const item = await this.own(itemId, userId);
+    const addedToList = await this.prisma.$transaction((tx) => addRunOut(tx, userId, [item.name], newListName));
+    return { addedToList };
   }
 
   async remove(itemId: string, userId: string) {
