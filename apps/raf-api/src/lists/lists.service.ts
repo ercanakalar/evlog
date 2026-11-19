@@ -1,13 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
 import { normalizeProductName } from '../common/utils/normalize';
 import { HomeItemsService } from '../home-items/home-items.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { namesMatch } from '../products/product-matcher';
 import { AddListItemDto, ListNameDto, UpdateListItemDto } from './dto/list.dto';
-
-/** Name of the list made for products that run out when the user has none. */
-export const DEFAULT_LIST_NAME = 'Shopping list';
 
 /** How many recent purchases are searched for a "last price". */
 const PRICE_LOOKBACK = 600;
@@ -76,31 +72,6 @@ export class ListsService {
     return this.prisma.shoppingListItem.create({
       data: { listId, name: dto.name, normalizedName: normalizeProductName(dto.name) },
     });
-  }
-
-  /**
-   * Puts products that ran out at home on the user's first list (making one
-   * if there is none), skipping any still to buy on one of their lists.
-   * Returns the list the products went on, or null if none were added.
-   */
-  async addRunOut(tx: Prisma.TransactionClient, userId: string, names: string[], newListName = DEFAULT_LIST_NAME) {
-    const open = await tx.shoppingListItem.findMany({
-      where: { doneAt: null, list: { userId } },
-      select: { name: true },
-    });
-    const missing = names.filter(
-      (name, i) =>
-        names.indexOf(name) === i && !open.some((item) => namesMatch(name, item.name) || namesMatch(item.name, name)),
-    );
-    if (missing.length === 0) return null;
-
-    const list =
-      (await tx.shoppingList.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } })) ??
-      (await tx.shoppingList.create({ data: { userId, name: newListName } }));
-    await tx.shoppingListItem.createMany({
-      data: missing.map((name) => ({ listId: list.id, name, normalizedName: normalizeProductName(name) })),
-    });
-    return { id: list.id, name: list.name, added: missing };
   }
 
   async updateItem(itemId: string, userId: string, dto: UpdateListItemDto) {

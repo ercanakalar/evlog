@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '../generated/prisma/client';
 import type { HomeUnit } from '../generated/prisma/enums';
 import { normalizeProductName } from '../common/utils/normalize';
+import { addRunOut } from '../lists/run-out';
 import { namesMatch, weightKg } from '../products/product-matcher';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeItemDto, UpdateHomeItemDto } from './dto/home-item.dto';
@@ -236,12 +237,17 @@ export class HomeItemsService {
    * A product from a saved receipt was used up: every home item its line
    * matches goes down by what the line bought, never below 0. What was taken
    * is recorded against the receipt (as a negative change), so deleting the
-   * receipt later takes back only what is still counted. Returns the home
-   * items that are now at 0.
+   * receipt later takes back only what is still counted. Home items now at
+   * 0 go on the market list; returns that list, or null.
    */
-  async useUp(tx: Prisma.TransactionClient, userId: string, line: ReceiptLine & { receiptId: string }) {
+  async useUp(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    line: ReceiptLine & { receiptId: string },
+    newListName?: string,
+  ) {
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { trackHomeItems: true } });
-    if (!user.trackHomeItems) return [];
+    if (!user.trackHomeItems) return null;
 
     const empty: HomeItemRow[] = [];
     for (const { home, amount } of matchLines(await tx.homeItem.findMany({ where: { userId } }), [line])) {
@@ -255,7 +261,7 @@ export class HomeItemsService {
       }
       if (after === 0) empty.push(home);
     }
-    return empty;
+    return addRunOut(tx, userId, empty.map((home) => home.name), newListName);
   }
 
   /** Undoes `useUp` for a product marked used up by mistake. */

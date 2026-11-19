@@ -2,6 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
 import { useErrorAlert } from '@/hooks/common/useErrorAlert';
+import { useRunOutNotice } from '@/hooks/common/useRunOutNotice';
 import { useGetItemQuery, useUpdateItemMutation } from '@/store/services/itemService';
 import type { UpdateItemRequest } from '@/types/api/requests';
 
@@ -15,6 +16,7 @@ export function useProduct(itemId: string) {
   const navigation = useNavigation();
   const showError = useErrorAlert();
   const modal = useModal();
+  const announceRunOut = useRunOutNotice();
   const item = useGetItemQuery(itemId);
   const [update, updateState] = useUpdateItemMutation();
 
@@ -30,10 +32,7 @@ export function useProduct(itemId: string) {
     const updated = await change({ usedUp: true, newListName: t('lists.defaultName') });
     if (!updated) return;
     navigation.goBack();
-    const list = updated.addedToList;
-    if (list) {
-      modal.alert(t('product.addedToList', { list: list.name }), t('product.ranOut', { names: list.added.join(', ') }));
-    }
+    announceRunOut(updated.addedToList);
   };
 
   return {

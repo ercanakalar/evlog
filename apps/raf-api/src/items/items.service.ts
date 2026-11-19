@@ -3,7 +3,6 @@ import { Prisma } from '../generated/prisma/client';
 import type { Category } from '../generated/prisma/enums';
 import { addDays, DAY_MS } from '../common/utils/normalize';
 import { HomeItemsService } from '../home-items/home-items.service';
-import { ListsService } from '../lists/lists.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OcrClient } from '../receipts/ocr.client';
 import { ListItemsQueryDto, UpdateItemDto } from './dto/item.dto';
@@ -71,7 +70,6 @@ export class ItemsService {
     private readonly prisma: PrismaService,
     private readonly ocr: OcrClient,
     private readonly homeItems: HomeItemsService,
-    private readonly lists: ListsService,
   ) {}
 
   /**
@@ -211,15 +209,15 @@ export class ItemsService {
         await this.homeItems.restoreUsedUp(tx, itemId);
         return null;
       }
-      const ranOut = await this.homeItems.useUp(tx, userId, {
+      const line = {
         id: item.id,
         receiptId: item.receipt.id,
         name: item.name,
         rawName: item.rawName,
         quantity: item.quantity,
         unit: item.unit,
-      });
-      return this.lists.addRunOut(tx, userId, ranOut.map((home) => home.name), dto.newListName);
+      };
+      return this.homeItems.useUp(tx, userId, line, dto.newListName);
     });
     return { ...(await this.get(itemId, userId)), addedToList };
   }
