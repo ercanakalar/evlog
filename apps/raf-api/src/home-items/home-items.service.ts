@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeItemDto, UpdateHomeItemDto } from './dto/home-item.dto';
 
 type Line = { name: string; rawName: string; quantity: Prisma.Decimal; unit: string | null };
+type ReceiptLine = Line & { id: string };
 type HomeItemRow = Prisma.HomeItemGetPayload<object>;
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -23,6 +24,25 @@ export const amountBought = (line: Line, unit: HomeUnit): number => {
   }
   // Pieces: weighed produce ("1.12 kg of bananas") counts as one bag.
   return weighed || (line.unit && line.unit !== 'pcs') ? 1 : Math.max(1, Math.round(quantity));
+};
+
+/**
+ * Which receipt lines raise which home items, and by how much. Each line
+ * counts once per home item, even when both its clean and printed names match.
+ */
+export const matchLines = (homeItems: HomeItemRow[], lines: ReceiptLine[]) =>
+  homeItems.flatMap((home) =>
+    lines
+      .filter((line) => namesMatch(home.name, line.name) || namesMatch(home.name, line.rawName))
+      .map((line) => ({ home, line, amount: amountBought(line, home.unit) }))
+      .filter((m) => m.amount > 0),
+  );
+
+/** Sum of the matched amounts per home item. */
+const totals = (matches: { home: { id: string }; amount: number }[]) => {
+  const map = new Map<string, number>();
+  for (const m of matches) map.set(m.home.id, round3((map.get(m.home.id) ?? 0) + m.amount));
+  return map;
 };
 
 /** At or below this, an item shows as "running low": 1 piece, or half a kilo. */
@@ -103,42 +123,92 @@ export class HomeItemsService {
     await this.prisma.homeItem.delete({ where: { id: itemId } });
   }
 
-  /** Raises counts for every home item a saved receipt matches. */
+  /**
+   * Raises counts for every home item a saved receipt matches, and records
+   * each line's share so deleting the receipt can take exactly that back.
+   */
   async countReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
+    await tx.receipt.update({ where: { id: receiptId }, data: { homeCountsRecorded: true } });
     const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
       select: { trackHomeItems: true, countFromReceipts: true },
     });
     if (!user.trackHomeItems || !user.countFromReceipts) return;
 
-    const [homeItems, receipt] = await Promise.all([
-      tx.homeItem.findMany({ where: { userId } }),
-      tx.receipt.findUniqueOrThrow({
-        where: { id: receiptId },
-        select: {
-          merchantName: true,
-          issuedAt: true,
-          items: { select: { name: true, rawName: true, quantity: true, unit: true } },
-        },
-      }),
-    ]);
-    for (const home of homeItems) {
-      const added = round3(
-        receipt.items
-          .filter((line) => namesMatch(home.name, line.name) || namesMatch(home.name, line.rawName))
-          .reduce((sum, line) => sum + amountBought(line, home.unit), 0),
-      );
-      if (added === 0) continue;
+    const receipt = await this.receiptLines(tx, receiptId);
+    const matches = matchLines(await tx.homeItem.findMany({ where: { userId } }), receipt.items);
+    for (const { home, line, amount } of matches) {
+      await tx.homeItemChange.create({
+        data: { homeItemId: home.id, receiptId, receiptItemId: line.id, amount },
+      });
+    }
+    for (const [homeId, added] of totals(matches)) {
       await tx.homeItem.update({
-        where: { id: home.id },
+        where: { id: homeId },
         data: {
           count: { increment: added },
           lastMatchAdded: added,
           lastMatchMarket: receipt.merchantName,
           lastMatchAt: receipt.issuedAt,
+          lastMatchReceiptId: receiptId,
         },
       });
     }
+  }
+
+  /**
+   * Takes back what a saved receipt added at home (when it is deleted).
+   * Counts never go below 0, in case the user already lowered them by hand.
+   */
+  async uncountReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
+    const receipt = await tx.receipt.findUniqueOrThrow({
+      where: { id: receiptId },
+      select: { status: true, homeCountsRecorded: true, merchantName: true, issuedAt: true },
+    });
+    if (receipt.status !== 'CONFIRMED') return [];
+
+    let taken: Map<string, number>;
+    if (receipt.homeCountsRecorded) {
+      const changes = await tx.homeItemChange.findMany({ where: { receiptId } });
+      taken = new Map();
+      for (const c of changes) taken.set(c.homeItemId, round3((taken.get(c.homeItemId) ?? 0) + c.amount.toNumber()));
+    } else {
+      // Saved before changes were recorded: match the lines again, as when it was saved.
+      const lines = await this.receiptLines(tx, receiptId);
+      taken = totals(matchLines(await tx.homeItem.findMany({ where: { userId } }), lines.items));
+    }
+
+    const result: { homeItemId: string; amount: number }[] = [];
+    for (const [homeId, amount] of taken) {
+      const home = await tx.homeItem.findUnique({ where: { id: homeId } });
+      if (!home) continue;
+      const fromThisReceipt = receipt.homeCountsRecorded
+        ? home.lastMatchReceiptId === receiptId
+        : home.lastMatchMarket === receipt.merchantName &&
+          home.lastMatchAt?.getTime() === receipt.issuedAt?.getTime();
+      await tx.homeItem.update({
+        where: { id: homeId },
+        data: {
+          count: Math.max(0, round3(home.count.toNumber() - amount)),
+          ...(fromThisReceipt
+            ? { lastMatchAdded: null, lastMatchMarket: null, lastMatchAt: null, lastMatchReceiptId: null }
+            : {}),
+        },
+      });
+      result.push({ homeItemId: homeId, amount });
+    }
+    return result;
+  }
+
+  private receiptLines(tx: Prisma.TransactionClient, receiptId: string) {
+    return tx.receipt.findUniqueOrThrow({
+      where: { id: receiptId },
+      select: {
+        merchantName: true,
+        issuedAt: true,
+        items: { select: { id: true, name: true, rawName: true, quantity: true, unit: true } },
+      },
+    });
   }
 
   private checkCount(unit: HomeUnit, count: number) {

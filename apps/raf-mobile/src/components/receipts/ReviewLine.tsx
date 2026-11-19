@@ -15,7 +15,7 @@ interface Props {
   atHome?: { amount: number; unit: HomeUnit };
   editable: boolean;
   onConfirm: () => void;
-  onFix: (name: string, category: Category) => void;
+  onFix: (name: string, category: Category, quantity: number) => void;
   onRemove: () => void;
 }
 
@@ -31,6 +31,10 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix,
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<Category>(item.category);
+  const byPiece = !item.unit || item.unit === 'pcs';
+  const [quantity, setQuantity] = useState(String(Number(item.quantity)));
+  const quantityValue = Number(quantity.replace(',', '.'));
+  const quantityOk = byPiece ? Number.isInteger(quantityValue) && quantityValue >= 1 : quantityValue > 0;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: item.needsReview ? colors.urgentBar : 'transparent' }]}>
@@ -48,6 +52,11 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix,
         </SpaceBetween>
         <Text variant="monoSmall" muted>
           {item.rawName}
+        </Text>
+        <Text variant="smallMedium" style={{ fontSize: 12.5 }}>
+          {byPiece
+            ? t('review.pieces', { count: Number(item.quantity) })
+            : t('review.weight', { amount: f.homeAmount(Number(item.quantity), 'KG') })}
         </Text>
         <Row style={{ flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
           <Tag label={f.category(item.category)} />
@@ -71,6 +80,13 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix,
       {editing ? (
         <View style={{ gap: space.sm, paddingTop: 6 }}>
           <Field label={t('review.productName')} value={name} onChangeText={setName} />
+          <Field
+            label={byPiece ? t('review.quantityPieces') : t('review.quantityKg')}
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType={byPiece ? 'number-pad' : 'decimal-pad'}
+            error={quantityOk ? undefined : t(byPiece ? 'review.quantityWhole' : 'review.quantityPositive')}
+          />
           <ChipRow
             label={t('review.category')}
             value={category}
@@ -80,10 +96,10 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix,
           <Button
             title={t('common.done')}
             compact
-            disabled={!name.trim()}
+            disabled={!name.trim() || !quantityOk}
             onPress={() => {
               setEditing(false);
-              onFix(name.trim(), category);
+              onFix(name.trim(), category, quantityValue);
             }}
           />
           <Button

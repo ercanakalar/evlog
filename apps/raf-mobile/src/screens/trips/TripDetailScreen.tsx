@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { ReceiptPhoto } from '@/components/trips/ReceiptPhoto';
-import { Button, ErrorView, Loading, ReceiptPaper, Rule, Screen, ScreenHeader, SpaceBetween, Text } from '@/components/ui';
+import { Button, ErrorView, Loading, ReceiptPaper, Rule, Screen, ScreenHeader, SpaceBetween, Tag, Text } from '@/components/ui';
 import { HIT } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { daysUntil, useTripDetail } from '@/hooks/trips/useTripDetail';
 import { fonts, useTheme } from '@/theme';
 import type { RootScreenProps } from '@/types/screens/navigation';
 import { countdownColors } from '@/utils/countdown';
+import { lineQuantity } from '@/utils/format';
 
 export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
   const { t } = useTranslation();
@@ -57,8 +58,11 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
               const days = daysUntil(item.expiresAt);
               const tone = days === null ? colors.textMuted : countdownColors(days, colors).text;
               const left = days === null ? t('countdown.noExpiry') : days === 0 ? t('trip.useToday') : t('trip.daysLeft', { count: days });
-              const quantity = Number(item.quantity);
-              const name = !item.unit && quantity > 1 ? `${item.name} × ${quantity}` : item.name;
+              const times = lineQuantity(item.quantity, item.unit);
+              const name = times ? `${item.name} ${times}` : item.name;
+              const atHome = (item.homeChanges ?? [])
+                .map((c) => t('trip.atHome', { amount: f.homeAmount(Number(c.amount), c.homeItem.unit), name: c.homeItem.name }))
+                .join(' · ');
               return (
                 <Pressable
                   key={item.id}
@@ -73,6 +77,11 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
                     <Text variant="monoSmall" color={tone}>
                       {left.toLocaleUpperCase()}
                     </Text>
+                    {atHome ? (
+                      <View style={{ marginTop: 3 }}>
+                        <Tag label={atHome} tone="accent" />
+                      </View>
+                    ) : null}
                   </View>
                   <Text variant="mono" style={{ fontSize: 14 }}>
                     {f.money(item.totalPrice, receipt.currency)}

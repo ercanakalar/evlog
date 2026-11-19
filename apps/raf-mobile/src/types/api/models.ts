@@ -43,6 +43,8 @@ export interface ReceiptItem {
   openedShelfLifeDays: number | null;
   needsReview: boolean;
   expiresAt: string | null;
+  /** What this line added at home when the receipt was saved. */
+  homeChanges?: { amount: string; homeItem: { id: string; name: string; unit: HomeUnit } }[];
 }
 
 export interface Receipt {

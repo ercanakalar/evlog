@@ -65,7 +65,8 @@ export const receiptService = baseApi.injectEndpoints({
     }),
     deleteReceipt: build.mutation<void, string>({
       query: (id) => ({ url: `/receipts/${id}`, method: 'DELETE' }),
-      invalidatesTags: [{ type: 'Receipt', id: 'LIST' }, 'Item', 'Insights', 'List', 'Me'],
+      // Deleting a saved receipt also takes back what it added at home.
+      invalidatesTags: [{ type: 'Receipt', id: 'LIST' }, 'Item', 'Insights', 'List', 'Me', 'HomeItem'],
     }),
   }),
 });

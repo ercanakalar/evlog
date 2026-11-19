@@ -18,7 +18,11 @@ import { OcrClient, OcrDispatchResult } from './ocr.client';
 import { mergeReceiptParts } from './receipt-merge';
 
 const withItems = {
-  items: { orderBy: { position: 'asc' } },
+  items: {
+    orderBy: { position: 'asc' },
+    // What each line added at home when the receipt was saved.
+    include: { homeChanges: { select: { amount: true, homeItem: { select: { id: true, name: true, unit: true } } } } },
+  },
 } satisfies Prisma.ReceiptInclude;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -186,9 +190,13 @@ export class ReceiptsService {
     return this.get(receiptId, userId);
   }
 
+  /** Deletes a receipt and takes back what it added to the at-home counts. */
   async remove(receiptId: string, userId: string) {
     const receipt = await this.own(receiptId, userId);
-    await this.prisma.receipt.delete({ where: { id: receipt.id } });
+    await this.prisma.$transaction(async (tx) => {
+      await this.homeItems.uncountReceipt(tx, userId, receipt.id);
+      await tx.receipt.delete({ where: { id: receipt.id } });
+    });
   }
 
   /** The original photo; `part` picks one part of a long receipt. */

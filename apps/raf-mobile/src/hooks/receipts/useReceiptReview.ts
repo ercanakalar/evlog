@@ -97,7 +97,8 @@ export function useReceiptReview(receiptId: string) {
     updating: updateState.isLoading,
     rescanning: rescanState.isLoading,
     confirmLine: (itemId: string) => void editLine(itemId, {}),
-    fixLine: (itemId: string, name: string, category: Category) => void editLine(itemId, { name, category }),
+    fixLine: (itemId: string, name: string, category: Category, quantity: number) =>
+      void editLine(itemId, { name, category, quantity }),
     /** Drops a line the reader got wrong (e.g. read twice where photos overlap). */
     removeLine: (itemId: string, name: string) =>
       modal.confirm({

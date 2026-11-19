@@ -19,6 +19,12 @@ export const formatMoney = (
 };
 
 /** en-GB puts a comma after the weekday ("Mon, 16 Nov"); the receipt style drops it. */
+/** Quantity printed on a receipt line: "× 2" for pieces, "" for one; weighed lines carry it in the name. */
+export const lineQuantity = (quantity: string, unit: string | null) => {
+  const n = Number(quantity);
+  return (!unit || unit === 'pcs') && n !== 1 ? `× ${n}` : '';
+};
+
 /** "1.25" / "1,25"; up to 3 decimals, no trailing zeros. */
 export const formatAmount = (value: number, language = 'en') =>
   new Intl.NumberFormat(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 3 }).format(value);

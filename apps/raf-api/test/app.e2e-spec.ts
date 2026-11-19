@@ -5,7 +5,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/setup-app';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { FakeOcr } from './fake-ocr';
+import cityGross from './fixtures/city-gross.json';
 
 /** A minimal JPEG header plus random bytes: passes magic-number checks, unique hash. */
 const jpeg = () =>
@@ -249,5 +251,68 @@ describe('Raf API (e2e)', () => {
     expect(updated.body.reminderLeadDays).toBe(3);
 
     await api().delete('/api/v1/me').set(auth(other)).expect(204);
+  });
+
+  describe('at-home counts from the City Gross receipt (reader output of the real photo)', () => {
+    let user: string;
+    const homeAuth = () => ({ Authorization: `Bearer ${user}` });
+    const counts = async () => {
+      const res = await api().get('/api/v1/home-items').set(homeAuth()).expect(200);
+      return Object.fromEntries(res.body.map((h: { name: string; count: number }) => [h.name, h.count]));
+    };
+    const saveReceipt = async () => {
+      ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(10) } });
+      const scanned = await api()
+        .post('/api/v1/receipts')
+        .set(homeAuth())
+        .attach('files', jpeg(), { filename: 'r.jpg', contentType: 'image/jpeg' })
+        .expect(201);
+      await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(homeAuth()).expect(200);
+      return scanned.body.id as string;
+    };
+
+    beforeAll(async () => {
+      user = await register('counts@example.com');
+      await api().post('/api/v1/home-items').set(homeAuth()).send({ name: 'Kefir', count: 1 }).expect(201);
+      await api().post('/api/v1/home-items').set(homeAuth()).send({ name: 'Labneh', count: 1 }).expect(201);
+    });
+
+    it('adds one kefir for the one kefir line and shows it on that line', async () => {
+      const id = await saveReceipt();
+      expect(await counts()).toEqual({ Kefir: 2, Labneh: 2 });
+      const receipt = await api().get(`/api/v1/receipts/${id}`).set(homeAuth()).expect(200);
+      const kefir = receipt.body.items.find((i: { rawName: string }) => i.rawName.includes('KEFIR'));
+      expect(kefir.quantity).toBe('1');
+      expect(kefir.homeChanges).toEqual([{ amount: '1', homeItem: expect.objectContaining({ name: 'Kefir' }) }]);
+    });
+
+    it('takes the counts back when the receipt is deleted', async () => {
+      const list = await api().get('/api/v1/receipts').set(homeAuth()).expect(200);
+      await api().delete(`/api/v1/receipts/${list.body[0].id}`).set(homeAuth()).expect(204);
+      expect(await counts()).toEqual({ Kefir: 1, Labneh: 1 });
+      const home = await api().get('/api/v1/home-items').set(homeAuth()).expect(200);
+      expect(home.body.find((h: { name: string }) => h.name === 'Kefir').lastMatchAdded).toBeNull();
+    });
+
+    it('never goes below 0 when the count was already lowered by hand', async () => {
+      const id = await saveReceipt();
+      const home = await api().get('/api/v1/home-items').set(homeAuth()).expect(200);
+      const kefir = home.body.find((h: { name: string }) => h.name === 'Kefir');
+      await api().patch(`/api/v1/home-items/${kefir.id}`).set(homeAuth()).send({ count: 0 }).expect(200);
+      await api().delete(`/api/v1/receipts/${id}`).set(homeAuth()).expect(204);
+      expect(await counts()).toEqual({ Kefir: 0, Labneh: 1 });
+    });
+
+    it('also takes back counts from receipts saved before changes were recorded', async () => {
+      await api().patch('/api/v1/home-items/' + (await api().get('/api/v1/home-items').set(homeAuth())).body.find((h: { name: string }) => h.name === 'Kefir').id).set(homeAuth()).send({ count: 1 }).expect(200);
+      const id = await saveReceipt();
+      expect(await counts()).toEqual({ Kefir: 2, Labneh: 2 });
+      // Make it look like a receipt saved by the previous version.
+      const prisma = app.get(PrismaService);
+      await prisma.homeItemChange.deleteMany({ where: { receiptId: id } });
+      await prisma.receipt.update({ where: { id }, data: { homeCountsRecorded: false } });
+      await api().delete(`/api/v1/receipts/${id}`).set(homeAuth()).expect(204);
+      expect(await counts()).toEqual({ Kefir: 1, Labneh: 1 });
+    });
   });
 });

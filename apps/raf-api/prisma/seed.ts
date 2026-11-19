@@ -97,6 +97,8 @@ async function main() {
       data: {
         userId: user.id,
         status: 'CONFIRMED',
+        // Demo trips did not raise any at-home counts, so deleting one takes nothing back.
+        homeCountsRecorded: true,
         imageKeys: [],
         mimeType: 'image/jpeg',
         sha256: `demo-${index}`,

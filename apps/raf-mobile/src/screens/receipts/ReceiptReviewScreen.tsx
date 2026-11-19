@@ -119,7 +119,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
           atHome={r.homeMatches.get(item.id)}
           editable={editable}
           onConfirm={() => r.confirmLine(item.id)}
-          onFix={(name, category) => r.fixLine(item.id, name, category)}
+          onFix={(name, category, quantity) => r.fixLine(item.id, name, category, quantity)}
           onRemove={() => r.removeLine(item.id, item.name)}
         />
       ))}
