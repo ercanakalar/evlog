@@ -27,6 +27,8 @@ from datetime import datetime
 from itertools import product
 from statistics import median
 
+from lexicon import correct_name
+
 
 @dataclass
 class Word:
@@ -96,13 +98,14 @@ def parse_price(word: Word) -> Price | None:
     return Price(word, candidates) if candidates else None
 
 
-QTY_UNIT = re.compile(r"^([\dGOoBl.,]*)\s*(KG|KGM|ADET|AD|LT|GR|PK|PKT)\.?$", re.I)
+QTY_UNIT = re.compile(r"^([\dGOoBl.,/']*)\s*(KG|KGM|ADET|AD|LT|GR|PK|PKT)\.?$", re.I)
 UNIT_NAMES = {"KG": "kg", "KGM": "kg", "ADET": "pcs", "AD": "pcs", "LT": "L", "GR": "g", "PK": "pcs", "PKT": "pcs"}
 
 
 def quantity_candidates(text: str, unit: str) -> list[float]:
     """'4,072' -> [4.072]; 'G.822' -> [0.822, 1.822, ...] (first digit unreadable)."""
-    s = text.replace("O", "0").replace("o", "0").rstrip(".")
+    # OCR sometimes adds a slash or apostrophe inside a number: "1.0/32" is 1,032.
+    s = text.replace("O", "0").replace("o", "0").replace("/", "").replace("'", "").rstrip(".")
     if not s:
         return []
     if unit == "pcs":
@@ -147,12 +150,14 @@ def find_quantity_lines(words: list[Word], h: float) -> list[QuantityLine]:
         qty_text, x0 = match.group(1), word.x0
         if not qty_text:  # quantity is a separate word just left of the unit
             left = [w for w in words if w.x1 <= word.x0 + 2 and abs(w.y - word.y) < 0.7 * h
-                    and word.x0 - w.x1 < 3 * h and re.fullmatch(r"[\dGO.,]+\.?", w.text)]
+                    and word.x0 - w.x1 < 3 * h and re.fullmatch(r"[\dGO.,/']+\.?", w.text)]
             if left:
                 nearest = max(left, key=lambda w: w.x1)
                 qty_text, x0 = nearest.text, nearest.x0
         if not qty_text and unit not in ("pcs", "kg"):
             continue  # a bare 'GR' / 'LT' is part of a product name ('250 GR')
+        if sum(c.isdigit() for c in qty_text) > 6:
+            continue  # a barcode next to a name's 'GR' row is not a quantity
         lines.append(QuantityLine(word, unit, quantity_candidates(qty_text, unit), x0))
     return sorted(lines, key=lambda line: line.word.y)
 
@@ -168,8 +173,47 @@ def has_letters(text: str, n: int = 2) -> bool:
 CODE = re.compile(r"[\dBO]{7,14}")
 
 
+# Receipt header text that sits right above the first item: the e-invoice
+# number (ETTN), the loyalty card line and the column headings
+# ("S.N Miktar Birim Fiyat KDV İnd. Kdvli Tutar"), often garbled by OCR.
+HEADER = re.compile(r"(?i)(\bE\s?[T1I]{1,2}\s?N\b|\b[IK]?KART\s*N[O0]|\bMiktar|\bBirim|\bBir[hn]n\b|\bFiyat|\bTutar|\bKdvl?[iı1T]?\b)")
+
+
+def drop_header_rows(rows: list[list[Word]]) -> list[list[Word]]:
+    """
+    Keeps only the words below the last receipt-header word. The first item's
+    name can share a printed row with the column headings, so words are
+    compared one by one, not whole rows.
+    """
+    header = [w for row in rows for w in row if HEADER.search(w.text)]
+    if not header:
+        return rows
+    cut = max(w.y for w in header)
+    kept = [[w for w in row if w.y > cut and not HEADER.search(w.text)] for row in rows]
+    return [row for row in kept if row]
+
+
+def strip_leading_codes(name: str) -> str:
+    """
+    Drops what is left of the item number and barcode at the start of a name
+    when OCR misread some digits ("DOV170Z008SB7 SOLEU…", "5089 SUTAS…").
+    """
+    tokens = name.split(" ")
+    while len(tokens) > 1:
+        t = tokens[0]
+        digits = sum(c.isdigit() for c in t)
+        digit_like = sum(c.isdigit() or c in "OQDBSZGIL" for c in t)
+        if (len(t) == 1 or (len(t) >= 4 and digits * 2 >= len(t)) or (t.isdigit() and len(t) <= 3)
+                or (len(t) >= 8 and digits >= 3 and digit_like * 4 >= len(t) * 3)):
+            tokens.pop(0)
+        else:
+            break
+    return " ".join(tokens)
+
+
 def clean_name(rows: list[list[Word]]) -> str:
     """Joins name rows; drops the item index and barcode and anything above it."""
+    rows = drop_header_rows(rows)
     code_row = next((row for row in rows if any(CODE.search(w.text) for w in row)), None)
     if code_row is not None:
         code_y = median(w.y for w in code_row)
@@ -191,7 +235,8 @@ def clean_name(rows: list[list[Word]]) -> str:
         parts.append(text)
     name = " ".join(parts)
     name = re.sub(r"^\W*(\d{1,3}\s+)?([A-Z0-9]\s+)?", "", name.strip())  # index / stray char
-    return re.sub(r"\s+", " ", name).strip(" .-:")
+    name = strip_leading_codes(re.sub(r"\s+", " ", name).strip(" .-:"))
+    return correct_name(name)
 
 
 def group_rows(words: list[Word], h: float) -> list[list[Word]]:
@@ -202,6 +247,23 @@ def group_rows(words: list[Word], h: float) -> list[list[Word]]:
         else:
             rows.append([word])
     return rows
+
+
+def exact_quantity(total: float, unit_price: float, unit: str) -> float | None:
+    """The quantity that makes quantity x unit price = total to the kuruş, if there is one."""
+    if unit_price <= 0:
+        return None
+    if unit == "pcs":
+        q = round(total / unit_price)
+        return q if 1 <= q <= 999 and abs(round(q * unit_price, 2) - total) <= 0.01 else None
+    q = round(total / unit_price, 3)
+    return q if 0 < q < 1000 and abs(round(q * unit_price, 2) - total) <= 0.01 else None
+
+
+def similarity(a: float, b: float) -> int:
+    """How many digits two numbers share in place ("0.968" vs "0.068" -> 4)."""
+    x, y = f"{a:.3f}", f"{b:.3f}"
+    return sum(c == d for c, d in zip(x.rjust(9), y.rjust(9)))
 
 
 def resolve(line: QuantityLine, unit_price: Price | None, total: Price | None) -> tuple[float | None, float | None, float | None, bool, list[float]]:
@@ -218,6 +280,17 @@ def resolve(line: QuantityLine, unit_price: Price | None, total: Price | None) -
         for q, u in product(quantities, units):
             if abs(round(q * u, 2) - t) <= 0.02 + 0.002 * t:
                 return q, u, t, True, []
+    # Quantity misread too (0,968 -> "0.068"): a unit price reading that
+    # divides the total exactly gives the quantity; closest to what was read wins.
+    if totals and units and line.quantities:
+        exact = []
+        for u in units:
+            q = exact_quantity(totals[0], u, line.unit)
+            if q is not None:
+                exact.append((similarity(q, line.quantities[0]), q, u))
+        if exact:
+            _, q, u = max(exact)
+            return q, u, totals[0], True, []
     u = units[0] if units else None
     computed = round(known_qty * u, 2) if known_qty is not None and u else None
     if totals and computed and unit_price.word.score > total.word.score + 0.05:
@@ -239,6 +312,8 @@ def resolve(line: QuantityLine, unit_price: Price | None, total: Price | None) -
                 q = round(derived)
         elif q:
             u = round(t / q, 2)
+        if q is None and line.unit == "pcs" and u is None:
+            q = 1  # count and unit price unreadable: one piece is by far the most common
         return q, u, t, False, ([computed] if computed else []) + totals[1:]
     return known_qty, u, computed, False, []  # line total unreadable
 
@@ -270,7 +345,7 @@ def items_from_quantity_lines(words: list[Word], lines: list[QuantityLine], h: f
         unit_price = next((p for p in found if p is not total and p not in in_column
                            and 0.0 not in p.candidates and any(c > 0 for c in p.candidates)), None)
 
-        top = max(previous_y + 0.2 * h if previous_y is not None else -1e9, y - 3.6 * h)
+        top = max(previous_y + 0.2 * h if previous_y is not None else -1e9, y - 4.5 * h)
         right_edge = total.word.x0 if total else float("inf")
         name_words = [
             w for w in words
@@ -327,7 +402,8 @@ def grand_total(words: list[Word], h: float, below_y: float) -> float | None:
 def issued_at(words: list[Word]) -> str | None:
     text = " ".join(w.text for w in sorted(words, key=lambda w: (w.y, w.x0)))
     date = None
-    for match in re.finditer(r"(?<!\d)(\d{2})[./-]?(\d{2})[./-]?(20\d{2})(?!\d)", text):
+    # A separator dot is often read as "1" or ",": "08.11.2026" -> "081112026".
+    for match in re.finditer(r"(?<!\d)(\d{2})[./,-]?(\d{2})[./,1-]?(20\d{2})(?!\d)", text):
         day, month, year = map(int, match.groups())
         try:
             date = datetime(year, month, day)

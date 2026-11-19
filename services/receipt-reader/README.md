@@ -30,6 +30,32 @@ The port is only open to this computer. If an API runs elsewhere (in the cloud),
 expose the reader through a tunnel (Cloudflare Tunnel, Tailscale) rather than
 opening the port.
 
+## How it reads
+
+1. `ocr.py` finds every word and its position (RapidOCR, PaddleOCR's models).
+2. `receipt_parser.py` finds each item's quantity row (`1 ADET ₺98,90 … ₺98,90`),
+   takes the name from the rows above it and checks quantity × unit price = line
+   total, trying every likely reading of a misread number (the ₺ sign read as a
+   digit, `0,968` read as `0.068`, `1.0/32` for `1,032`), then the sum against
+   the printed total.
+3. `lexicon.py` fixes letters OCR confuses in names (H/N/M, U/N, O/Q/0, 7/Y):
+   `MANDALIHA` → `MANDALINA`, `MUZITHAL` → `MUZ ITHAL`, `PE7H` → `PEYN`. Only
+   words close to a word in its list change; Turkish endings (`POSETI`), short
+   words and unknown brands stay as read. Add common words or brands to
+   `WORDS` to teach it more.
+
+Header text above the first item (ETTN, loyalty card, column headings) and
+barcodes OCR half-misread are kept out of names.
+
+Tall photos of long receipts read best at full width; the Raf app sends them
+up to 1200 px wide instead of shrinking them to 2000 px tall.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v      # no OCR models needed
+```
+
 ## Contract
 
 `POST /v1/receipts/parse` (multipart: `file`, `receiptId`, `kind`, `callbackUrl`,
