@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Tag, Text } from '@/components/ui';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Tag, Text, useModal } from '@/components/ui';
 import { HIT, radius } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useTheme } from '@/theme';
@@ -25,6 +25,7 @@ export function HomeItemRow({
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
+  const modal = useModal();
   const amount = f.homeAmount(item.count, item.unit);
   const match =
     item.lastMatchAdded && item.lastMatchAt
@@ -37,11 +38,14 @@ export function HomeItemRow({
   const other: HomeUnit = item.unit === 'KG' ? 'PIECE' : 'KG';
 
   const openMenu = () =>
-    Alert.alert(item.name, t(item.unit === 'KG' ? 'atHome.countedKg' : 'atHome.countedPieces'), [
-      { text: t(other === 'KG' ? 'atHome.useKg' : 'atHome.usePieces'), onPress: () => onUnit(other) },
-      { text: t('atHome.remove'), style: 'destructive', onPress: onRemove },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+    modal.choose({
+      title: item.name,
+      message: t(item.unit === 'KG' ? 'atHome.countedKg' : 'atHome.countedPieces'),
+      choices: [
+        { label: t(other === 'KG' ? 'atHome.useKg' : 'atHome.usePieces'), onPress: () => onUnit(other) },
+        { label: t('atHome.remove'), destructive: true, onPress: onRemove },
+      ],
+    });
 
   return (
     <Pressable

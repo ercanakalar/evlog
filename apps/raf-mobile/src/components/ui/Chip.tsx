@@ -4,13 +4,24 @@ import { useTheme } from '@/theme';
 import { Text } from './Text';
 
 /** Outlined pill filter; the selected one is filled with ink. */
-export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
+export function Chip({
+  label,
+  selected,
+  onPress,
+  onLongPress,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
   const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [
         styles.chip,
         { borderColor: colors.text, backgroundColor: selected ? colors.ink : 'transparent', opacity: pressed ? 0.8 : 1 },

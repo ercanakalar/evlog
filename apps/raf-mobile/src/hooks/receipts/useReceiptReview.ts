@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { RECEIPT_POLL_MS } from '@/constants/domain';
 import { useErrorAlert } from '@/hooks/common/useErrorAlert';
 import { useListHomeItemsQuery } from '@/store/services/homeItemService';
@@ -38,6 +38,7 @@ export function useReceiptReview(receiptId: string) {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const showError = useErrorAlert();
+  const modal = useModal();
   // Poll only while the reader is still working on the photo.
   const cached = receiptService.endpoints.getReceipt.useQueryState(receiptId);
   const status = cached.data?.status;
@@ -116,17 +117,16 @@ export function useReceiptReview(receiptId: string) {
     },
     rescan: () => void rescan(receiptId).unwrap().catch((error: unknown) => showError(t('scan.failed'), error)),
     discard: () =>
-      Alert.alert(t('review.discardTitle'), t('review.discardBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('review.discard'),
-          style: 'destructive',
-          onPress: () =>
-            void remove(receiptId)
-              .unwrap()
-              .then(() => navigation.goBack())
-              .catch((error: unknown) => showError(t('common.somethingWrong'), error)),
-        },
-      ]),
+      modal.confirm({
+        title: t('review.discardTitle'),
+        message: t('review.discardBody'),
+        confirmLabel: t('review.discard'),
+        destructive: true,
+        onConfirm: () =>
+          remove(receiptId)
+            .unwrap()
+            .then(() => navigation.goBack())
+            .catch((error: unknown) => showError(t('common.somethingWrong'), error)),
+      }),
   };
 }

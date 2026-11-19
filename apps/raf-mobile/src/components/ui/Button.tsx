@@ -13,6 +13,7 @@ export function Button({ title, onPress, variant = 'primary', trailing, loading,
     outline: [colors.card, colors.text, colors.text],
     ghost: ['transparent', colors.text, 'transparent'],
     danger: ['transparent', colors.urgentText, 'transparent'],
+    dangerFilled: [colors.urgentBar, '#FCFCFA', 'transparent'],
     // Outline on the dark camera screen, in both themes.
     onDark: ['transparent', '#FCFCFA', '#FCFCFA'],
   }[variant];

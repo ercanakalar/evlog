@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Text } from '@/components/ui';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, useModal } from '@/components/ui';
 import { radius } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useTheme } from '@/theme';
@@ -22,6 +22,7 @@ export function ListItemRow({
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
+  const modal = useModal();
   const color = item.done ? colors.textMuted : colors.text;
   return (
     <Pressable
@@ -30,10 +31,12 @@ export function ListItemRow({
       accessibilityHint={t('lists.removeHint')}
       onPress={onToggle}
       onLongPress={() =>
-        Alert.alert(t('lists.removeTitle', { name: item.name }), undefined, [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('lists.remove'), style: 'destructive', onPress: onRemove },
-        ])
+        modal.confirm({
+          title: t('lists.removeTitle', { name: item.name }),
+          confirmLabel: t('lists.remove'),
+          destructive: true,
+          onConfirm: onRemove,
+        })
       }
       style={[styles.row, { backgroundColor: colors.card }]}>
       <View

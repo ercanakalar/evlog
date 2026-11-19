@@ -9,7 +9,7 @@ export type TextVariant =
   | 'body' | 'bodyMedium' | 'bodyStrong' | 'label' | 'small' | 'smallMedium' | 'caption'
   | 'amountXL' | 'amountL' | 'amount' | 'mono' | 'monoBold' | 'monoSmall';
 export type CardTone = 'paper' | 'ink';
-export type ButtonVariant = 'primary' | 'accent' | 'outline' | 'ghost' | 'danger' | 'onDark';
+export type ButtonVariant = 'primary' | 'accent' | 'outline' | 'ghost' | 'danger' | 'dangerFilled' | 'onDark';
 
 export interface TextProps {
   children: ReactNode;
@@ -61,4 +61,15 @@ export interface ScreenProps {
   refreshing?: boolean;
   onRefresh?: () => void;
   gap?: number;
+}
+
+export type ModalPresentation = 'sheet' | 'fullscreen';
+
+export interface ModalAction {
+  label: string;
+  /** Defaults to `primary`. */
+  variant?: ButtonVariant;
+  disabled?: boolean;
+  /** May be async; the button shows a spinner. Return false to keep the modal open. No handler = just close. */
+  onPress?: () => unknown;
 }

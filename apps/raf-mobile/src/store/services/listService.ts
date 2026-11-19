@@ -12,6 +12,10 @@ export const listService = baseApi.injectEndpoints({
       query: (body) => ({ url: '/lists', method: 'POST', body }),
       invalidatesTags: ['List'],
     }),
+    renameList: build.mutation<ShoppingList, { id: string; name: string }>({
+      query: ({ id, name }) => ({ url: `/lists/${id}`, method: 'PATCH', body: { name } }),
+      invalidatesTags: ['List'],
+    }),
     deleteList: build.mutation<void, string>({
       query: (id) => ({ url: `/lists/${id}`, method: 'DELETE' }),
       invalidatesTags: ['List'],
@@ -45,6 +49,7 @@ export const listService = baseApi.injectEndpoints({
 export const {
   useGetListsQuery,
   useCreateListMutation,
+  useRenameListMutation,
   useDeleteListMutation,
   useAddListItemMutation,
   useToggleListItemMutation,

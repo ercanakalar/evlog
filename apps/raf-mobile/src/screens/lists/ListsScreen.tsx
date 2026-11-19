@@ -4,6 +4,7 @@ import { ListItemRow } from '@/components/lists/ListItemRow';
 import {
   Button,
   Chip,
+  IconButton,
   Empty,
   ErrorView,
   FooterBar,
@@ -51,18 +52,32 @@ export function ListsScreen() {
         />
       ) : null}
       {l.lists.length > 0 ? (
-        <ScrollView
-          horizontal
-          accessibilityLabel={t('lists.yourLists')}
-          showsHorizontalScrollIndicator={false}
-          style={{ marginHorizontal: -space.xl, flexGrow: 0 }}
-          contentContainerStyle={{ paddingHorizontal: space.xl, gap: 6 }}>
-          {l.lists.map((list) => (
-            <Pressable key={list.id} onLongPress={() => l.confirmDelete(list.id, list.name)}>
-              <Chip label={list.name} selected={list.id === l.active?.id} onPress={() => l.select(list.id)} />
-            </Pressable>
-          ))}
-        </ScrollView>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: -space.xl }}>
+          <ScrollView
+            horizontal
+            accessibilityLabel={t('lists.yourLists')}
+            showsHorizontalScrollIndicator={false}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingLeft: space.xl, paddingRight: space.sm, gap: 6 }}>
+            {l.lists.map((list) => (
+              <Chip
+                key={list.id}
+                label={list.name}
+                selected={list.id === l.active?.id}
+                onPress={() => l.select(list.id)}
+                onLongPress={() => l.openOptions(list)}
+              />
+            ))}
+          </ScrollView>
+          {l.active ? (
+            <IconButton
+              icon="more-horizontal"
+              label={t('lists.optionsFor', { name: l.active.name })}
+              background={colors.cardMuted}
+              onPress={() => l.openOptions(l.active!)}
+            />
+          ) : null}
+        </View>
       ) : null}
       {l.active ? (
         <InlineAdd label={t('lists.productToAdd')} placeholder={t('lists.addProduct')} action={t('common.add')} onSubmit={l.add} />

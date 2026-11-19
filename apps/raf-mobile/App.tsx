@@ -6,17 +6,20 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppBootstrap } from '@/hooks/app/useAppBootstrap';
 import { linking } from '@/navigators/linking';
 import { navigationRef } from '@/navigators/navigationRef';
+import { ModalProvider } from '@/components/ui';
 import { RootNavigator } from '@/navigators/RootNavigator';
 import { store } from '@/store';
 import { FONT_ASSETS, ThemeProvider, useTheme } from '@/theme';
 
-/** Provider tree: Redux → theme → safe area → navigation. */
+/** Provider tree: Redux → theme → safe area → modal → navigation. */
 export default function App() {
   return (
     <Provider store={store}>
       <ThemeProvider>
         <SafeAreaProvider>
-          <AppContent />
+          <ModalProvider>
+            <AppContent />
+          </ModalProvider>
         </SafeAreaProvider>
       </ThemeProvider>
     </Provider>

@@ -3,7 +3,7 @@ import type { CameraView } from 'expo-camera';
 import { useCameraPermissions } from 'expo-camera';
 import { useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { MAX_RECEIPT_PARTS } from '@/constants/domain';
 import { PhotoPermissionError, pickImage, prepareImage } from '@/services/media/imageCapture';
 import { uploadReceipt } from '@/store/actions/receiptActions';
@@ -19,6 +19,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const navigation = useNavigation();
+  const modal = useModal();
   const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState(false);
@@ -35,7 +36,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       return;
     }
     setParts([]);
-    Alert.alert(t('scan.failed'), describeError(result.payload, t));
+    modal.alert(t('scan.failed'), describeError(result.payload, t));
   };
 
   const capture = async () => {
@@ -51,7 +52,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       if (next.length >= MAX_RECEIPT_PARTS) void upload(next);
     } catch {
       setBusy(null);
-      Alert.alert(t('scan.failed'), t('scan.cameraError'));
+      modal.alert(t('scan.failed'), t('scan.cameraError'));
     }
   };
 
@@ -62,7 +63,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       if (long) setParts((p) => [...p, file]);
       else void upload([file]);
     } catch (error) {
-      if (error instanceof PhotoPermissionError) Alert.alert(t('scan.failed'), t('scan.photosDenied'));
+      if (error instanceof PhotoPermissionError) modal.alert(t('scan.failed'), t('scan.photosDenied'));
     }
   };
 

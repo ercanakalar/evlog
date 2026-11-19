@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { CATEGORIES } from '@/constants/domain';
 import { useErrorAlert } from '@/hooks/common/useErrorAlert';
 import { useDeleteReceiptMutation, useGetReceiptQuery } from '@/store/services/receiptService';
@@ -22,6 +22,7 @@ export function useTripDetail(receiptId: string) {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const showError = useErrorAlert();
+  const modal = useModal();
   const query = useGetReceiptQuery(receiptId);
   const [remove] = useDeleteReceiptMutation();
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -47,17 +48,16 @@ export function useTripDetail(receiptId: string) {
     setPhotoOpen,
     openProduct: (itemId: string) => navigation.navigate('Product', { itemId }),
     remove: () =>
-      Alert.alert(t('trip.deleteTitle'), t('trip.deleteBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('trip.delete'),
-          style: 'destructive',
-          onPress: () =>
-            void remove(receiptId)
-              .unwrap()
-              .then(() => navigation.goBack())
-              .catch((error: unknown) => showError(t('common.somethingWrong'), error)),
-        },
-      ]),
+      modal.confirm({
+        title: t('trip.deleteTitle'),
+        message: t('trip.deleteBody'),
+        confirmLabel: t('trip.delete'),
+        destructive: true,
+        onConfirm: () =>
+          remove(receiptId)
+            .unwrap()
+            .then(() => navigation.goBack())
+            .catch((error: unknown) => showError(t('common.somethingWrong'), error)),
+      }),
   };
 }

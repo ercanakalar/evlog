@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { useErrorAlert } from '@/hooks/common/useErrorAlert';
 import { signOut } from '@/store/actions/sessionActions';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -17,6 +17,7 @@ export function useSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const showError = useErrorAlert();
+  const modal = useModal();
   const me = useGetMeQuery();
   const [update] = useUpdateSettingsMutation();
   const [deleteAccount, deleteState] = useDeleteAccountMutation();
@@ -27,11 +28,17 @@ export function useSettings() {
   const set = (changes: UpdateSettingsRequest) =>
     void update(changes).unwrap().catch((error: unknown) => showError(t('settings.saveFailed'), error));
 
-  const pick = <T extends string>(title: string, options: readonly T[], label: (v: T) => string, onPick: (v: T) => void) =>
-    Alert.alert(title, undefined, [
-      ...options.map((o) => ({ text: label(o), onPress: () => onPick(o) })),
-      { text: t('common.cancel'), style: 'cancel' as const },
-    ]);
+  const pick = <T extends string>(
+    title: string,
+    options: readonly T[],
+    current: T | undefined,
+    label: (v: T) => string,
+    onPick: (v: T) => void,
+  ) =>
+    modal.choose({
+      title,
+      choices: options.map((o) => ({ label: label(o), selected: o === current, onPress: () => onPick(o) })),
+    });
 
   return {
     me: me.data,
@@ -44,29 +51,28 @@ export function useSettings() {
     usageReporting: usage === 'granted',
     setUsageReporting: (on: boolean) => dispatch(usageReportingDecided(on ? 'granted' : 'denied')),
     pickCurrency: () =>
-      pick(t('settings.currency'), CURRENCIES, (c) => t(`currencies.${c}`), (currency) => set({ currency })),
+      pick(t('settings.currency'), CURRENCIES, me.data?.currency as (typeof CURRENCIES)[number] | undefined, (c) => t(`currencies.${c}`), (currency) => set({ currency })),
     pickLanguage: () =>
-      pick<LanguagePreference>(t('settings.language'), ['system', 'en', 'tr'], (l) => t(`settings.languages.${l}`), (l) =>
+      pick<LanguagePreference>(t('settings.language'), ['system', 'en', 'tr'], language, (l) => t(`settings.languages.${l}`), (l) =>
         dispatch(languageChanged(l)),
       ),
     pickTheme: () =>
-      pick<ThemePreference>(t('settings.theme'), ['system', 'light', 'dark'], (v) => t(`settings.themes.${v}`), (v) =>
+      pick<ThemePreference>(t('settings.theme'), ['system', 'light', 'dark'], theme, (v) => t(`settings.themes.${v}`), (v) =>
         dispatch(themeChanged(v)),
       ),
     logOut: () => void dispatch(signOut()),
     deleting: deleteState.isLoading,
     deleteAccount: () =>
-      Alert.alert(t('settings.deleteTitle'), t('settings.deleteBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('settings.deleteAccount'),
-          style: 'destructive',
-          onPress: () =>
-            void deleteAccount()
-              .unwrap()
-              .then(() => dispatch(signedOut()))
-              .catch((error: unknown) => showError(t('common.somethingWrong'), error)),
-        },
-      ]),
+      modal.confirm({
+        title: t('settings.deleteTitle'),
+        message: t('settings.deleteBody'),
+        confirmLabel: t('settings.deleteAccount'),
+        destructive: true,
+        onConfirm: () =>
+          deleteAccount()
+            .unwrap()
+            .then(() => dispatch(signedOut()))
+            .catch((error: unknown) => showError(t('common.somethingWrong'), error)),
+      }),
   };
 }

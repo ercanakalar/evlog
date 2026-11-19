@@ -1,3 +1,4 @@
+export { AppModal, ModalChoice, type AppModalProps } from './AppModal';
 export { Button } from './Button';
 export { Card } from './Card';
 export { Chip, ChipRow } from './Chip';
@@ -8,6 +9,7 @@ export { InlineAdd } from './InlineAdd';
 export { ReceiptEdge, ReceiptPaper } from './ReceiptPaper';
 export { Row, SpaceBetween } from './Row';
 export { Rule } from './Rule';
+export { ModalProvider, useModal, type ModalApi } from './ModalProvider';
 export { FooterBar, Screen } from './Screen';
 export { ScreenHeader } from './ScreenHeader';
 export { SectionHeader, TextLink } from './SectionHeader';
