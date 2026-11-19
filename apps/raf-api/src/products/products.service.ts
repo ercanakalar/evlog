@@ -18,24 +18,40 @@ export class ProductsService implements OnApplicationBootstrap {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * A fresh database gets the built-in table on first boot, so the app works
-   * without running the seed. `npm run db:seed` updates existing rows.
+   * Brings the table in line with the built-in list on every start: new
+   * keywords are added and changed ones updated, so a deployed database
+   * picks up fixes without re-running the seed.
    */
   async onApplicationBootstrap() {
-    if ((await this.prisma.shelfLife.count()) > 0) return;
-    const { count } = await this.prisma.shelfLife.createMany({
-      data: SHELF_LIFE.map(([keyword, displayName, category, storage, shelfLifeDays, openedShelfLifeDays]) => ({
-        keyword,
-        displayName,
-        category,
-        storage,
-        shelfLifeDays,
-        openedShelfLifeDays,
-        source: SHELF_LIFE_SOURCE,
-      })),
-      skipDuplicates: true,
+    const rows = SHELF_LIFE.map(([keyword, displayName, category, storage, shelfLifeDays, openedShelfLifeDays]) => ({
+      keyword,
+      displayName,
+      category,
+      storage,
+      shelfLifeDays,
+      openedShelfLifeDays,
+      source: SHELF_LIFE_SOURCE,
+    }));
+    const existing = new Map((await this.prisma.shelfLife.findMany()).map((r) => [r.keyword, r]));
+    const changed = rows.filter((row) => {
+      const current = existing.get(row.keyword);
+      return (
+        !current ||
+        current.displayName !== row.displayName ||
+        current.category !== row.category ||
+        current.storage !== row.storage ||
+        current.shelfLifeDays !== row.shelfLifeDays ||
+        current.openedShelfLifeDays !== row.openedShelfLifeDays
+      );
     });
-    this.logger.log(`Loaded ${count} shelf-life entries`);
+    if (changed.length === 0) return;
+    await this.prisma.$transaction(
+      changed.map((row) =>
+        this.prisma.shelfLife.upsert({ where: { keyword: row.keyword }, update: row, create: row }),
+      ),
+    );
+    this.loadedAt = 0; // reload the cache with the new rows
+    this.logger.log(`Shelf-life table: ${changed.length} entries added or updated`);
   }
 
   async match(rawName: string, quantity?: number, unit?: string | null): Promise<ProductMatch> {

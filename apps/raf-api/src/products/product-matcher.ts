@@ -47,10 +47,23 @@ export const weightKg = (raw: string): number | null => {
   return match[2].toLowerCase() === 'kg' ? amount : amount / 1000;
 };
 
+/**
+ * Turkish "-li / -lı / -lu / -lü" makes a flavour adjective: "CILEKLI" is
+ * strawberry-flavoured (yogurt), "PORTAKALLI" orange-flavoured (crackers).
+ * After normalising, what is left of the word is just "li" or "lu".
+ */
+const FLAVOUR_SUFFIX = /^l[iu](?![a-z])/;
+
 const keywordMatches = (name: string, keyword: string): boolean => {
   const haystack = ` ${name} `;
   if (keyword.length < MIN_PREFIX_KEYWORD) return haystack.includes(` ${keyword} `);
-  return haystack.includes(` ${keyword}`);
+  // Every place a word starts with the keyword; it counts unless the rest of
+  // that word only makes it a flavour.
+  for (let at = haystack.indexOf(` ${keyword}`); at !== -1; at = haystack.indexOf(` ${keyword}`, at + 1)) {
+    const rest = haystack.slice(at + 1 + keyword.length).split(' ')[0] ?? '';
+    if (!FLAVOUR_SUFFIX.test(rest)) return true;
+  }
+  return false;
 };
 
 const titleCase = (text: string): string =>
@@ -99,14 +112,26 @@ export function matchProduct(
   };
 }
 
+/** What may follow a home item's word inside a receipt word: a plural, or a size ("1l", ".500gr"). */
+const WORD_TAIL = /^(s|es|ler|lar)?([^a-z].*)?$/;
+
 /**
- * Whether a product the user keeps at home ("Whole milk") is the same as a
- * purchased line ("whole milk 1 l" / "tam yagli sut 1l"): every word of the
- * home item must start a word of the purchase.
+ * Whether a product the user keeps at home ("Whole milk", "Süt") is the
+ * same as a purchased line ("Whole milk 1 L" / "TAM YAGLI SUT 1L"). Each word
+ * of the home item must be a word of the purchase, or that word plus a
+ * plural or a size: "Egg" finds "Eggs", but "Süt" does not find the brand
+ * "SUTAS", and "Soğan" does not find onion-flavoured crisps ("SOGAN.EKST").
  */
 export const namesMatch = (homeItem: string, purchase: string): boolean => {
   const words = normalizeProductName(homeItem).split(' ').filter(Boolean);
   if (words.length === 0) return false;
-  const target = ` ${normalizeProductName(purchase)} `;
-  return words.every((word) => target.includes(` ${word}`));
+  const tokens = normalizeProductName(purchase).split(' ');
+  return words.every((word) =>
+    tokens.some((token) => {
+      if (!token.startsWith(word)) return false;
+      const tail = token.slice(word.length);
+      // "sogan.ekst" is a word with an abbreviation after it, not a size.
+      return WORD_TAIL.test(tail) && !/^\.[a-z]/.test(tail) && !FLAVOUR_SUFFIX.test(tail);
+    }),
+  );
 };

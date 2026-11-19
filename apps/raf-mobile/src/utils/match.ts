@@ -34,9 +34,20 @@ export const amountBought = (
   return weighed || (line.unit && line.unit !== 'pcs') ? 1 : Math.max(1, Math.round(quantity));
 };
 
+/** Plural or size after the word ("eggs", "sut1l"); see WORD_TAIL in the API. */
+const WORD_TAIL = /^(s|es|ler|lar)?([^a-z].*)?$/;
+/** Turkish flavour suffix: "cilekli" is strawberry-flavoured, not strawberries. */
+const FLAVOUR_SUFFIX = /^l[iu](?![a-z])/;
+
 export const namesMatch = (homeItem: string, purchase: string) => {
   const words = normalizeName(homeItem).split(' ').filter(Boolean);
   if (words.length === 0) return false;
-  const target = ` ${normalizeName(purchase)} `;
-  return words.every((word) => target.includes(` ${word}`));
+  const tokens = normalizeName(purchase).split(' ');
+  return words.every((word) =>
+    tokens.some((token) => {
+      if (!token.startsWith(word)) return false;
+      const tail = token.slice(word.length);
+      return WORD_TAIL.test(tail) && !/^\.[a-z]/.test(tail) && !FLAVOUR_SUFFIX.test(tail);
+    }),
+  );
 };

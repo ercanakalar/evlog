@@ -8,6 +8,9 @@
  *
  * Keywords are normalised (lower case, no Turkish diacritics) and match the
  * start of a word in a receipt line, so "sut" finds "TAM YAGLI SUT 1L".
+ * A word that only adds the flavour suffix -li/-lu ("CILEKLI" = strawberry
+ * flavoured) is not a match. Brand and product-form keywords ("master potato",
+ * "kraker") are longer than the flavours they carry, so they win.
  */
 export type ShelfLifeSeed = [
   keyword: string,
@@ -38,12 +41,14 @@ export const SHELF_LIFE: ShelfLifeSeed[] = [
   ['krm peyn', 'Cream cheese', 'DAIRY_EGGS', 'FRIDGE', 14, 7],
   ['labne', 'Labneh', 'DAIRY_EGGS', 'FRIDGE', 14, 7],
   ['peynir', 'Cheese', 'DAIRY_EGGS', 'FRIDGE', 30, 7],
+  ['peyn', 'Cheese', 'DAIRY_EGGS', 'FRIDGE', 30, 7],
   ['cheese', 'Cheese', 'DAIRY_EGGS', 'FRIDGE', 30, 7],
   ['tereyag', 'Butter', 'DAIRY_EGGS', 'FRIDGE', 60, 30],
   ['butter', 'Butter', 'DAIRY_EGGS', 'FRIDGE', 60, 30],
   ['kaymak', 'Clotted cream', 'DAIRY_EGGS', 'FRIDGE', 7, 3],
   ['krema', 'Cream', 'DAIRY_EGGS', 'FRIDGE', 14, 4],
   ['yumurta', 'Eggs', 'DAIRY_EGGS', 'FRIDGE', 28, null],
+  ['yum.', 'Eggs', 'DAIRY_EGGS', 'FRIDGE', 28, null],
   ['egg', 'Eggs', 'DAIRY_EGGS', 'FRIDGE', 28, null],
 
   // Meat & fish
@@ -55,6 +60,7 @@ export const SHELF_LIFE: ShelfLifeSeed[] = [
   ['kiyma', 'Ground beef', 'MEAT_FISH', 'FRIDGE', 2, null],
   ['dana', 'Beef', 'MEAT_FISH', 'FRIDGE', 3, null],
   ['kuzu', 'Lamb', 'MEAT_FISH', 'FRIDGE', 3, null],
+  ['kuzu kulag', 'Sorrel', 'FRUIT_VEG', 'FRIDGE', 3, null],
   ['kofte', 'Meatballs', 'MEAT_FISH', 'FRIDGE', 2, null],
   ['balik', 'Fish', 'MEAT_FISH', 'FRIDGE', 2, null],
   ['somon', 'Salmon', 'MEAT_FISH', 'FRIDGE', 2, null],
@@ -73,6 +79,8 @@ export const SHELF_LIFE: ShelfLifeSeed[] = [
   ['elma', 'Apples', 'FRUIT_VEG', 'FRIDGE', 30, null],
   ['armut', 'Pears', 'FRUIT_VEG', 'FRIDGE', 7, null],
   ['portakal', 'Oranges', 'FRUIT_VEG', 'PANTRY', 21, null],
+  ['greyfurt', 'Grapefruit', 'FRUIT_VEG', 'PANTRY', 21, null],
+  ['hurma', 'Persimmons', 'FRUIT_VEG', 'PANTRY', 7, null],
   ['mandalina', 'Mandarins', 'FRUIT_VEG', 'PANTRY', 14, null],
   ['limon', 'Lemons', 'FRUIT_VEG', 'FRIDGE', 21, null],
   ['cilek', 'Strawberries', 'FRUIT_VEG', 'FRIDGE', 3, null],
@@ -137,6 +145,10 @@ export const SHELF_LIFE: ShelfLifeSeed[] = [
   ['biskuvi', 'Biscuits', 'PANTRY', 'PANTRY', 180, 14],
   ['cikolata', 'Chocolate', 'PANTRY', 'PANTRY', 270, null],
   ['cips', 'Crisps', 'PANTRY', 'PANTRY', 120, 3],
+  ['master potato', 'Crisps', 'PANTRY', 'PANTRY', 120, 3],
+  ['kraker', 'Crackers', 'PANTRY', 'PANTRY', 180, 14],
+  ['greta', 'Crackers', 'PANTRY', 'PANTRY', 180, 14],
+  ['nutella', 'Hazelnut spread', 'PANTRY', 'PANTRY', 365, 60],
   ['kuruyemis', 'Nuts', 'PANTRY', 'PANTRY', 180, 60],
 
   // Drinks
@@ -164,6 +176,7 @@ export const SHELF_LIFE: ShelfLifeSeed[] = [
   ['kagit havlu', 'Paper towels', 'HOUSEHOLD', 'PANTRY', null, null],
   ['pecete', 'Napkins', 'HOUSEHOLD', 'PANTRY', null, null],
   ['cop poset', 'Bin bags', 'HOUSEHOLD', 'PANTRY', null, null],
+  ['market poset', 'Shopping bags', 'HOUSEHOLD', 'PANTRY', null, null],
   ['sabun', 'Soap', 'HOUSEHOLD', 'PANTRY', null, null],
   ['sampuan', 'Shampoo', 'HOUSEHOLD', 'PANTRY', null, null],
   ['dis macun', 'Toothpaste', 'HOUSEHOLD', 'PANTRY', null, null],
