@@ -54,6 +54,10 @@ export class LabelResultDto {
 
   @IsOptional() @IsString() @MaxLength(500)
   error?: string;
+
+  /** The text the reader found, shown when no date was read. */
+  @IsOptional() @IsString() @MaxLength(1000)
+  text?: string;
 }
 
 export class OcrResultDto {
@@ -80,4 +84,8 @@ export class OcrResultDto {
   /** Set instead of the fields when the reader could not read the image. */
   @IsOptional() @IsString() @MaxLength(500)
   error?: string;
+
+  /** The text the reader found, shown when no date was read. */
+  @IsOptional() @IsString() @MaxLength(1000)
+  text?: string;
 }

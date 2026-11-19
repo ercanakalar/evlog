@@ -82,14 +82,23 @@ def read_receipt(image: bytes, kind: str) -> dict:
 
 
 def read_label(image: bytes) -> dict:
+    """
+    Reads the photo as taken; when no expiry date is found, tries it turned
+    and with evened-out lighting before giving up (see ocr.label_views).
+    """
     started = time.monotonic()
     try:
-        words = ocr.recognize(image)
+        img = ocr.decode(image)
     except ValueError:
         return {"error": "Unsupported image format, send a JPEG or PNG"}
-    result = label_parser.parse_label(words)
-    logger.info("Read pack label: %d words, expires %s, barcode %s, %.1fs",
-                len(words), result["expiresOn"], result["barcode"], time.monotonic() - started)
+    result, view, words = None, "", []
+    for view, variant in ocr.label_views(img):
+        words = ocr.recognize_array(variant)
+        result = label_parser.parse_label(words)
+        if result["expiresOn"]:
+            break
+    logger.info("Read pack label (%s): %d words, expires %s, barcode %s, %.1fs",
+                view, len(words), result["expiresOn"], result["barcode"], time.monotonic() - started)
     if not result["expiresOn"]:
         result["error"] = "No expiry date found. Photograph the date printed on the pack, close up."
     return result

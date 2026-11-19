@@ -26,11 +26,23 @@ EXPIRY = re.compile(
 )
 PRODUCTION = re.compile(r"[ÜU]\.?\s?T\b|[ÜU]RT|[ÜU]RET[İI]M|PROD|MFG|\bP\.?\s?D\b|IMAL", re.I)
 
-# Separators OCR may read for "." : "," "/" "-" " " and sometimes nothing.
-SEP = r"\s?[./,\-]\s?"
+# Between day, month and year: "." "/" "-" "," (OCR for "."), or just a space
+# ("15 03 2027" is common in inkjet print).
+SEP = r"(?:\s?[./,\-]\s?|\s)"
 FULL = re.compile(rf"(?<!\d)([0-3]?\d){SEP}([01]?\d){SEP}((?:20)?\d{{2}})(?!\d)")
 MONTH = re.compile(rf"(?<![\d./,\-])([01]?\d){SEP}(20\d{{2}})(?!\d)")
 ISO = re.compile(r"(?<!\d)(20\d{2})-([01]\d)-([0-3]\d)(?!\d)")
+# No separators at all: "150327", "15032027". Only trusted right after an
+# expiry label, since lot numbers look the same.
+COMPACT = re.compile(r"(?<!\d)([0-3]\d)([01]\d)((?:20)?\d{2})(?!\d)")
+# Month names, Turkish and English: "15 MAR 2027", "15.OCA.27", "MAR 2027".
+MONTHS = {
+    "OCA": 1, "SUB": 2, "ŞUB": 2, "MAR": 3, "NIS": 4, "NİS": 4, "MAY": 5, "HAZ": 6, "TEM": 7,
+    "AGU": 8, "AĞU": 8, "EYL": 9, "EKI": 10, "EKİ": 10, "KAS": 11, "ARA": 12,
+    "JAN": 1, "FEB": 2, "APR": 4, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}
+_NAMES = "|".join(sorted(MONTHS, key=len, reverse=True))
+NAMED = re.compile(rf"(?<![\w])(?:([0-3]?\d)\s?[./\-]?\s?)?({_NAMES})[A-ZÇĞİÖŞÜa-zçğıöşü]*\.?\s?[./\-]?\s?((?:20)?\d{{2}})(?!\d)", re.I)
 
 
 @dataclass
@@ -82,10 +94,24 @@ def find_dates(text: str, today: date) -> list[FoundDate]:
             add(date(_year(m[3]), int(m[2]), int(m[1])), m.span())
         except ValueError:
             pass
+    for m in NAMED.finditer(text):
+        month, year = MONTHS[m[2].upper()], _year(m[3])
+        day = int(m[1]) if m[1] else calendar.monthrange(year, month)[1]
+        try:
+            add(date(year, month, day), m.span())
+        except ValueError:
+            pass
     for m in MONTH.finditer(text):
         month, year = int(m[1]), int(m[2])
         if 1 <= month <= 12:
             add(date(year, month, calendar.monthrange(year, month)[1]), m.span())
+    for m in COMPACT.finditer(text):
+        if _kind(text, m.start(), 0) != "expiry":
+            continue
+        try:
+            add(date(_year(m[3]), int(m[2]), int(m[1])), m.span())
+        except ValueError:
+            pass
     found.sort(key=lambda f: f.start)
     ends = {r.start: r.stop for r in taken}
     previous_end = 0
@@ -111,7 +137,8 @@ def reading_text(words: list[Word]) -> str:
 
 def parse_label(words: list[Word], today: date | None = None) -> dict:
     """
-    {"expiresOn": "2027-03-12" | None, "barcode": "869..." | None, "dates": [...]}.
+    {"expiresOn": "2027-03-12" | None, "barcode": "869..." | None, "dates": [...],
+     "text": what was read, so the app can show it when no date is found}.
     The expiry date is the one labelled SKT/TETT/EXP; failing that, the
     latest date that is not labelled as the production date.
     """
@@ -125,4 +152,5 @@ def parse_label(words: list[Word], today: date | None = None) -> dict:
         "expiresOn": expires.isoformat() if expires else None,
         "barcode": find_ean(text),
         "dates": [{"date": d.value.isoformat(), "kind": d.kind} for d in dates],
+        "text": " ".join(text.split())[:300],
     }

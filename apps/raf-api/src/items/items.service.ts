@@ -89,6 +89,7 @@ export class ItemsService {
         barcode: label.barcode ?? null,
         barcodeMatches: item.barcode && label.barcode ? item.barcode === label.barcode : null,
         error: label.expiresOn ? null : (label.error ?? 'No expiry date found on the photo'),
+        text: label.text?.slice(0, 300) ?? null,
       },
     };
   }

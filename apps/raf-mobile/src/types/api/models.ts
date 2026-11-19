@@ -114,6 +114,8 @@ export interface PackLabelResult {
     /** False when the photographed pack's barcode is another product's. */
     barcodeMatches: boolean | null;
     error: string | null;
+    /** What the camera read, shown when no date was found. */
+    text: string | null;
   };
 }
 

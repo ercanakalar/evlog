@@ -54,8 +54,14 @@ only one repair fits. Raf matches pack scans to receipt lines with it.
 (`label_parser.py`) and answers `{"expiresOn": "2027-03-15", "barcode": "…"}`.
 It takes the date labelled SKT / TETT / S.K.T. / EXP / BEST BEFORE, never the
 production date (ÜT / ÜRT / ÜRETİM / PROD) printed beside it; without a label,
-the latest date. Accepts 15.03.2027, 15/03/27, 03/2027 (end of month) and
-2027-03-15.
+the latest date. Accepts 15.03.2027, 15/03/27, 15 03 2027 (inkjet), 150327
+right after SKT / TETT, 15 MAR 2027 / 15.OCA.27 (Turkish and English months),
+03/2027 (end of month) and 2027-03-15.
+
+When the photo as taken has no date, it is read again upside down, with the
+lighting evened out (glare, dark print on colourful cartons) and turned 90°,
+stopping at the first view with a date. The answer includes the text read, so
+the app can show it when nothing was found (garbled text = a blurred photo).
 
 Header text above the first item (ETTN, loyalty card, column headings) and
 barcodes OCR half-misread are kept out of names.

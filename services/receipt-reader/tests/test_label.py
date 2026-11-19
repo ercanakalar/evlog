@@ -44,6 +44,23 @@ class ExpiryDates(unittest.TestCase):
         self.assertEqual(expires("SKT 12,03,2027"), "2027-03-12")
         self.assertEqual(expires("SKT 12. 03. 2027"), "2027-03-12")
 
+    def test_inkjet_layouts(self):
+        self.assertEqual(expires("SKT 15 03 2027"), "2027-03-15")
+        self.assertEqual(expires("TETT 15 03 27"), "2027-03-15")
+        self.assertEqual(expires("TETT 150327"), "2027-03-15")
+        self.assertEqual(expires("SKT:15032027"), "2027-03-15")
+
+    def test_month_names(self):
+        self.assertEqual(expires("EXP 15 MAR 2027"), "2027-03-15")
+        self.assertEqual(expires("SKT 15.OCA.27"), "2027-01-15")
+        self.assertEqual(expires("TETT KASIM 2027"), "2027-11-30")
+        self.assertEqual(expires("BEST BEFORE 05 AUG 2027"), "2027-08-05")
+
+    def test_a_lot_number_is_not_a_date(self):
+        # Six digits without separators count only right after an expiry label.
+        self.assertIsNone(expires("L: 150327"))
+        self.assertEqual(expires("L 120427 SKT 15.03.2027"), "2027-03-15")
+
     def test_no_date(self):
         self.assertIsNone(expires("PINAR LABNE 400 g"))
         # A price or a weight is not a date.

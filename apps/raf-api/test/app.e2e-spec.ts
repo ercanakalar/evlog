@@ -335,20 +335,20 @@ describe('Raf API (e2e)', () => {
         .attach('file', jpeg(), { filename: 'pack.jpg', contentType: 'image/jpeg' })
         .expect(200);
       expect(read.body.label).toEqual({
-        expiresOn: '2027-03-15', barcode: '8690565007679', barcodeMatches: true, error: null,
+        expiresOn: '2027-03-15', barcode: '8690565007679', barcodeMatches: true, error: null, text: null,
       });
       expect(read.body.item).toMatchObject({ packDate: true });
       expect(read.body.item.expiresAt.slice(0, 10)).toBe('2027-03-15');
 
       // No date on the photo: nothing changes and the app is told why.
-      ocr.respond = () => ({ status: 200, body: { expiresOn: null, error: 'No expiry date found' } });
+      ocr.respond = () => ({ status: 200, body: { expiresOn: null, error: 'No expiry date found', text: 'P1NAR LA8NE' } });
       const kefir = shelf.body.find((i: { name: string }) => i.name.startsWith('Kefir'));
       const none = await api()
         .post(`/api/v1/items/${kefir.id}/label`)
         .set(homeAuth())
         .attach('file', jpeg(), { filename: 'pack.jpg', contentType: 'image/jpeg' })
         .expect(200);
-      expect(none.body.label).toMatchObject({ expiresOn: null, error: 'No expiry date found' });
+      expect(none.body.label).toMatchObject({ expiresOn: null, error: 'No expiry date found', text: 'P1NAR LA8NE' });
       expect(none.body.item.packDate).toBe(false);
       await api().delete(`/api/v1/receipts/${scanned.body.id}`).set(homeAuth()).expect(204);
     });

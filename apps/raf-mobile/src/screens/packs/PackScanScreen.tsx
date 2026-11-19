@@ -148,6 +148,7 @@ export function PackScanScreen({ route }: RootScreenProps<'PackScan'>) {
               ) : (
                 <TypeDate
                   message={s.result.label.error ?? t('packs.noDate')}
+                  read={s.result.label.text}
                   saving={s.saving}
                   onSave={(day) => void s.saveTyped(day)}
                   onRetry={s.retry}
@@ -165,12 +166,14 @@ export function PackScanScreen({ route }: RootScreenProps<'PackScan'>) {
 /** No date found on the photo: try again, or type the date in. */
 function TypeDate({
   message,
+  read,
   saving,
   onSave,
   onRetry,
   onSkip,
 }: {
   message: string;
+  read: string | null;
   saving: boolean;
   onSave: (isoDay: string) => void;
   onRetry: () => void;
@@ -184,6 +187,9 @@ function TypeDate({
     <View style={{ gap: space.sm }}>
       <Text variant="smallMedium" color={colors.urgentText}>
         {message}
+      </Text>
+      <Text variant="small" muted>
+        {read ? t('packs.whatWasRead', { text: read }) : t('packs.nothingRead')}
       </Text>
       <Field
         label={t('product.packDate')}
