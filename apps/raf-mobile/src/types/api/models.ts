@@ -104,6 +104,15 @@ export interface PurchaseRecord {
 
 export type ShelfItemDetail = ShelfItem & { history: PurchaseRecord[] };
 
+/** At-home products that ran out when a product was marked used up, and the list they went on. */
+export interface AddedToList {
+  id: string;
+  name: string;
+  added: string[];
+}
+
+export type UpdatedItem = ShelfItemDetail & { addedToList?: AddedToList | null };
+
 /** What the reader found on a photo of a pack. */
 export interface PackLabelResult {
   item: ShelfItemDetail;

@@ -1,5 +1,5 @@
 import { formDataFile } from '@/services/media/formDataFile';
-import type { Category, PackLabelResult, ShelfItem, ShelfItemDetail } from '@/types/api/models';
+import type { Category, PackLabelResult, ShelfItem, ShelfItemDetail, UpdatedItem } from '@/types/api/models';
 import type { UpdateItemRequest, UploadFile } from '@/types/api/requests';
 import { compact } from '../bases/query';
 import { baseApi } from '../middlewares/createApi';
@@ -15,9 +15,14 @@ export const itemService = baseApi.injectEndpoints({
       query: (id) => `/items/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'Item', id }],
     }),
-    updateItem: build.mutation<ShelfItemDetail, UpdateItemRequest>({
+    /** Marking a product used up also lowers at-home counts and can add to a list. */
+    updateItem: build.mutation<UpdatedItem, UpdateItemRequest>({
       query: ({ id, ...body }) => ({ url: `/items/${id}`, method: 'PATCH', body }),
-      invalidatesTags: [{ type: 'Item', id: 'LIST' }, 'Insights'],
+      invalidatesTags: (_r, _e, { usedUp }) => [
+        { type: 'Item', id: 'LIST' },
+        'Insights',
+        ...(usedUp === undefined ? [] : (['HomeItem', 'List'] as const)),
+      ],
       async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
         const { data } = await queryFulfilled.catch(() => ({ data: undefined }));
         if (data) dispatch(itemService.util.upsertQueryData('getItem', id, data));

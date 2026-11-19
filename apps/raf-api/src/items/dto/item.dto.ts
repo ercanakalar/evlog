@@ -1,5 +1,17 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, Max, Min, ValidateIf } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 import { Category } from '../../generated/prisma/enums';
 
 export class ListItemsQueryDto {
@@ -25,6 +37,14 @@ export class UpdateItemDto {
 
   @IsOptional() @IsBoolean()
   usedUp?: boolean;
+
+  /**
+   * Name for the market list made when a used-up product runs out at home and
+   * the user has no list yet (in the app's language).
+   */
+  @IsOptional() @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString() @IsNotEmpty() @MaxLength(60)
+  newListName?: string;
 
   @IsOptional() @IsEnum(Category)
   category?: Category;

@@ -34,8 +34,8 @@ describe('Raf API (e2e)', () => {
     return res.body.accessToken as string;
   };
 
-  const scan = (parts = 1) => {
-    const req = api().post('/api/v1/receipts').set(auth());
+  const scan = (parts = 1, t = token) => {
+    const req = api().post('/api/v1/receipts').set(auth(t));
     for (let i = 0; i < parts; i++) {
       void req.attach('files', jpeg(), { filename: `r${i}.jpg`, contentType: 'image/jpeg' });
     }
@@ -140,9 +140,13 @@ describe('Raf API (e2e)', () => {
     const opened = await api().patch(`/api/v1/items/${milk.id}`).set(auth()).send({ opened: true }).expect(200);
     expect(opened.body.daysLeft).toBe(3);
     expect(opened.body.history).toHaveLength(1);
-    await api().patch(`/api/v1/items/${milk.id}`).set(auth()).send({ usedUp: true }).expect(200);
+    // Using it up takes the 2 bottles back off the count at home (3 -> 1).
+    const usedUp = await api().patch(`/api/v1/items/${milk.id}`).set(auth()).send({ usedUp: true }).expect(200);
+    expect(usedUp.body.addedToList).toBeNull();
     const after = await api().get('/api/v1/items').set(auth()).expect(200);
     expect(after.body.some((i: { id: string }) => i.id === milk.id)).toBe(false);
+    const homeAfter = await api().get('/api/v1/home-items').set(auth()).expect(200);
+    expect(homeAfter.body.find((h: { name: string }) => h.name === 'Whole milk').count).toBe(1);
   });
 
   it('matches lines typed in by hand when the reader fails', async () => {
@@ -223,11 +227,15 @@ describe('Raf API (e2e)', () => {
       expect.objectContaining({ name: 'Pasta', done: true, lastPrice: '34.50' }),
       expect.objectContaining({ name: 'Saffron', done: false, lastPrice: null }),
     ]);
-    expect(res.body.runningLow).toEqual([
-      expect.objectContaining({ name: 'Pasta 500', unit: 'KG', count: 0.5 }),
-      expect.objectContaining({ name: 'Pasta', unit: 'PIECE', count: 1 }),
-      expect.objectContaining({ name: 'Olive oil', unit: 'PIECE', count: 1 }),
-    ]);
+    expect(res.body.runningLow[0]).toMatchObject({ name: 'Pasta 500', unit: 'KG', count: 0.5 });
+    expect(res.body.runningLow).toHaveLength(4);
+    expect(res.body.runningLow).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Pasta', unit: 'PIECE', count: 1 }),
+        expect.objectContaining({ name: 'Olive oil', unit: 'PIECE', count: 1 }),
+        expect.objectContaining({ name: 'Whole milk', unit: 'PIECE', count: 1 }),
+      ]),
+    );
 
     // Switching a kg item to pieces rounds its amount.
     const items = await api().get('/api/v1/home-items').set(auth()).expect(200);
@@ -238,6 +246,67 @@ describe('Raf API (e2e)', () => {
       .send({ unit: 'PIECE' })
       .expect(200);
     expect(switched.body).toMatchObject({ unit: 'PIECE', count: 1, lastMatchAdded: null });
+  });
+
+  it('puts products that run out at home on the market list', async () => {
+    const counts = async () =>
+      Object.fromEntries(
+        (await api().get('/api/v1/home-items').set(auth()).expect(200)).body.map(
+          (h: { name: string; count: number }) => [h.name, h.count],
+        ),
+      );
+    const shelf = await api().get('/api/v1/items').set(auth()).expect(200);
+    const pasta = shelf.body.find((i: { name: string }) => i.name === 'Pasta 500 g');
+    const useUp = (usedUp: boolean) =>
+      api().patch(`/api/v1/items/${pasta.id}`).set(auth()).send({ usedUp, newListName: 'Market' }).expect(200);
+
+    // The 500 g pack matches "Pasta" (1 piece) and "Pasta 500" (0.5 kg): both reach 0
+    // and go on the first list; the ticked-off "Pasta" there does not count.
+    const first = await useUp(true);
+    expect(first.body.addedToList).toMatchObject({ name: 'Weekend shop', added: ['Pasta', 'Pasta 500'] });
+    expect(await counts()).toMatchObject({ Pasta: 0, 'Pasta 500': 0 });
+
+    // Marking it again changes nothing; undoing gives the counts back.
+    expect((await useUp(true)).body.addedToList).toBeNull();
+    expect(await counts()).toMatchObject({ Pasta: 0, 'Pasta 500': 0 });
+    await useUp(false);
+    expect(await counts()).toMatchObject({ Pasta: 1, 'Pasta 500': 0.5 });
+
+    // Already on the list and not bought yet: not added twice.
+    expect((await useUp(true)).body.addedToList).toBeNull();
+    const lists = await api().get('/api/v1/lists').set(auth()).expect(200);
+    expect(lists.body.lists).toHaveLength(1);
+    expect(lists.body.lists[0].items.map((i: { name: string; done: boolean }) => [i.name, i.done])).toEqual([
+      ['Pasta', true],
+      ['Saffron', false],
+      ['Pasta', false],
+      ['Pasta 500', false],
+    ]);
+  });
+
+  it('makes a list for products that run out when there is none', async () => {
+    const token = await register('lists@example.com');
+    await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Whole milk' }).expect(201);
+    ocr.respond = () => ({
+      status: 200,
+      body: { merchantName: 'A101', issuedAt: daysAgo(1), total: 56, items: [{ name: 'TAM YAGLI SUT 1L', totalPrice: 56 }] },
+    });
+    const scanned = await scan(1, token).expect(201);
+    const confirmed = await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(token)).expect(200);
+    const milk = confirmed.body.items[0];
+
+    const res = await api()
+      .patch(`/api/v1/items/${milk.id}`)
+      .set(auth(token))
+      .send({ usedUp: true, newListName: 'Market' })
+      .expect(200);
+    expect(res.body.addedToList).toMatchObject({ name: 'Market', added: ['Whole milk'] });
+
+    // Deleting the receipt takes back nothing more: the milk it added was used up.
+    await api().delete(`/api/v1/receipts/${scanned.body.id}`).set(auth(token)).expect(204);
+    const home = await api().get('/api/v1/home-items').set(auth(token)).expect(200);
+    expect(home.body[0]).toMatchObject({ name: 'Whole milk', count: 0 });
+    await api().delete('/api/v1/me').set(auth(token)).expect(204);
   });
 
   it('keeps users apart and deletes accounts', async () => {

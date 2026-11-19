@@ -48,6 +48,8 @@ export interface UpdateItemRequest {
   opened?: boolean;
   packExpiresAt?: string | null;
   usedUp?: boolean;
+  /** Name for the list made if a used-up product runs out at home and there is no list. */
+  newListName?: string;
   category?: Category;
 }
 

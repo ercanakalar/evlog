@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '../generated/prisma/client';
 import type { Category } from '../generated/prisma/enums';
 import { addDays, DAY_MS } from '../common/utils/normalize';
+import { HomeItemsService } from '../home-items/home-items.service';
+import { ListsService } from '../lists/lists.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OcrClient } from '../receipts/ocr.client';
 import { ListItemsQueryDto, UpdateItemDto } from './dto/item.dto';
@@ -64,6 +66,8 @@ export class ItemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ocr: OcrClient,
+    private readonly homeItems: HomeItemsService,
+    private readonly lists: ListsService,
   ) {}
 
   /**
@@ -159,7 +163,11 @@ export class ItemsService {
     };
   }
 
-  /** Mark opened (shorter countdown), set the pack date, or mark used up. */
+  /**
+   * Mark opened (shorter countdown), set the pack date, or mark used up.
+   * Using a product up lowers the at-home counts it matches; any that reach 0
+   * go on the market list, which `addedToList` reports.
+   */
   async update(itemId: string, userId: string, dto: UpdateItemDto) {
     const item = await this.own(itemId, userId);
     const data: Prisma.ReceiptItemUpdateInput = {};
@@ -191,8 +199,25 @@ export class ItemsService {
     }
 
     if (Object.keys(data).length === 0) throw new BadRequestException('Nothing to change');
-    await this.prisma.receiptItem.update({ where: { id: itemId }, data });
-    return this.get(itemId, userId);
+    const usedUpChanged = dto.usedUp !== undefined && dto.usedUp !== (item.usedUpAt !== null);
+    const addedToList = await this.prisma.$transaction(async (tx) => {
+      await tx.receiptItem.update({ where: { id: itemId }, data });
+      if (!usedUpChanged) return null;
+      if (!dto.usedUp) {
+        await this.homeItems.restoreUsedUp(tx, itemId);
+        return null;
+      }
+      const ranOut = await this.homeItems.useUp(tx, userId, {
+        id: item.id,
+        receiptId: item.receipt.id,
+        name: item.name,
+        rawName: item.rawName,
+        quantity: item.quantity,
+        unit: item.unit,
+      });
+      return this.lists.addRunOut(tx, userId, ranOut.map((home) => home.name), dto.newListName);
+    });
+    return { ...(await this.get(itemId, userId)), addedToList };
   }
 
   private estimate(item: ItemRow, openedAt: Date | null): Date | null {

@@ -7,5 +7,6 @@ import { ListsService } from './lists.service';
   imports: [HomeItemsModule],
   controllers: [ListsController],
   providers: [ListsService],
+  exports: [ListsService],
 })
 export class ListsModule {}

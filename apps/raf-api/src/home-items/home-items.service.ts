@@ -157,8 +157,47 @@ export class HomeItemsService {
   }
 
   /**
-   * Takes back what a saved receipt added at home (when it is deleted).
-   * Counts never go below 0, in case the user already lowered them by hand.
+   * A product from a saved receipt was used up: every home item its line
+   * matches goes down by what the line bought, never below 0. What was taken
+   * is recorded against the receipt (as a negative change), so deleting the
+   * receipt later takes back only what is still counted. Returns the home
+   * items that are now at 0.
+   */
+  async useUp(tx: Prisma.TransactionClient, userId: string, line: ReceiptLine & { receiptId: string }) {
+    const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { trackHomeItems: true } });
+    if (!user.trackHomeItems) return [];
+
+    const empty: HomeItemRow[] = [];
+    for (const { home, amount } of matchLines(await tx.homeItem.findMany({ where: { userId } }), [line])) {
+      const before = home.count.toNumber();
+      const after = Math.max(0, round3(before - amount));
+      if (after !== before) {
+        await tx.homeItemChange.create({
+          data: { homeItemId: home.id, receiptId: line.receiptId, receiptItemId: line.id, amount: round3(after - before) },
+        });
+        await tx.homeItem.update({ where: { id: home.id }, data: { count: after } });
+      }
+      if (after === 0) empty.push(home);
+    }
+    return empty;
+  }
+
+  /** Undoes `useUp` for a product marked used up by mistake. */
+  async restoreUsedUp(tx: Prisma.TransactionClient, receiptItemId: string) {
+    const taken = await tx.homeItemChange.findMany({ where: { receiptItemId, amount: { lt: 0 } } });
+    for (const change of taken) {
+      await tx.homeItem.update({
+        where: { id: change.homeItemId },
+        data: { count: { increment: change.amount.negated() } },
+      });
+    }
+    await tx.homeItemChange.deleteMany({ where: { id: { in: taken.map((c) => c.id) } } });
+  }
+
+  /**
+   * Takes back what a saved receipt added at home (when it is deleted), less
+   * what its products already took away when they were used up. Counts never
+   * go below 0, in case the user already lowered them by hand.
    */
   async uncountReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
     const receipt = await tx.receipt.findUniqueOrThrow({
@@ -167,19 +206,17 @@ export class HomeItemsService {
     });
     if (receipt.status !== 'CONFIRMED') return [];
 
-    let taken: Map<string, number>;
-    if (receipt.homeCountsRecorded) {
-      const changes = await tx.homeItemChange.findMany({ where: { receiptId } });
-      taken = new Map();
-      for (const c of changes) taken.set(c.homeItemId, round3((taken.get(c.homeItemId) ?? 0) + c.amount.toNumber()));
-    } else {
-      // Saved before changes were recorded: match the lines again, as when it was saved.
-      const lines = await this.receiptLines(tx, receiptId);
-      taken = totals(matchLines(await tx.homeItem.findMany({ where: { userId } }), lines.items));
-    }
+    // Saved before additions were recorded: match the lines again, as when it was saved.
+    const taken = receipt.homeCountsRecorded
+      ? new Map<string, number>()
+      : totals(matchLines(await tx.homeItem.findMany({ where: { userId } }), (await this.receiptLines(tx, receiptId)).items));
+    // Recorded changes: what it added, and (negative) what using its products up took away.
+    const changes = await tx.homeItemChange.findMany({ where: { receiptId } });
+    for (const c of changes) taken.set(c.homeItemId, round3((taken.get(c.homeItemId) ?? 0) + c.amount.toNumber()));
 
     const result: { homeItemId: string; amount: number }[] = [];
     for (const [homeId, amount] of taken) {
+      if (amount <= 0) continue;
       const home = await tx.homeItem.findUnique({ where: { id: homeId } });
       if (!home) continue;
       const fromThisReceipt = receipt.homeCountsRecorded
