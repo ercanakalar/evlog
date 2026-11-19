@@ -9,18 +9,22 @@ import type { HomeItem, HomeUnit } from '@/types/api/models';
 
 /**
  * "Whole milk  [+2 from Migros, 16 Nov]   − 3 +", or "− 1.2 kg +" for a
- * product counted by weight. Long-press to switch piece / kg or remove.
+ * product counted by weight, with its brands and sizes under the name
+ * ("Sütaş · 1000 ml, 250 ml"). Tap for the details; long-press to switch
+ * piece / kg or remove.
  */
 export function HomeItemRow({
   item,
   onStep,
   onUnit,
   onRemove,
+  onOpen,
 }: {
   item: HomeItem;
   onStep: (direction: 1 | -1) => void;
   onUnit: (unit: HomeUnit) => void;
   onRemove: () => void;
+  onOpen: () => void;
 }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -36,6 +40,7 @@ export function HomeItemRow({
         })
       : null;
   const other: HomeUnit = item.unit === 'KG' ? 'PIECE' : 'KG';
+  const brands = summary(item, t('atHome.noBrand'), f.pack);
 
   const openMenu = () =>
     modal.choose({
@@ -49,13 +54,20 @@ export function HomeItemRow({
 
   return (
     <Pressable
+      onPress={onOpen}
       onLongPress={openMenu}
+      accessibilityRole="button"
       accessibilityHint={t('atHome.menuHint')}
       accessibilityActions={[{ name: 'longpress', label: t('atHome.options') }]}
       onAccessibilityAction={openMenu}
       style={[styles.row, { backgroundColor: colors.card }]}>
       <View style={{ flexShrink: 1, gap: 3, alignItems: 'flex-start' }}>
         <Text variant="bodyStrong">{item.name}</Text>
+        {brands ? (
+          <Text variant="small" muted numberOfLines={1}>
+            {brands}
+          </Text>
+        ) : null}
         {match ? <Tag label={match} tone="accent" /> : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -83,6 +95,20 @@ export function HomeItemRow({
       </View>
     </Pressable>
   );
+}
+
+/** "Sütaş · 1000 ml, 250 ml / Pınar · 1 L": each brand with its pack sizes. */
+function summary(item: HomeItem, noBrand: string, pack: (amount: number | null, unit: string | null) => string | null) {
+  const byBrand = new Map<string, string[]>();
+  for (const v of item.variants) {
+    const brand = v.brand ?? noBrand;
+    const sizes = byBrand.get(brand) ?? [];
+    const size = pack(v.packAmount, v.packUnit);
+    if (size && !sizes.includes(size)) sizes.push(size);
+    byBrand.set(brand, sizes);
+  }
+  if (byBrand.size === 0 || (byBrand.size === 1 && byBrand.has(noBrand) && byBrand.get(noBrand)!.length === 0)) return null;
+  return [...byBrand].map(([brand, sizes]) => (sizes.length ? `${brand} · ${sizes.join(', ')}` : brand)).join(' / ');
 }
 
 const styles = StyleSheet.create({

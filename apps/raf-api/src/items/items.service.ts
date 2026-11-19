@@ -26,6 +26,9 @@ const itemSelect = {
   packDate: true,
   openedAt: true,
   usedUpAt: true,
+  packAmount: true,
+  packUnit: true,
+  brand: { select: { id: true, name: true } },
   receipt: { select: { id: true, merchantName: true, issuedAt: true } },
 } satisfies Prisma.ReceiptItemSelect;
 
@@ -52,6 +55,7 @@ export const withCountdown = (item: ItemRow) => {
       : null;
   return {
     ...item,
+    packAmount: item.packAmount?.toNumber() ?? null,
     boughtAt: item.receipt.issuedAt,
     market: item.receipt.merchantName,
     receiptId: item.receipt.id,

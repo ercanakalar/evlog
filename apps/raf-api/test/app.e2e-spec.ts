@@ -309,6 +309,46 @@ describe('Raf API (e2e)', () => {
     await api().delete('/api/v1/me').set(auth(token)).expect(204);
   });
 
+  it('shows what is at home by brand and pack size', async () => {
+    const token = await register('brands@example.com');
+    const ayran = await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Ayran' }).expect(201);
+    expect(ayran.body.variants).toEqual([]);
+    ocr.respond = () => ({
+      status: 200,
+      body: {
+        merchantName: 'Migros',
+        issuedAt: daysAgo(1),
+        total: 75,
+        items: [
+          { name: 'SUTAS AYRAN 1000ML', totalPrice: 45 },
+          { name: 'SUTAS AYRAN 250 ML', totalPrice: 15, quantity: 2 },
+        ],
+      },
+    });
+    const scanned = await scan(1, token).expect(201);
+    expect(scanned.body.items[0]).toMatchObject({ name: 'Ayran 1000 ml', brand: { name: 'Sütaş' }, packAmount: '1000', packUnit: 'ml' });
+    const confirmed = await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(token)).expect(200);
+
+    const detail = await api().get(`/api/v1/home-items/${ayran.body.id}`).set(auth(token)).expect(200);
+    expect(detail.body).toMatchObject({ name: 'Ayran', count: 3 });
+    expect(detail.body.variants).toEqual([
+      expect.objectContaining({ brand: 'Sütaş', name: 'Ayran 250 ml', packAmount: 250, packUnit: 'ml', count: 2, lastMarket: 'Migros' }),
+      expect.objectContaining({ brand: 'Sütaş', name: 'Ayran 1000 ml', packAmount: 1000, packUnit: 'ml', count: 1 }),
+    ]);
+    const list = await api().get('/api/v1/home-items').set(auth(token)).expect(200);
+    expect(list.body[0].variants).toHaveLength(2);
+
+    // The shelf shows the brand too; using up the big bottle removes it from the breakdown.
+    const big = confirmed.body.items[0];
+    const item = await api().get(`/api/v1/items/${big.id}`).set(auth(token)).expect(200);
+    expect(item.body).toMatchObject({ brand: { name: 'Sütaş' }, packAmount: 1000, packUnit: 'ml' });
+    await api().patch(`/api/v1/items/${big.id}`).set(auth(token)).send({ usedUp: true }).expect(200);
+    const after = await api().get(`/api/v1/home-items/${ayran.body.id}`).set(auth(token)).expect(200);
+    expect(after.body.count).toBe(2);
+    expect(after.body.variants).toEqual([expect.objectContaining({ packAmount: 250, count: 2 })]);
+    await api().delete('/api/v1/me').set(auth(token)).expect(204);
+  });
+
   it('keeps users apart and deletes accounts', async () => {
     const other = await register('other@example.com');
     const mine = await api().get('/api/v1/receipts').set(auth()).expect(200);

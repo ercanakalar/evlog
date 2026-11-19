@@ -158,12 +158,30 @@ model ReceiptItem {
   packDate            Boolean   @default(false)
   openedAt            DateTime? @db.Timestamptz(3)
   usedUpAt            DateTime? @db.Timestamptz(3)
+  /// Brand found in the printed name ("SUTAS AYRAN 1000ML" -> Sütaş).
+  brandId             String?   @db.Uuid
+  /// Pack size printed in the name: 1000 + "ml", 1 + "L", 15 + "pack".
+  packAmount          Decimal?  @db.Decimal(10, 3)
+  packUnit            String?
 
   receipt     Receipt          @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  brand       Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
   homeChanges HomeItemChange[]
 
   @@unique([receiptId, position])
   @@index([normalizedName])
+  @@index([brandId])
+}
+
+/// Product brands, kept in line with the built-in list (brands.data.ts) on start.
+model Brand {
+  id       String   @id @default(uuid(7)) @db.Uuid
+  /// As the brand writes itself: "Sütaş".
+  name     String   @unique
+  /// Normalised spellings found on receipts: ["sutas"].
+  keywords String[]
+
+  items ReceiptItem[]
 }
 
 // ───────────────────────────── Lists & home ─────────────────────────────

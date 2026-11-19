@@ -48,11 +48,76 @@ const totals = (matches: { home: { id: string }; amount: number }[]) => {
 /** At or below this, an item shows as "running low": 1 piece, or half a kilo. */
 export const RUNNING_LOW_AT: Record<HomeUnit, number> = { PIECE: 1, KG: 0.5 };
 
+/** One brand and pack size of a product at home: "Sütaş, 1000 ml, 1 left". */
+export interface HomeVariant {
+  brand: string | null;
+  /** Clean name of the newest line ("Ayran 1000 ml"). */
+  name: string;
+  packAmount: number | null;
+  packUnit: string | null;
+  /** In the home item's unit, as receipts added it, less what was used up. */
+  count: number;
+  lastBoughtAt: Date | null;
+  lastMarket: string | null;
+}
+
+const changeSource = {
+  homeItemId: true,
+  amount: true,
+  receiptItem: {
+    select: {
+      name: true,
+      normalizedName: true,
+      packAmount: true,
+      packUnit: true,
+      brand: { select: { name: true } },
+      receipt: { select: { merchantName: true, issuedAt: true } },
+    },
+  },
+} satisfies Prisma.HomeItemChangeSelect;
+
+type ChangeRow = Prisma.HomeItemChangeGetPayload<{ select: typeof changeSource }>;
+
+/**
+ * Groups receipt changes by brand and pack size. Lines with neither are
+ * grouped by their name. Only what is still at home (count above 0) is kept,
+ * most first.
+ */
+export const variantsOf = (changes: ChangeRow[]): HomeVariant[] => {
+  const groups = new Map<string, HomeVariant>();
+  for (const { amount, receiptItem: line } of changes) {
+    const packAmount = line.packAmount?.toNumber() ?? null;
+    const brand = line.brand?.name ?? null;
+    const key = brand || packAmount ? `${brand}|${packAmount}|${line.packUnit}` : `|${line.normalizedName}`;
+    const group = groups.get(key) ?? {
+      brand,
+      name: line.name,
+      packAmount,
+      packUnit: line.packUnit,
+      count: 0,
+      lastBoughtAt: null,
+      lastMarket: null,
+    };
+    group.count = round3(group.count + amount.toNumber());
+    const boughtAt = line.receipt.issuedAt;
+    if (amount.isPositive() && boughtAt && (!group.lastBoughtAt || boughtAt > group.lastBoughtAt)) {
+      group.lastBoughtAt = boughtAt;
+      group.lastMarket = line.receipt.merchantName;
+      group.name = line.name;
+    }
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .filter((v) => v.count > 0)
+    .sort((a, b) => b.count - a.count || (b.lastBoughtAt?.getTime() ?? 0) - (a.lastBoughtAt?.getTime() ?? 0));
+};
+
 /** Counts go out as plain numbers ("1.25"), not Decimal strings. */
-export const toHomeItem = (item: HomeItemRow) => ({
+export const toHomeItem = (item: HomeItemRow, variants: HomeVariant[] = []) => ({
   ...item,
   count: item.count.toNumber(),
   lastMatchAdded: item.lastMatchAdded?.toNumber() ?? null,
+  variants,
 });
 
 /**
@@ -64,9 +129,21 @@ export const toHomeItem = (item: HomeItemRow) => ({
 export class HomeItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Every product at home, each with its brands and pack sizes. */
   async list(userId: string) {
     const items = await this.prisma.homeItem.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }] });
-    return items.map(toHomeItem);
+    const changes = await this.prisma.homeItemChange.findMany({
+      where: { homeItemId: { in: items.map((i) => i.id) } },
+      select: changeSource,
+    });
+    return items.map((item) => toHomeItem(item, variantsOf(changes.filter((c) => c.homeItemId === item.id))));
+  }
+
+  /** One product at home with what it is made of: "Sütaş 1000 ml × 1, Sütaş 250 ml × 1". */
+  async get(itemId: string, userId: string) {
+    const item = await this.own(itemId, userId);
+    const changes = await this.prisma.homeItemChange.findMany({ where: { homeItemId: itemId }, select: changeSource });
+    return toHomeItem(item, variantsOf(changes));
   }
 
   /** Products that are nearly gone, for the market list suggestions. */
@@ -81,7 +158,7 @@ export class HomeItemsService {
       },
       orderBy: { count: 'asc' },
     });
-    return items.map(toHomeItem);
+    return items.map((item) => toHomeItem(item));
   }
 
   async create(userId: string, dto: CreateHomeItemDto) {
@@ -105,17 +182,16 @@ export class HomeItemsService {
     // Pieces are whole: switching from kg rounds the amount.
     if (dto.count === undefined && unit === 'PIECE') count = Math.round(count);
     this.checkCount(unit, count);
-    return toHomeItem(
-      await this.prisma.homeItem.update({
-        where: { id: itemId },
-        data: {
-          unit,
-          count,
-          ...(dto.unit && dto.unit !== item.unit ? { lastMatchAdded: null, lastMatchMarket: null, lastMatchAt: null } : {}),
-          ...(dto.name ? { name: dto.name, normalizedName: normalizeProductName(dto.name) } : {}),
-        },
-      }),
-    );
+    await this.prisma.homeItem.update({
+      where: { id: itemId },
+      data: {
+        unit,
+        count,
+        ...(dto.unit && dto.unit !== item.unit ? { lastMatchAdded: null, lastMatchMarket: null, lastMatchAt: null } : {}),
+        ...(dto.name ? { name: dto.name, normalizedName: normalizeProductName(dto.name) } : {}),
+      },
+    });
+    return this.get(itemId, userId);
   }
 
   async remove(itemId: string, userId: string) {

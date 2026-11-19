@@ -18,6 +18,8 @@ export type RootStackParamList = {
   Scan: undefined;
   ReceiptReview: { receiptId: string };
   Product: { itemId: string };
+  /** An at-home product with its brands and pack sizes. */
+  HomeItem: { homeItemId: string };
   /** Photograph packs for their printed dates: all products, one receipt's, or one product. */
   PackScan: { receiptId?: string; itemId?: string } | undefined;
   TripDetail: { receiptId: string };

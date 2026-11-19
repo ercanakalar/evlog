@@ -59,7 +59,8 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
               const tone = days === null ? colors.textMuted : countdownColors(days, colors).text;
               const left = days === null ? t('countdown.noExpiry') : days === 0 ? t('trip.useToday') : t('trip.daysLeft', { count: days });
               const times = lineQuantity(item.quantity, item.unit);
-              const name = times ? `${item.name} ${times}` : item.name;
+              const product = item.brand ? `${item.brand.name} ${item.name}` : item.name;
+              const name = times ? `${product} ${times}` : product;
               const atHome = (item.homeChanges ?? [])
                 .map((c) => t('trip.atHome', { amount: f.homeAmount(Number(c.amount), c.homeItem.unit), name: c.homeItem.name }))
                 .join(' · ');

@@ -41,6 +41,8 @@ export function ProductScreen({ route }: RootScreenProps<'Product'>) {
   const opened = item.openedAt !== null;
   const tone = countdownColors(item.daysLeft, colors);
   const expires = item.expiresAt ? f.day(item.expiresAt).toLocaleUpperCase() : null;
+  // "Dairy & eggs · Sütaş · 1000 ml"
+  const about = [f.category(item.category), item.brand?.name, f.pack(item.packAmount, item.packUnit)].filter(Boolean).join(' · ');
 
   const formula = item.packDate
     ? t('product.formulaPack', { date: f.day(item.expiresAt) })
@@ -74,7 +76,7 @@ export function ProductScreen({ route }: RootScreenProps<'Product'>) {
       gap={16}>
       <ReceiptPaper style={{ paddingVertical: 16, gap: 10 }}>
         <Text variant="smallMedium" muted>
-          {f.category(item.category)}
+          {about}
         </Text>
         {item.daysLeft === null ? (
           <Text variant="heading" style={{ fontSize: 22 }}>

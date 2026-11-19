@@ -120,6 +120,7 @@ function AtHome({ header, atHome }: { header: React.ReactNode; atHome: ReturnTyp
             onStep={(direction) => atHome.step(item, direction)}
             onUnit={(unit) => atHome.changeUnit(item.id, unit)}
             onRemove={() => atHome.remove(item.id)}
+            onOpen={() => atHome.open(item.id)}
           />
         ))}
       </View>

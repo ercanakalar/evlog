@@ -39,6 +39,39 @@ export const packSize = (raw: string): string | null => {
   return unit === 'pack' ? `${amount} pack` : `${amount} ${unit}`;
 };
 
+/** Pack size as a number and unit: "AYRAN 1000ML" -> 1000 ml; "YUMURTA 15LI" -> 15 pack. */
+export const packOf = (raw: string): { amount: number; unit: string } | null => {
+  const match = SIZE_RE.exec(raw);
+  if (!match) return null;
+  const amount = Number(match[1].replace(',', '.'));
+  return amount > 0 ? { amount, unit: UNIT_LABEL[match[2].toLowerCase()] } : null;
+};
+
+export interface BrandEntry {
+  id: string;
+  name: string;
+  /** Normalised spellings, matched as whole words. */
+  keywords: string[];
+}
+
+/**
+ * The brand printed in a receipt line, if it is a known one. Punctuation
+ * separates words ("SUTAS.AYRAN"), and the longest spelling found wins, so
+ * "pinar su" (water) beats "pinar" (dairy).
+ */
+export const findBrand = <B extends BrandEntry>(rawName: string, brands: readonly B[]): B | null => {
+  const haystack = ` ${normalizeProductName(rawName).replace(/[.,%]/g, ' ')} `;
+  let best: { brand: B; length: number } | null = null;
+  for (const brand of brands) {
+    for (const keyword of brand.keywords) {
+      if (haystack.includes(` ${keyword} `) && (!best || keyword.length > best.length)) {
+        best = { brand, length: keyword.length };
+      }
+    }
+  }
+  return best?.brand ?? null;
+};
+
 /** Weight printed in a product name, in kg: "MAKARNA 500G" -> 0.5, "PIRINC 1KG" -> 1. */
 export const weightKg = (raw: string): number | null => {
   const match = /(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b/i.exec(raw);

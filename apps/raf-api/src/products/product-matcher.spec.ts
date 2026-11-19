@@ -1,5 +1,6 @@
+import { BRANDS } from './brands.data';
 import { SHELF_LIFE } from './shelf-life.data';
-import { matchProduct, namesMatch, packSize, type ShelfLifeEntry } from './product-matcher';
+import { findBrand, matchProduct, namesMatch, packOf, packSize, type ShelfLifeEntry } from './product-matcher';
 
 const catalog: ShelfLifeEntry[] = SHELF_LIFE.map(
   ([keyword, displayName, category, storage, shelfLifeDays, openedShelfLifeDays]) => ({
@@ -103,5 +104,39 @@ describe('namesMatch with products kept at home', () => {
     ['Muz', 'MUZ ITHAL (KG)', true],
   ])('%s / %s -> %s', (home, purchase, expected) => {
     expect(namesMatch(home, purchase)).toBe(expected);
+  });
+});
+
+describe('findBrand', () => {
+  const brands = BRANDS.map(([name, ...keywords]) => ({ id: name, name, keywords }));
+  it.each([
+    ['SUTAS AYRAN 1000ML', 'Sütaş'],
+    ['SÜTAŞ AYRAN 250 ML', 'Sütaş'],
+    ['SUTAS.AYRAN 1L', 'Sütaş'],
+    ['PINAR SUT 1L', 'Pınar'],
+    ['PINAR SU 5L', 'Pınar Su'],
+    ['ULKER CIK.GOFRET 36G', 'Ülker'],
+    ['COCA COLA 1L', 'Coca-Cola'],
+    // "eti" here is meat, not the Eti brand.
+    ['DANA ETI KG', null],
+    ['TAM YAGLI SUT 1L', null],
+  ])('%s -> %s', (raw, brand) => {
+    expect(findBrand(raw, brands)?.name ?? null).toBe(brand);
+  });
+
+  it('lists every spelling once, normalised', () => {
+    const all = BRANDS.flatMap(([, ...keywords]) => keywords);
+    expect(new Set(all).size).toBe(all.length);
+    for (const k of all) expect(k).toMatch(/^[a-z0-9 ]+$/);
+  });
+});
+
+describe('packOf', () => {
+  it('reads the printed pack size as a number and unit', () => {
+    expect(packOf('SUTAS AYRAN 1000ML')).toEqual({ amount: 1000, unit: 'ml' });
+    expect(packOf('SUTAS AYRAN 250 ML')).toEqual({ amount: 250, unit: 'ml' });
+    expect(packOf('TAM YAGLI SUT 1,5LT')).toEqual({ amount: 1.5, unit: 'L' });
+    expect(packOf('YUMURTA 15LI')).toEqual({ amount: 15, unit: 'pack' });
+    expect(packOf('EKMEK')).toBeNull();
   });
 });

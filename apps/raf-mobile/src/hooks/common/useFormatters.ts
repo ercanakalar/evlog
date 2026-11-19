@@ -29,6 +29,13 @@ export function useFormatters() {
         unit === 'KG'
           ? t('atHome.kgAmount', { amount: formatAmount(count, lang) })
           : formatAmount(count, lang),
+      /** Printed pack size: "1000 ml", "1.5 L", "15 pack". */
+      pack: (amount: number | string | null | undefined, unit: string | null | undefined) =>
+        amount === null || amount === undefined || !unit
+          ? null
+          : unit === 'pack'
+            ? t('atHome.packOf', { count: Number(amount) })
+            : `${formatAmount(Number(amount), lang)} ${unit}`,
       /** Countdown label as printed on the bar: "TODAY", "1 DAY", "5 DAYS". */
       left: (daysLeft: number | null) =>
         daysLeft === null ? t('countdown.noExpiry') : daysLeft === 0 ? t('countdown.today') : t('countdown.days', { count: daysLeft }),

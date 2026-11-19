@@ -39,6 +39,7 @@ export function useCountdown() {
 /** Products kept at home, counted in pieces or kilograms. */
 export function useAtHome() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const showError = useErrorAlert();
   const me = useGetMeQuery();
   const items = useListHomeItemsQuery(undefined, { skip: me.data?.trackHomeItems === false });
@@ -67,5 +68,6 @@ export function useAtHome() {
     },
     changeUnit: (id: string, unit: HomeUnit) => void setUnit({ id, unit }).unwrap().catch(fail),
     remove: (id: string) => void remove(id).unwrap().catch(fail),
+    open: (homeItemId: string) => navigation.navigate('HomeItem', { homeItemId }),
   };
 }

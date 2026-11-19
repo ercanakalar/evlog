@@ -20,8 +20,14 @@ import { mergeReceiptParts } from './receipt-merge';
 const withItems = {
   items: {
     orderBy: { position: 'asc' },
-    // What each line added at home when the receipt was saved.
-    include: { homeChanges: { select: { amount: true, homeItem: { select: { id: true, name: true, unit: true } } } } },
+    include: {
+      brand: { select: { id: true, name: true } },
+      // What each line added at home when the receipt was saved (not what using it up took).
+      homeChanges: {
+        where: { amount: { gt: 0 } },
+        select: { amount: true, homeItem: { select: { id: true, name: true, unit: true } } },
+      },
+    },
   },
 } satisfies Prisma.ReceiptInclude;
 
@@ -299,6 +305,9 @@ export class ReceiptsService {
         shelfLifeDays: match.shelfLifeDays,
         openedShelfLifeDays: match.openedShelfLifeDays,
         needsReview: match.needsReview,
+        brandId: match.brandId,
+        packAmount: match.packAmount,
+        packUnit: match.packUnit,
       };
     });
   }
@@ -330,6 +339,9 @@ export class ReceiptsService {
         shelfLifeDays: item.shelfLifeDays !== undefined ? item.shelfLifeDays : match.shelfLifeDays,
         openedShelfLifeDays: match.openedShelfLifeDays,
         needsReview: item.checked ? false : match.needsReview && !item.category,
+        brandId: match.brandId,
+        packAmount: match.packAmount,
+        packUnit: match.packUnit,
       };
     });
   }

@@ -8,6 +8,11 @@ export const homeItemService = baseApi.injectEndpoints({
       query: () => '/home-items',
       providesTags: ['HomeItem'],
     }),
+    /** One product with its brands and pack sizes. */
+    getHomeItem: build.query<HomeItem, string>({
+      query: (id) => `/home-items/${id}`,
+      providesTags: ['HomeItem'],
+    }),
     addHomeItem: build.mutation<HomeItem, { name: string; unit: HomeUnit; count?: number }>({
       query: (body) => ({ url: '/home-items', method: 'POST', body }),
       invalidatesTags: ['HomeItem', 'List'],
@@ -23,7 +28,15 @@ export const homeItemService = baseApi.injectEndpoints({
             if (item) item.count = count;
           }),
         );
-        await queryFulfilled.catch(() => patch.undo());
+        const detail = dispatch(
+          homeItemService.util.updateQueryData('getHomeItem', id, (item) => {
+            item.count = count;
+          }),
+        );
+        await queryFulfilled.catch(() => {
+          patch.undo();
+          detail.undo();
+        });
       },
     }),
     /** Switching to pieces rounds the amount on the server. */
@@ -40,6 +53,7 @@ export const homeItemService = baseApi.injectEndpoints({
 
 export const {
   useListHomeItemsQuery,
+  useGetHomeItemQuery,
   useAddHomeItemMutation,
   useSetHomeItemCountMutation,
   useSetHomeItemUnitMutation,

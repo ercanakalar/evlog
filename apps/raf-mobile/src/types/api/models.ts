@@ -45,6 +45,11 @@ export interface ReceiptItem {
   openedShelfLifeDays: number | null;
   needsReview: boolean;
   expiresAt: string | null;
+  /** Brand printed in the line ("SUTAS AYRAN" -> Sütaş), when it is a known one. */
+  brand?: Brand | null;
+  /** Pack size printed in the line, as a decimal string ("1000") and unit ("ml"). */
+  packAmount?: string | null;
+  packUnit?: string | null;
   /** What this line added at home when the receipt was saved. */
   homeChanges?: { amount: string; homeItem: { id: string; name: string; unit: HomeUnit } }[];
 }
@@ -68,6 +73,11 @@ export interface Market {
   trips: number;
 }
 
+export interface Brand {
+  id: string;
+  name: string;
+}
+
 /** A product from a saved receipt, with its countdown. */
 export interface ShelfItem {
   id: string;
@@ -84,6 +94,10 @@ export interface ShelfItem {
   packDate: boolean;
   openedAt: string | null;
   usedUpAt: string | null;
+  brand: Brand | null;
+  /** Printed pack size: 1000 + "ml", 1 + "L", 15 + "pack". */
+  packAmount: number | null;
+  packUnit: string | null;
   boughtAt: string | null;
   market: string | null;
   receiptId: string;
@@ -141,6 +155,21 @@ export interface HomeItem {
   lastMatchAdded: number | null;
   lastMatchMarket: string | null;
   lastMatchAt: string | null;
+  /** What is at home by brand and pack size, from receipts (less what was used up). */
+  variants: HomeVariant[];
+}
+
+/** One brand and pack size of an at-home product: Sütaş, 1000 ml, 1 at home. */
+export interface HomeVariant {
+  brand: string | null;
+  /** Clean name of the newest purchase ("Ayran 1000 ml"). */
+  name: string;
+  packAmount: number | null;
+  packUnit: string | null;
+  /** In the home item's unit. */
+  count: number;
+  lastBoughtAt: string | null;
+  lastMarket: string | null;
 }
 
 export interface ShoppingListItem {

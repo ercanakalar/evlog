@@ -26,6 +26,12 @@ export class HomeItemsController {
     return this.homeItems.list(user.id);
   }
 
+  /** One product with its brands and pack sizes. */
+  @Get(':itemId')
+  get(@CurrentUser() user: AuthUser, @Param('itemId', ParseUUIDPipe) itemId: string) {
+    return this.homeItems.get(itemId, user.id);
+  }
+
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateHomeItemDto) {
     return this.homeItems.create(user.id, dto);
