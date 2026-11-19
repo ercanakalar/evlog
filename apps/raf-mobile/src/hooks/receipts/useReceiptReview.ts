@@ -98,6 +98,25 @@ export function useReceiptReview(receiptId: string) {
     rescanning: rescanState.isLoading,
     confirmLine: (itemId: string) => void editLine(itemId, {}),
     fixLine: (itemId: string, name: string, category: Category) => void editLine(itemId, { name, category }),
+    /** Drops a line the reader got wrong (e.g. read twice where photos overlap). */
+    removeLine: (itemId: string, name: string) =>
+      modal.confirm({
+        title: t('review.removeLineTitle', { name }),
+        message: t('review.removeLineBody'),
+        confirmLabel: t('review.removeLine'),
+        destructive: true,
+        onConfirm: async () => {
+          if (!receipt?.items) return;
+          try {
+            await update({
+              id: receipt.id,
+              items: receipt.items.filter((i) => i.id !== itemId).map((i) => toLine(i)),
+            }).unwrap();
+          } catch (error) {
+            showError(t('review.saveFailed'), error);
+          }
+        },
+      }),
     updateHeader: async (fields: { merchantName: string; issuedAt: string; totalAmount: number }) => {
       try {
         await update({ id: receiptId, ...fields }).unwrap();

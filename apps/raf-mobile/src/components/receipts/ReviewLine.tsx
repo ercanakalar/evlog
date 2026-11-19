@@ -16,6 +16,7 @@ interface Props {
   editable: boolean;
   onConfirm: () => void;
   onFix: (name: string, category: Category) => void;
+  onRemove: () => void;
 }
 
 /**
@@ -23,7 +24,7 @@ interface Props {
  * printed, and tags. Unsure matches get a red border and a "Yes" button;
  * tapping a line opens a small editor for its name and category.
  */
-export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix }: Props) {
+export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix, onRemove }: Props) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
@@ -83,6 +84,15 @@ export function ReviewLine({ item, currency, atHome, editable, onConfirm, onFix 
             onPress={() => {
               setEditing(false);
               onFix(name.trim(), category);
+            }}
+          />
+          <Button
+            title={t('review.removeLine')}
+            variant="danger"
+            compact
+            onPress={() => {
+              setEditing(false);
+              onRemove();
             }}
           />
         </View>
