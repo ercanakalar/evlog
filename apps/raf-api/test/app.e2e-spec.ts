@@ -68,7 +68,9 @@ describe('Raf API (e2e)', () => {
 
   it('reads a receipt, matches products, and on save starts countdowns and counts', async () => {
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Whole milk', count: 1 }).expect(201);
-    await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta' }).expect(201);
+    // Added without a count: starts at 0, so the receipt alone makes it 1.
+    const pasta = await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta' }).expect(201);
+    expect(pasta.body.count).toBe(0);
     // Counted by weight: the weighed bananas and the 500 g pasta pack add kilograms.
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Bananas', unit: 'KG', count: 0.25 }).expect(201);
     await api().post('/api/v1/home-items').set(auth()).send({ name: 'Pasta 500', unit: 'KG' }).expect(201);
@@ -116,7 +118,7 @@ describe('Raf API (e2e)', () => {
     const counts = Object.fromEntries(
       home.body.map((h: { name: string; count: number }) => [h.name, h.count]),
     );
-    expect(counts).toEqual({ 'Whole milk': 3, Pasta: 2, Bananas: 1.37, 'Pasta 500': 0.5 });
+    expect(counts).toEqual({ 'Whole milk': 3, Pasta: 1, Bananas: 1.37, 'Pasta 500': 0.5 });
     expect(home.body.find((h: { name: string }) => h.name === 'Bananas')).toMatchObject({
       unit: 'KG',
       lastMatchAdded: 1.12,
@@ -221,6 +223,7 @@ describe('Raf API (e2e)', () => {
     ]);
     expect(res.body.runningLow).toEqual([
       expect.objectContaining({ name: 'Pasta 500', unit: 'KG', count: 0.5 }),
+      expect.objectContaining({ name: 'Pasta', unit: 'PIECE', count: 1 }),
       expect.objectContaining({ name: 'Olive oil', unit: 'PIECE', count: 1 }),
     ]);
 

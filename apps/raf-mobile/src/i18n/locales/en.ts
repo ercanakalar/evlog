@@ -137,7 +137,7 @@ const en = {
     empty: 'Nothing on the shelf. Save a receipt to start the countdown.',
   },
   atHome: {
-    explain: 'When a receipt has the same product name, its count goes up. Count in pieces or kg.',
+    explain: 'New products start at 0. When a receipt has the same product name, what you bought is added. Count in pieces or kg.',
     productName: 'Product name',
     addPlaceholder: 'Add a product',
     addFailed: 'Could not add the product',

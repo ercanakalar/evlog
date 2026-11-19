@@ -12,7 +12,7 @@ export class CreateHomeItemDto {
   @IsOptional() @IsEnum(HomeUnit)
   unit?: HomeUnit;
 
-  /** Pieces (whole numbers), or kilograms with up to 3 decimals. */
+  /** How many are at home now: pieces (whole numbers) or kilograms. Defaults to 0. */
   @IsOptional() @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) @Max(9999)
   count?: number;
 }

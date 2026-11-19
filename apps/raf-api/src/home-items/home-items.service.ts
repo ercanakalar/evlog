@@ -68,7 +68,9 @@ export class HomeItemsService {
     const normalizedName = normalizeProductName(dto.name);
     if (!normalizedName) throw new BadRequestException('Name is empty');
     const unit = dto.unit ?? 'PIECE';
-    const count = dto.count ?? (unit === 'KG' ? 0 : 1);
+    // A new product starts at 0: adding it only says "track this". Starting
+    // at 1 made the first receipt count it twice (1 kefir bought -> 2).
+    const count = dto.count ?? 0;
     this.checkCount(unit, count);
     // Duplicate names surface as 409 via PrismaExceptionFilter.
     return toHomeItem(

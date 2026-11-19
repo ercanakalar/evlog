@@ -139,7 +139,7 @@ const tr: Translation = {
     empty: 'Rafta bir şey yok. Geri sayımı başlatmak için fiş kaydet.',
   },
   atHome: {
-    explain: 'Bir fişte aynı adlı ürün olduğunda sayısı artar. Adet ya da kg olarak say.',
+    explain: 'Yeni ürünler 0’dan başlar. Bir fişte aynı adlı ürün olduğunda aldığın miktar eklenir. Adet ya da kg olarak say.',
     productName: 'Ürün adı',
     addPlaceholder: 'Ürün ekle',
     addFailed: 'Ürün eklenemedi',
