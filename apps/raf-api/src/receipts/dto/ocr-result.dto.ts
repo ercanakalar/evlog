@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -36,6 +37,23 @@ export class OcrItemDto {
 
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(10_000_000)
   totalPrice: number;
+
+  /** EAN-13 / EAN-8 printed beside the line (check digit verified by the reader). */
+  @IsOptional() @Matches(/^(\d{8}|\d{13})$/)
+  barcode?: string;
+}
+
+/** What the reader found on a photo of a product pack. */
+export class LabelResultDto {
+  /** The use-by / best-before date, "YYYY-MM-DD". */
+  @IsOptional() @IsDateString()
+  expiresOn?: string | null;
+
+  @IsOptional() @Matches(/^(\d{8}|\d{13})$/)
+  barcode?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  error?: string;
 }
 
 export class OcrResultDto {

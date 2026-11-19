@@ -47,6 +47,9 @@ export function useTripDetail(receiptId: string) {
     photoOpen,
     setPhotoOpen,
     openProduct: (itemId: string) => navigation.navigate('Product', { itemId }),
+    /** Packaged, perishable lines whose date can be scanned (not fruit & veg). */
+    packsToScan: (query.data?.items ?? []).filter((i) => i.category !== 'FRUIT_VEG' && i.shelfLifeDays !== null).length,
+    scanPacks: () => navigation.navigate('PackScan', { receiptId }),
     remove: () =>
       modal.confirm({
         title: t('trip.deleteTitle'),

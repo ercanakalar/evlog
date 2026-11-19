@@ -27,6 +27,7 @@ const toLine = (item: ReceiptItem, patch: Partial<ReceiptLineInput> = {}): Recei
   category: item.category,
   shelfLifeDays: item.shelfLifeDays,
   checked: !item.needsReview,
+  barcode: item.barcode ?? undefined,
   ...patch,
 });
 

@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { useExpiryReminders } from '@/hooks/app/useExpiryReminders';
 import { SignInScreen } from '@/screens/auth/SignInScreen';
+import { PackScanScreen } from '@/screens/packs/PackScanScreen';
 import { ProductScreen } from '@/screens/product/ProductScreen';
 import { ReceiptReviewScreen } from '@/screens/receipts/ReceiptReviewScreen';
 import { ScanScreen } from '@/screens/scan/ScanScreen';
@@ -39,6 +40,7 @@ export function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="Scan" component={ScanScreen} options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="ReceiptReview" component={ReceiptReviewScreen} />
           <Stack.Screen name="Product" component={ProductScreen} />
+          <Stack.Screen name="PackScan" component={PackScanScreen} options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="TripDetail" component={TripDetailScreen} />
           <Stack.Screen name="Spending" component={SpendingScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />

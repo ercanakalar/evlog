@@ -118,6 +118,65 @@ def quantity_candidates(text: str, unit: str) -> list[float]:
     return []
 
 
+# ───────── Barcodes ─────────
+
+_DIGIT_LIKE = str.maketrans({"O": "0", "o": "0", "D": "0", "Q": "0", "B": "8", "S": "5", "Z": "2", "I": "1", "l": "1"})
+
+
+def ean_valid(code: str) -> bool:
+    """EAN-13 / EAN-8 check digit."""
+    if len(code) not in (8, 13) or not code.isdigit():
+        return False
+    digits = [int(c) for c in code]
+    weights = [1, 3] * 6 if len(code) == 13 else [3, 1] * 4
+    return (sum(d * w for d, w in zip(digits[:-1], weights)) + digits[-1]) % 10 == 0
+
+
+# Digits OCR confuses on receipt print.
+_LOOKALIKE_DIGITS = {"0": "68", "6": "085", "8": "063", "1": "7", "7": "1", "3": "8", "5": "6", "9": "4", "4": "9"}
+
+
+def _repaired(code: str) -> str | None:
+    """
+    One misread digit, fixed with the check digit: every single look-alike
+    swap that makes a valid code. Kept only when the answer is unique
+    (Turkish barcodes, 868/869, win a tie).
+    """
+    fixes = {
+        code[:i] + d + code[i + 1:]
+        for i, c in enumerate(code)
+        for d in _LOOKALIKE_DIGITS.get(c, "")
+        if ean_valid(code[:i] + d + code[i + 1:])
+    }
+    if len(fixes) > 1:
+        fixes = {f for f in fixes if f.startswith(("868", "869"))}
+    return fixes.pop() if len(fixes) == 1 else None
+
+
+def find_ean(text: str) -> str | None:
+    """
+    The first EAN-13 / EAN-8 barcode in OCR text whose check digit is right.
+    Look-alike letters are read as digits ("869O565OO7679"); a barcode glued
+    to the item number ("178690565007679") is found at the end of the run;
+    one misread digit is repaired with the check digit.
+    """
+    for run in re.findall(r"[0-9ODQBSZIl]{8,16}", text):
+        digits = run.translate(_DIGIT_LIKE)
+        if not digits.isdigit() or sum(c.isdigit() for c in run) * 4 < len(run) * 3:
+            continue
+        # EAN-8 only when the number is 8 digits: inside a longer number it is chance.
+        sizes = (13,) if len(digits) >= 12 else (8,) if len(digits) <= 9 else ()
+        for size in sizes:
+            ends = [digits[len(digits) - size:]] + [digits[i:i + size] for i in range(len(digits) - size)]
+            for code in ends:
+                if ean_valid(code):
+                    return code
+            fixed = _repaired(ends[0])
+            if fixed:
+                return fixed
+    return None
+
+
 # ───────── Items ─────────
 
 
@@ -130,6 +189,7 @@ class Item:
     unit_price: float | None = None
     verified: bool = False  # quantity x unit price matched the line total
     alternatives: list[float] = field(default_factory=list)  # other readings of total
+    barcode: str | None = None  # printed beside the name, check digit verified
 
 
 @dataclass
@@ -353,13 +413,17 @@ def items_from_quantity_lines(words: list[Word], lines: list[QuantityLine], h: f
             and has_letters(w.text) and not looks_like_price(w.text) and not QTY_UNIT.match(w.text)
         ]
         name = clean_name(group_rows(name_words, h))
+        barcode = find_ean(" ".join(
+            w.text for w in sorted(words, key=lambda w: (w.y, w.x0))
+            if top <= w.y < y - 0.5 * h and w.x0 < right_edge - h
+        ))
         previous_y = y
 
         q, u, t, verified, alternatives = resolve(line, unit_price, total)
         if t is None or t <= 0:
             continue
         alternatives = [a for a in dict.fromkeys(alternatives) if a and a != t]
-        items.append(Item(name or "?", t, q, line.unit, u, verified, alternatives))
+        items.append(Item(name or "?", t, q, line.unit, u, verified, alternatives, barcode))
     return items
 
 
@@ -480,6 +544,7 @@ def parse(words: list[Word]) -> dict:
                 "unit": i.unit,
                 "unitPrice": i.unit_price,
                 "totalPrice": i.total,
+                "barcode": i.barcode,
             }.items() if v is not None}
             for i in items[:300]
         ],

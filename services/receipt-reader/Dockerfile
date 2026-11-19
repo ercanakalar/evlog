@@ -12,7 +12,7 @@ RUN pip install --retries 10 --timeout 120 -r requirements.txt
 # Download the OCR models once, into the image (not at every start).
 # Only these files decide which models are used, so code changes
 # elsewhere don't trigger a re-download.
-COPY ocr.py receipt_parser.py lexicon.py ./
+COPY ocr.py receipt_parser.py lexicon.py label_parser.py ./
 RUN python -c "import ocr; ocr.warm_up()"
 
 COPY . .

@@ -1,5 +1,20 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { ImageFilePipe } from '../common/pipes/image-file.pipe';
 import { type AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { ListItemsQueryDto, UpdateItemDto } from './dto/item.dto';
 import { ItemsService } from './items.service';
@@ -19,6 +34,20 @@ export class ItemsController {
   @Get(':itemId')
   get(@CurrentUser() user: AuthUser, @Param('itemId', ParseUUIDPipe) itemId: string) {
     return this.items.get(itemId, user.id);
+  }
+
+  /** Photo of the pack ("file"): reads the printed use-by / best-before date and uses it. */
+  @Post(':itemId/label')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  readLabel(
+    @CurrentUser() user: AuthUser,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @UploadedFile(ImageFilePipe) file: Express.Multer.File,
+  ) {
+    return this.items.readLabel(itemId, user.id, file.buffer, file.mimetype);
   }
 
   @Patch(':itemId')

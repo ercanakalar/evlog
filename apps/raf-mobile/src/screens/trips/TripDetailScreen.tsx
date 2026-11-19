@@ -103,6 +103,14 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
         </SpaceBetween>
       </ReceiptPaper>
 
+      {trip.packsToScan > 0 ? (
+        <View style={{ gap: 4 }}>
+          <Button title={t('trip.scanPacks', { count: trip.packsToScan })} variant="accent" onPress={trip.scanPacks} />
+          <Text variant="small" muted style={{ textAlign: 'center' }}>
+            {t('trip.scanPacksHint')}
+          </Text>
+        </View>
+      ) : null}
       <Button title={t('trip.delete')} variant="danger" onPress={trip.remove} />
       <ReceiptPhoto receiptId={receipt.id} visible={trip.photoOpen} onClose={() => trip.setPhotoOpen(false)} />
     </Screen>

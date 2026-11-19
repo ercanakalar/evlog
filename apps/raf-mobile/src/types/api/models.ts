@@ -34,6 +34,8 @@ export interface ReceiptItem {
   position: number;
   name: string;
   rawName: string;
+  /** EAN printed beside the line on the receipt, when the reader could verify it. */
+  barcode?: string | null;
   quantity: string;
   unit: string | null;
   unitPrice: string | null;
@@ -71,6 +73,7 @@ export interface ShelfItem {
   id: string;
   name: string;
   rawName: string;
+  barcode: string | null;
   quantity: string;
   unit: string | null;
   totalPrice: string;
@@ -100,6 +103,19 @@ export interface PurchaseRecord {
 }
 
 export type ShelfItemDetail = ShelfItem & { history: PurchaseRecord[] };
+
+/** What the reader found on a photo of a pack. */
+export interface PackLabelResult {
+  item: ShelfItemDetail;
+  label: {
+    /** "YYYY-MM-DD", or null when no date was found. */
+    expiresOn: string | null;
+    barcode: string | null;
+    /** False when the photographed pack's barcode is another product's. */
+    barcodeMatches: boolean | null;
+    error: string | null;
+  };
+}
 
 /** How an at-home product is counted: whole pieces, or kilograms. */
 export type HomeUnit = 'PIECE' | 'KG';

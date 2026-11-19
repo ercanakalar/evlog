@@ -89,8 +89,9 @@ export function matchProduct(
   }
 
   let size = packSize(rawName);
-  // Loose produce: "MUZ KG" with quantity 1.12 -> "1.12 kg".
-  if (!size && unit && quantity && quantity !== 1) size = `${quantity} ${unit}`;
+  // Loose produce: "MUZ KG" with quantity 1.12 -> "1.12 kg". A count of
+  // pieces is not part of the name (the receipt line shows "× 6" already).
+  if (!size && unit && unit !== 'pcs' && quantity && quantity !== 1) size = `${quantity} ${unit}`;
 
   if (!best) {
     return {

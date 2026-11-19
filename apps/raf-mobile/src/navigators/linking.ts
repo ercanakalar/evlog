@@ -26,6 +26,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
       Scan: 'scan',
       ReceiptReview: 'receipt/:receiptId',
       Product: 'product/:itemId',
+      PackScan: 'scan-packs',
       TripDetail: 'trip/:receiptId',
       Spending: 'spending/:month?',
       Settings: 'settings',

@@ -112,7 +112,8 @@
    "quantity": 1,
    "unit": "pcs",
    "unitPrice": 279.9,
-   "totalPrice": 279.9
+   "totalPrice": 279.9,
+   "barcode": "8690565007679"
   },
   {
    "name": "5089 SUTAS PE7H.500GR SUZME",
@@ -126,7 +127,8 @@
    "quantity": 1,
    "unit": "pcs",
    "unitPrice": 279.9,
-   "totalPrice": 279.9
+   "totalPrice": 279.9,
+   "barcode": "80176800"
   },
   {
    "name": "DANONE HEYVELIYOGURT CILEKLI 400GR",
@@ -140,7 +142,8 @@
    "quantity": 1,
    "unit": "pcs",
    "unitPrice": 98.9,
-   "totalPrice": 98.9
+   "totalPrice": 98.9,
+   "barcode": "8692971429410"
   },
   {
    "name": "FR.SUP.CEREZZA 121GR STICK PEY.SOG",

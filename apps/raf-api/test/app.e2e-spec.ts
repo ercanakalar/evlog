@@ -313,6 +313,46 @@ describe('Raf API (e2e)', () => {
       expect(await counts()).toEqual(before);
     });
 
+    it('keeps receipt barcodes and reads the date from a photo of the pack', async () => {
+      ocr.respond = (call) =>
+        call.path === '/v1/labels/parse'
+          ? { status: 200, body: { expiresOn: '2027-03-15', barcode: '8690565007679', dates: [] } }
+          : { status: 200, body: { ...cityGross, issuedAt: daysAgo(3) } };
+      const scanned = await api()
+        .post('/api/v1/receipts')
+        .set(homeAuth())
+        .attach('files', jpeg(), { filename: 'r.jpg', contentType: 'image/jpeg' })
+        .expect(201);
+      await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(homeAuth()).expect(200);
+
+      const shelf = await api().get('/api/v1/items').set(homeAuth()).expect(200);
+      const labneh = shelf.body.find((i: { barcode: string | null }) => i.barcode === '8690565007679');
+      expect(labneh).toMatchObject({ name: 'Labneh 400 g', packDate: false });
+
+      const read = await api()
+        .post(`/api/v1/items/${labneh.id}/label`)
+        .set(homeAuth())
+        .attach('file', jpeg(), { filename: 'pack.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+      expect(read.body.label).toEqual({
+        expiresOn: '2027-03-15', barcode: '8690565007679', barcodeMatches: true, error: null,
+      });
+      expect(read.body.item).toMatchObject({ packDate: true });
+      expect(read.body.item.expiresAt.slice(0, 10)).toBe('2027-03-15');
+
+      // No date on the photo: nothing changes and the app is told why.
+      ocr.respond = () => ({ status: 200, body: { expiresOn: null, error: 'No expiry date found' } });
+      const kefir = shelf.body.find((i: { name: string }) => i.name.startsWith('Kefir'));
+      const none = await api()
+        .post(`/api/v1/items/${kefir.id}/label`)
+        .set(homeAuth())
+        .attach('file', jpeg(), { filename: 'pack.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+      expect(none.body.label).toMatchObject({ expiresOn: null, error: 'No expiry date found' });
+      expect(none.body.item.packDate).toBe(false);
+      await api().delete(`/api/v1/receipts/${scanned.body.id}`).set(homeAuth()).expect(204);
+    });
+
     it('never goes below 0 when the count was already lowered by hand', async () => {
       const id = await saveReceipt();
       const home = await api().get('/api/v1/home-items').set(homeAuth()).expect(200);

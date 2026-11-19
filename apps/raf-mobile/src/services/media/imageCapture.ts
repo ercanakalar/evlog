@@ -1,5 +1,6 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 import type { UploadFile } from '@/types/api/requests';
 
 const MAX_EDGE = 2000;
@@ -31,7 +32,10 @@ export async function prepareImage(photo: { uri: string; width: number; height: 
   if (size.width < photo.width) context.resize(size);
   const rendered = await context.renderAsync();
   const saved = await rendered.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
-  return { uri: saved.uri, name: 'receipt.jpg', type: 'image/jpeg' };
+  const file: UploadFile = { uri: saved.uri, name: 'receipt.jpg', type: 'image/jpeg' };
+  // A browser cannot read the saved file back from a path; keep its bytes.
+  if (Platform.OS === 'web') file.blob = await (await fetch(saved.uri)).blob();
+  return file;
 }
 
 /**

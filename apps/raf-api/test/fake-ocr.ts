@@ -1,6 +1,8 @@
 import { createServer, IncomingMessage, Server } from 'node:http';
 
 export interface OcrCall {
+  /** "/v1/receipts/parse" or "/v1/labels/parse". */
+  path: string;
   receiptId: string;
   kind: string;
   callbackUrl: string;
@@ -37,6 +39,7 @@ export class FakeOcr {
       duplex: 'half',
     } as RequestInit).formData();
     const call: OcrCall = {
+      path: (req.url ?? '').split('?')[0],
       receiptId: form.get('receiptId') as string,
       kind: form.get('kind') as string,
       callbackUrl: form.get('callbackUrl') as string,

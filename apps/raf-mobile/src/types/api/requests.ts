@@ -5,6 +5,8 @@ export interface UploadFile {
   uri: string;
   name: string;
   type: string;
+  /** Web only: the photo's bytes (the browser has no file system to read the uri from). */
+  blob?: Blob;
 }
 
 export interface SignInRequest { email: string; password: string }
@@ -23,6 +25,7 @@ export interface ReceiptLineInput {
   category?: Category;
   shelfLifeDays?: number | null;
   checked?: boolean;
+  barcode?: string;
 }
 
 export interface UpdateReceiptRequest {

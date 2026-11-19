@@ -1,5 +1,6 @@
-import type { Category, ShelfItem, ShelfItemDetail } from '@/types/api/models';
-import type { UpdateItemRequest } from '@/types/api/requests';
+import { formDataFile } from '@/services/media/formDataFile';
+import type { Category, PackLabelResult, ShelfItem, ShelfItemDetail } from '@/types/api/models';
+import type { UpdateItemRequest, UploadFile } from '@/types/api/requests';
 import { compact } from '../bases/query';
 import { baseApi } from '../middlewares/createApi';
 
@@ -22,7 +23,20 @@ export const itemService = baseApi.injectEndpoints({
         if (data) dispatch(itemService.util.upsertQueryData('getItem', id, data));
       },
     }),
+    /** Photo of the pack: the reader finds the printed date and it replaces the estimate. */
+    readPackLabel: build.mutation<PackLabelResult, { id: string; file: UploadFile }>({
+      query: ({ id, file }) => {
+        const body = new FormData();
+        body.append('file', formDataFile(file));
+        return { url: `/items/${id}/label`, method: 'POST', body, timeout: 120_000 };
+      },
+      invalidatesTags: [{ type: 'Item', id: 'LIST' }, 'Insights'],
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        const { data } = await queryFulfilled.catch(() => ({ data: undefined }));
+        if (data) dispatch(itemService.util.upsertQueryData('getItem', id, data.item));
+      },
+    }),
   }),
 });
 
-export const { useListShelfQuery, useGetItemQuery, useUpdateItemMutation } = itemService;
+export const { useListShelfQuery, useGetItemQuery, useUpdateItemMutation, useReadPackLabelMutation } = itemService;

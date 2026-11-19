@@ -143,16 +143,23 @@ export function ProductScreen({ route }: RootScreenProps<'Product'>) {
             </View>
           ) : item.packDate ? (
             <Button title={t('product.useEstimate')} variant="outline" compact onPress={() => void p.setPackDate(null)} />
+          ) : item.category === 'FRUIT_VEG' ? (
+            <Text variant="small" muted>
+              {t('product.produceAverage')}
+            </Text>
           ) : (
-            <Button
-              title={t('product.usePackDate')}
-              variant="outline"
-              compact
-              onPress={() => {
-                setPackDay(item.expiresAt ? isoDate(new Date(item.expiresAt)) : '');
-                setPackEditing(true);
-              }}
-            />
+            <View style={{ gap: 8 }}>
+              <Button title={t('product.scanPack')} compact onPress={() => p.scanPack()} />
+              <Button
+                title={t('product.usePackDate')}
+                variant="outline"
+                compact
+                onPress={() => {
+                  setPackDay(item.expiresAt ? isoDate(new Date(item.expiresAt)) : '');
+                  setPackEditing(true);
+                }}
+              />
+            </View>
           )}
         </View>
       ) : null}

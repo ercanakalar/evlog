@@ -13,6 +13,7 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -49,6 +50,10 @@ export class ReceiptLineDto {
   /** The user confirmed the matched product. */
   @IsOptional() @IsBoolean()
   checked?: boolean;
+
+  /** Kept from the reader so pack scanning can match the line. */
+  @IsOptional() @Matches(/^(\d{8}|\d{13})$/)
+  barcode?: string;
 }
 
 /** User corrections after reviewing what the reader found. */

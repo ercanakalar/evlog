@@ -3,6 +3,7 @@ import { Prisma } from '../generated/prisma/client';
 import type { Category } from '../generated/prisma/enums';
 import { addDays, DAY_MS } from '../common/utils/normalize';
 import { PrismaService } from '../prisma/prisma.service';
+import { OcrClient } from '../receipts/ocr.client';
 import { ListItemsQueryDto, UpdateItemDto } from './dto/item.dto';
 
 type Tx = Prisma.TransactionClient;
@@ -11,6 +12,7 @@ const itemSelect = {
   id: true,
   name: true,
   rawName: true,
+  barcode: true,
   normalizedName: true,
   quantity: true,
   unit: true,
@@ -59,7 +61,37 @@ export const withCountdown = (item: ItemRow) => {
 
 @Injectable()
 export class ItemsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ocr: OcrClient,
+  ) {}
+
+  /**
+   * Reads the date printed on a photo of the product's pack and uses it
+   * instead of the estimate. The photo is not kept. When the pack's barcode
+   * was read too, it is kept on the product if the receipt had none, and
+   * `barcodeMatches` says whether it is the product's barcode.
+   */
+  async readLabel(itemId: string, userId: string, image: Buffer, mimeType: string) {
+    const item = await this.own(itemId, userId);
+    const label = await this.ocr.readLabel(image, mimeType);
+    if (label.barcode && !item.barcode) {
+      await this.prisma.receiptItem.update({ where: { id: itemId }, data: { barcode: label.barcode } });
+    }
+    const result = label.expiresOn
+      // Noon in Istanbul, so the day is the printed day in the user's calendar.
+      ? await this.update(itemId, userId, { packExpiresAt: `${label.expiresOn}T09:00:00.000Z` })
+      : await this.get(itemId, userId);
+    return {
+      item: result,
+      label: {
+        expiresOn: label.expiresOn ?? null,
+        barcode: label.barcode ?? null,
+        barcodeMatches: item.barcode && label.barcode ? item.barcode === label.barcode : null,
+        error: label.expiresOn ? null : (label.error ?? 'No expiry date found on the photo'),
+      },
+    };
+  }
 
   /** Called when a receipt is saved: every product gets its estimated expiry. */
   async startCountdowns(tx: Tx, receiptId: string, boughtAt: Date) {

@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { CountdownRow } from '@/components/shelf/CountdownRow';
 import { HomeItemRow } from '@/components/shelf/HomeItemRow';
 import { UnitToggle } from '@/components/shelf/UnitToggle';
-import { ChipRow, Empty, ErrorView, InlineAdd, Loading, Screen, ScreenHeader, Segmented, Text } from '@/components/ui';
+import { Button, ChipRow, Empty, ErrorView, InlineAdd, Loading, Screen, ScreenHeader, Segmented, Text } from '@/components/ui';
 import { CATEGORIES } from '@/constants/domain';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useAtHome, useCountdown, type ShelfView } from '@/hooks/shelf/useShelf';
@@ -18,7 +18,20 @@ export function ShelfScreen({ route, navigation }: TabScreenProps<'Shelf'>) {
 
   const header = (
     <>
-      <ScreenHeader title={t('shelf.title')} />
+      <ScreenHeader
+        title={t('shelf.title')}
+        action={
+          view === 'countdown' ? (
+            <Button
+              title={t('shelf.scanDates')}
+              variant="outline"
+              compact
+              onPress={() => navigation.navigate('PackScan')}
+              style={{ minHeight: 44, paddingHorizontal: 14, backgroundColor: 'transparent' }}
+            />
+          ) : undefined
+        }
+      />
       {atHome.enabled ? (
         <Segmented<ShelfView>
           value={view}

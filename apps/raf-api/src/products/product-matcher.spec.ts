@@ -28,6 +28,10 @@ describe('matchProduct', () => {
     expect(matchProduct('MUZ KG', catalog, 1.12, 'kg').name).toBe('Bananas 1.12 kg');
   });
 
+  it('does not put a count of pieces in the name', () => {
+    expect(matchProduct('KUZU KULAGI (ADET)', catalog, 2, 'pcs').name).toBe('Sorrel');
+  });
+
   it('needs whole words for short keywords', () => {
     expect(matchProduct('BALIK FILETO', catalog).name).toBe('Fish');
     expect(matchProduct('SU 5L', catalog).name).toBe('Water 5 L');

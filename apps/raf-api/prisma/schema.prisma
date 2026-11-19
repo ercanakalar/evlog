@@ -137,6 +137,8 @@ model ReceiptItem {
   position            Int
   /// Clean name ("Whole milk 1 L"); editable.
   name                String
+  /// EAN-13 / EAN-8 printed beside the line, when the reader could verify it.
+  barcode             String?
   /// Text as printed on the receipt ("TAM YAGLI SUT 1L").
   rawName             String
   /// Normalised name; matches purchases, lists and at-home items.

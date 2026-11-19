@@ -10,6 +10,7 @@ import type { UploadFile } from '@/types/api/requests';
  * has name, type and a bytes() reader, so the file is read from disk on send.
  */
 export function formDataFile(file: UploadFile): Blob {
+  if (file.blob) return file.blob; // web
   const local = new File(file.uri);
   const part = { name: file.name, type: file.type, bytes: () => local.bytes() };
   return part as unknown as Blob;

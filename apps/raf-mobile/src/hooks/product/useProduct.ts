@@ -32,5 +32,6 @@ export function useProduct(itemId: string) {
       change({ packExpiresAt: isoDay === null ? null : new Date(`${isoDay}T12:00:00`).toISOString() }),
     usedUp: () => void change({ usedUp: true }).then((ok) => ok && navigation.goBack()),
     openTrip: (receiptId: string) => navigation.navigate('TripDetail', { receiptId }),
+    scanPack: () => navigation.navigate('PackScan', { itemId }),
   };
 }

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { Env } from '../config/env.validation';
-import { OcrResultDto } from './dto/ocr-result.dto';
+import { LabelResultDto, OcrResultDto } from './dto/ocr-result.dto';
 
 export type OcrDispatchResult =
   | { kind: 'parsed'; result: OcrResultDto }
@@ -65,6 +65,33 @@ export class OcrClient {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Receipt reader unreachable for ${input.receiptId}: ${message}`);
       return { kind: 'failed', error: 'Receipt reader is unreachable, try again later' };
+    }
+  }
+
+  /**
+   * Reads a photo of a product pack:  POST {OCR_SERVICE_URL}/v1/labels/parse
+   * (multipart "file"). Returns what the reader found, or an error message.
+   */
+  async readLabel(image: Buffer, mimeType: string): Promise<LabelResultDto> {
+    const base = this.config.get('OCR_SERVICE_URL', { infer: true });
+    const form = new FormData();
+    form.append('file', new Blob([new Uint8Array(image)], { type: mimeType }), 'label');
+    try {
+      const response = await fetch(new URL('/v1/labels/parse', base), {
+        method: 'POST',
+        body: form,
+        headers: { Authorization: `Bearer ${this.config.get('OCR_SERVICE_TOKEN', { infer: true })}` },
+        signal: AbortSignal.timeout(this.config.get('OCR_TIMEOUT_MS', { infer: true })),
+      });
+      if (!response.ok) return { error: `Receipt reader answered ${response.status}` };
+      const result = plainToInstance(LabelResultDto, (await response.json()) ?? {});
+      const errors = await validate(result, { whitelist: true });
+      if (errors.length > 0) return { error: 'Reader returned an invalid label result' };
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Receipt reader unreachable for a pack label: ${message}`);
+      return { error: 'Receipt reader is unreachable, try again later' };
     }
   }
 

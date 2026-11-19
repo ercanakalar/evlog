@@ -35,6 +35,7 @@ sign-in is not set up yet.
 | Shelf · At home | Products you keep at home with counts; saved receipts raise matching counts. |
 | Scan (lime button) | Live camera with flash, gallery, and *long receipt* mode (photograph in parts). |
 | Review receipt | Market, date, total; each line's clean name, receipt text, category, shelf life and "At home +1"; unsure lines ask "Is this the right product?". |
+| Scan pack dates | From a receipt, the shelf or a product: the camera reads a pack's barcode, finds the product on your receipts, then a photo of the printed date (SKT / TETT / EXP) replaces the estimate. Fruit and veg keep their average keeping times. If no date is read, type it in. |
 | Product | Big countdown, unopened / opened estimate, date on the pack, purchase history, mark as used up. |
 | Lists | Several market lists, ticks, last prices and an estimate; running-low suggestions. |
 | Trips | Saved receipts by month with totals, filtered by market. |

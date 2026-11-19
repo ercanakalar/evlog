@@ -44,6 +44,19 @@ opening the port.
    words and unknown brands stay as read. Add common words or brands to
    `WORDS` to teach it more.
 
+Each item also gets the barcode printed beside it (EAN-13 / EAN-8) when its
+check digit is right; one misread digit is repaired with the check digit when
+only one repair fits. Raf matches pack scans to receipt lines with it.
+
+## Pack labels
+
+`POST /v1/labels/parse` (multipart `file`, same token) reads a photo of a pack
+(`label_parser.py`) and answers `{"expiresOn": "2027-03-15", "barcode": "…"}`.
+It takes the date labelled SKT / TETT / S.K.T. / EXP / BEST BEFORE, never the
+production date (ÜT / ÜRT / ÜRETİM / PROD) printed beside it; without a label,
+the latest date. Accepts 15.03.2027, 15/03/27, 03/2027 (end of month) and
+2027-03-15.
+
 Header text above the first item (ETTN, loyalty card, column headings) and
 barcodes OCR half-misread are kept out of names.
 
