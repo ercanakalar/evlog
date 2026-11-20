@@ -33,11 +33,9 @@ const toLine = (item: ReceiptItem, patch: Partial<ReceiptLineInput> = {}): Recei
   ...patch,
 });
 
-/** What saving does with one line: keep a countdown, and add it at home (to a match, or as a new product). */
+/** What saving does with one line: if checked, a countdown and a count at home (to a match, or as a new product). */
 export interface LineChoice {
-  countdown: boolean;
-  /** Null when at-home counting is off in Settings. */
-  atHome: boolean | null;
+  tracked: boolean;
   /** What it adds to a matching at-home product. */
   adds?: { amount: number; unit: HomeUnit };
   /** No at-home product matches: saving adds one with this name. */
@@ -70,36 +68,36 @@ export function useReceiptReview(receiptId: string) {
 
   const countsAtHome = me.data?.trackHomeItems && me.data.countFromReceipts;
   /**
-   * What saving does with each line. At home is on when the user said so,
-   * or (by default) when the line matches an at-home product.
+   * What saving does with each line. Checked (the default) keeps a countdown
+   * and counts it at home: on the matching at-home product, or as a new one
+   * (same rules as the API: not for products the reader could not place).
    */
   const choices = useMemo(() => {
     const map = new Map<string, LineChoice>();
     for (const item of receipt?.items ?? []) {
-      if (!countsAtHome) {
-        map.set(item.id, { countdown: item.onShelf, atHome: null });
+      const tracked = item.onShelf;
+      if (!countsAtHome || !tracked || item.countAtHome === false) {
+        map.set(item.id, { tracked });
         continue;
       }
       const home = (homeItems.data ?? []).find((h) => namesMatch(h.name, item.name) || namesMatch(h.name, item.rawName));
       const amount = home ? amountBought(item, home.unit) : 0;
-      const atHome = item.countAtHome ?? (home !== undefined && amount > 0);
       map.set(item.id, {
-        countdown: item.onShelf,
-        atHome,
-        adds: atHome && home && amount > 0 ? { amount, unit: home.unit } : undefined,
-        newAtHome: atHome && !home ? homeName(item.name) : undefined,
+        tracked,
+        adds: home && amount > 0 ? { amount, unit: home.unit } : undefined,
+        newAtHome: !home && item.countAtHome && !item.needsReview ? homeName(item.name) : undefined,
       });
     }
     return map;
   }, [countsAtHome, homeItems.data, receipt?.items]);
 
   const lines = receipt?.items ?? [];
-  const chosen = lines.filter((i) => choices.get(i.id)?.countdown || choices.get(i.id)?.atHome);
+  const tracked = lines.filter((i) => choices.get(i.id)?.tracked);
   const selection = {
-    countdown: lines.filter((i) => choices.get(i.id)?.countdown).length,
-    atHome: countsAtHome ? lines.filter((i) => choices.get(i.id)?.atHome).length : null,
-    /** What the products kept on the shelf or at home cost. */
-    sum: Math.round(chosen.reduce((sum, i) => sum + Number(i.totalPrice), 0) * 100) / 100,
+    tracked: tracked.length,
+    total: lines.length,
+    /** What the checked products cost. */
+    sum: Math.round(tracked.reduce((sum, i) => sum + Number(i.totalPrice), 0) * 100) / 100,
   };
 
   /** Saves a change to one line; `confirm` also marks an unsure match as checked. */
@@ -134,8 +132,8 @@ export function useReceiptReview(receiptId: string) {
     updating: updateState.isLoading,
     rescanning: rescanState.isLoading,
     confirmLine: (itemId: string) => void editLine(itemId, {}),
-    setCountdown: (itemId: string, on: boolean) => void editLine(itemId, { onShelf: on }, false),
-    setAtHome: (itemId: string, on: boolean) => void editLine(itemId, { countAtHome: on }, false),
+    /** Checks or unchecks a line: both its countdown and its count at home. */
+    setTracked: (itemId: string, on: boolean) => void editLine(itemId, { onShelf: on, countAtHome: on }, false),
     fixLine: (itemId: string, name: string, category: Category, quantity: number) =>
       void editLine(itemId, { name, category, quantity }),
     /** Drops a line the reader got wrong (e.g. read twice where photos overlap). */

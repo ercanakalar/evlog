@@ -35,10 +35,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
     sum: f.money(r.selection.sum, receipt.currency),
     total: f.money(receipt.totalAmount ?? r.itemsSum, receipt.currency),
   });
-  const counts =
-    r.selection.atHome === null
-      ? t('review.countdownCount', { count: r.selection.countdown })
-      : `${t('review.countdownCount', { count: r.selection.countdown })} · ${t('review.atHomeCount', { count: r.selection.atHome })}`;
+  const counts = t('review.trackedCount', { count: r.selection.tracked, total: r.selection.total });
 
   const footer = editable ? (
     <FooterBar>
@@ -135,8 +132,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
           currency={receipt.currency}
           choice={r.choices.get(item.id)}
           editable={editable}
-          onCountdown={(on) => r.setCountdown(item.id, on)}
-          onAtHome={(on) => r.setAtHome(item.id, on)}
+          onTrack={(on) => r.setTracked(item.id, on)}
           onConfirm={() => r.confirmLine(item.id)}
           onFix={(name, category, quantity) => r.fixLine(item.id, name, category, quantity)}
           onRemove={() => r.removeLine(item.id, item.name)}

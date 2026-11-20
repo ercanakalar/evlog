@@ -305,6 +305,8 @@ export class ReceiptsService {
         shelfLifeDays: match.shelfLifeDays,
         openedShelfLifeDays: match.openedShelfLifeDays,
         needsReview: match.needsReview,
+        // Checked on the review screen until the user unchecks it.
+        countAtHome: true,
         brandId: match.brandId,
         packAmount: match.packAmount,
         packUnit: match.packUnit,
@@ -340,7 +342,7 @@ export class ReceiptsService {
         openedShelfLifeDays: match.openedShelfLifeDays,
         needsReview: item.checked ? false : match.needsReview && !item.category,
         onShelf: item.onShelf ?? true,
-        countAtHome: item.countAtHome ?? null,
+        countAtHome: item.countAtHome !== undefined ? item.countAtHome : true,
         brandId: match.brandId,
         packAmount: match.packAmount,
         packUnit: match.packUnit,

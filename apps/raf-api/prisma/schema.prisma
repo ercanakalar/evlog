@@ -165,8 +165,9 @@ model ReceiptItem {
   packUnit            String?
   /// The user keeps a countdown for it: it is on the shelf and can expire.
   onShelf             Boolean   @default(true)
-  /// Count it at home: true adds it (creating the at-home product if needed),
-  /// false skips it, null counts it only if it matches an at-home product.
+  /// Count it at home: true adds it (creating the at-home product if needed;
+  /// new lines start true), false skips it, null (lines saved before this
+  /// choice existed) counts it only if it matches an at-home product.
   countAtHome         Boolean?
 
   receipt     Receipt          @relation(fields: [receiptId], references: [id], onDelete: Cascade)

@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Button, ChipRow, Field, Row, SpaceBetween, Tag, Text } from '@/components/ui';
+import { Button, ChipRow, Field, IconButton, Row, SpaceBetween, Tag, Text } from '@/components/ui';
 import { CATEGORIES } from '@/constants/domain';
 import { radius, space } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
@@ -13,23 +13,23 @@ import type { Category, ReceiptItem } from '@/types/api/models';
 interface Props {
   item: ReceiptItem;
   currency: string;
-  /** What saving does with the line: countdown, at home. */
+  /** What saving does with the line: tracked or not, and what it adds at home. */
   choice?: LineChoice;
   editable: boolean;
-  onCountdown: (on: boolean) => void;
-  onAtHome: (on: boolean) => void;
+  onTrack: (on: boolean) => void;
   onConfirm: () => void;
   onFix: (name: string, category: Category, quantity: number) => void;
   onRemove: () => void;
 }
 
 /**
- * One receipt line on the review screen: clean name, price, the text as
- * printed, and tags. Unsure matches get a red border and a "Yes" button;
- * tapping a line opens a small editor for its name and category. Two
- * switches choose whether saving keeps a countdown for it and counts it at home.
+ * One receipt line on the review screen: a checkbox, the clean name, price,
+ * the text as printed, and tags, with a trash button to remove the line.
+ * Checked (the default) means saving tracks it: a countdown on the shelf and
+ * a count at home. Unsure matches get a red border and a "Yes" button;
+ * tapping a line opens a small editor for its name and category.
  */
-export function ReviewLine({ item, currency, choice, editable, onCountdown, onAtHome, onConfirm, onFix, onRemove }: Props) {
+export function ReviewLine({ item, currency, choice, editable, onTrack, onConfirm, onFix, onRemove }: Props) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
@@ -40,47 +40,65 @@ export function ReviewLine({ item, currency, choice, editable, onCountdown, onAt
   const [quantity, setQuantity] = useState(String(Number(item.quantity)));
   const quantityValue = Number(quantity.replace(',', '.'));
   const quantityOk = byPiece ? Number.isInteger(quantityValue) && quantityValue >= 1 : quantityValue > 0;
+  const tracked = choice?.tracked ?? true;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: item.needsReview ? colors.urgentBar : 'transparent' }]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint={t('review.editHint')}
-        disabled={!editable}
-        onPress={() => setEditing((v) => !v)}
-        style={{ gap: 5 }}>
-        <SpaceBetween style={{ alignItems: 'baseline' }}>
-          <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
-            {item.name}
+      <Row style={{ alignItems: 'flex-start', gap: 8 }}>
+        {editable ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel={t('review.track', { name: item.name })}
+            accessibilityState={{ checked: tracked }}
+            onPress={() => onTrack(!tracked)}
+            hitSlop={8}
+            style={styles.check}>
+            <View style={[styles.box, { borderColor: colors.text, backgroundColor: tracked ? colors.accent : 'transparent' }]}>
+              {tracked ? <Feather name="check" size={16} color={colors.onAccent} /> : null}
+            </View>
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint={t('review.editHint')}
+          disabled={!editable}
+          onPress={() => setEditing((v) => !v)}
+          style={{ gap: 5, flex: 1, opacity: tracked ? 1 : 0.55 }}>
+          <SpaceBetween style={{ alignItems: 'baseline' }}>
+            <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
+              {item.name}
+            </Text>
+            <Text variant="amount">{f.money(item.totalPrice, currency)}</Text>
+          </SpaceBetween>
+          <Text variant="monoSmall" muted>
+            {item.rawName}
           </Text>
-          <Text variant="amount">{f.money(item.totalPrice, currency)}</Text>
-        </SpaceBetween>
-        <Text variant="monoSmall" muted>
-          {item.rawName}
-        </Text>
-        <Text variant="smallMedium" style={{ fontSize: 12.5 }}>
-          {byPiece
-            ? t('review.pieces', { count: Number(item.quantity) })
-            : t('review.weight', { amount: f.homeAmount(Number(item.quantity), 'KG') })}
-        </Text>
-        <Row style={{ flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
-          <Tag label={f.category(item.category)} />
-          <Tag label={f.lasts(item.shelfLifeDays)} />
-          {choice?.adds ? (
-            <Tag label={t('review.atHomePlus', { amount: f.homeAmount(choice.adds.amount, choice.adds.unit) })} tone="accent" />
-          ) : null}
-          {choice?.newAtHome ? <Tag label={t('review.newAtHome', { name: choice.newAtHome })} tone="accent" /> : null}
-        </Row>
-      </Pressable>
-
-      {editable && choice ? (
-        <Row style={{ gap: 6, paddingTop: 2 }}>
-          <ChoiceToggle icon="clock" label={t('review.countdown')} on={choice.countdown} onChange={onCountdown} />
-          {choice.atHome !== null ? (
-            <ChoiceToggle icon="home" label={t('review.atHome')} on={choice.atHome} onChange={onAtHome} />
-          ) : null}
-        </Row>
-      ) : null}
+          <Text variant="smallMedium" style={{ fontSize: 12.5 }}>
+            {byPiece
+              ? t('review.pieces', { count: Number(item.quantity) })
+              : t('review.weight', { amount: f.homeAmount(Number(item.quantity), 'KG') })}
+          </Text>
+          <Row style={{ flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
+            <Tag label={f.category(item.category)} />
+            <Tag label={f.lasts(item.shelfLifeDays)} />
+            {choice?.adds ? (
+              <Tag label={t('review.atHomePlus', { amount: f.homeAmount(choice.adds.amount, choice.adds.unit) })} tone="accent" />
+            ) : null}
+            {choice?.newAtHome ? <Tag label={t('review.newAtHome', { name: choice.newAtHome })} tone="accent" /> : null}
+            {!tracked ? <Tag label={t('review.notTracked')} /> : null}
+          </Row>
+        </Pressable>
+        {editable ? (
+          <IconButton
+            icon="trash-2"
+            iconSize={18}
+            size={36}
+            color={colors.textMuted}
+            label={t('review.removeNamed', { name: item.name })}
+            onPress={onRemove}
+          />
+        ) : null}
+      </Row>
 
       {item.needsReview && editable && !editing ? (
         <SpaceBetween style={{ paddingTop: 4 }}>
@@ -119,56 +137,15 @@ export function ReviewLine({ item, currency, choice, editable, onCountdown, onAt
               onFix(name.trim(), category, quantityValue);
             }}
           />
-          <Button
-            title={t('review.removeLine')}
-            variant="danger"
-            compact
-            onPress={() => {
-              setEditing(false);
-              onRemove();
-            }}
-          />
         </View>
       ) : null}
     </View>
   );
 }
 
-/** A pill switch: lime with a tick when on, plain when off. */
-function ChoiceToggle({
-  icon,
-  label,
-  on,
-  onChange,
-}: {
-  icon: 'clock' | 'home';
-  label: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  const { colors } = useTheme();
-  const fg = on ? colors.onAccent : colors.textMuted;
-  return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityState={{ checked: on }}
-      onPress={() => onChange(!on)}
-      hitSlop={6}
-      style={({ pressed }) => [
-        styles.toggle,
-        { backgroundColor: on ? colors.accent : colors.tag, opacity: pressed ? 0.7 : 1 },
-      ]}>
-      <Feather name={on ? 'check' : icon} size={14} color={fg} />
-      <Text variant="smallMedium" color={fg} style={{ fontSize: 12.5 }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 34, paddingHorizontal: 12, borderRadius: 17 },
+  check: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', marginLeft: -4 },
+  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   card: { borderRadius: radius.md, borderWidth: 1.5, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 11, gap: 5 },
   small: { minHeight: 44, paddingHorizontal: 16 },
 });

@@ -214,9 +214,11 @@ export class HomeItemsService {
   /**
    * Raises counts for every home item a saved receipt matches, and records
    * each line's share so deleting the receipt can take exactly that back.
-   * The user chose per line: lines switched off are skipped, and a line
-   * switched on that no home item matches gets one ("Ayran 1000 ml" adds
-   * "Ayran", starting at 0, so the receipt alone makes the count).
+   * The user chose per line: unchecked lines are skipped, and a checked line
+   * that no home item matches gets one ("Ayran 1000 ml" adds "Ayran",
+   * starting at 0, so the receipt alone makes the count) - unless the reader
+   * could not tell what the product is and the user did not confirm it,
+   * so raw receipt text never becomes an at-home product.
    */
   async countReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
     await tx.receipt.update({ where: { id: receiptId }, data: { homeCountsRecorded: true } });
@@ -229,7 +231,7 @@ export class HomeItemsService {
     const receipt = await this.receiptLines(tx, receiptId);
     const lines = receipt.items.filter((line) => line.countAtHome !== false);
     const homeItems = await tx.homeItem.findMany({ where: { userId } });
-    for (const line of lines.filter((l) => l.countAtHome === true)) {
+    for (const line of lines.filter((l) => l.countAtHome === true && !l.needsReview)) {
       if (homeItems.some((h) => namesMatch(h.name, line.name) || namesMatch(h.name, line.rawName))) continue;
       const name = homeName(line.name);
       const normalizedName = normalizeProductName(name);
@@ -349,7 +351,9 @@ export class HomeItemsService {
       select: {
         merchantName: true,
         issuedAt: true,
-        items: { select: { id: true, name: true, rawName: true, quantity: true, unit: true, countAtHome: true } },
+        items: {
+          select: { id: true, name: true, rawName: true, quantity: true, unit: true, countAtHome: true, needsReview: true },
+        },
       },
     });
   }

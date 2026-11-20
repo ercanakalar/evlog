@@ -56,7 +56,7 @@ export class ReceiptLineDto {
   @IsOptional() @IsBoolean()
   onShelf?: boolean;
 
-  /** Count it at home: true adds it, false skips it, null (default) only if it matches an at-home product. */
+  /** Count it at home: true (default) adds it, creating the at-home product if none matches; false skips it; null only if one matches. */
   @IsOptional() @ValidateIf((_o, v) => v !== null) @IsBoolean()
   countAtHome?: boolean | null;
 

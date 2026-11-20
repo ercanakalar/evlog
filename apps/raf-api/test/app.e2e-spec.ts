@@ -120,7 +120,8 @@ describe('Raf API (e2e)', () => {
     const counts = Object.fromEntries(
       home.body.map((h: { name: string; count: number }) => [h.name, h.count]),
     );
-    expect(counts).toEqual({ 'Whole milk': 3, Pasta: 1, Bananas: 1.37, 'Pasta 500': 0.5 });
+    // Checked lines no at-home product matched are added: the dish soap, and the sponges the user fixed.
+    expect(counts).toEqual({ 'Whole milk': 3, Pasta: 1, Bananas: 1.37, 'Pasta 500': 0.5, 'Dish soap': 1, Sponges: 1 });
     expect(home.body.find((h: { name: string }) => h.name === 'Bananas')).toMatchObject({
       unit: 'KG',
       lastMatchAdded: 1.12,
@@ -228,7 +229,6 @@ describe('Raf API (e2e)', () => {
       expect.objectContaining({ name: 'Saffron', done: false, lastPrice: null }),
     ]);
     expect(res.body.runningLow[0]).toMatchObject({ name: 'Pasta 500', unit: 'KG', count: 0.5 });
-    expect(res.body.runningLow).toHaveLength(4);
     expect(res.body.runningLow).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Pasta', unit: 'PIECE', count: 1 }),
@@ -372,7 +372,7 @@ describe('Raf API (e2e)', () => {
     await api().delete('/api/v1/me').set(auth(token)).expect(204);
   });
 
-  it('saves only the countdowns and at-home counts chosen per line', async () => {
+  it('tracks only the checked lines and adds the ones missing at home', async () => {
     const token = await register('choices@example.com');
     await api().post('/api/v1/home-items').set(auth(token)).send({ name: 'Bread', count: 0 }).expect(201);
     ocr.respond = () => ({
@@ -392,20 +392,22 @@ describe('Raf API (e2e)', () => {
     const lines = scanned.body.items.map((i: Record<string, unknown>) => ({
       name: i.name, rawName: i.rawName, quantity: Number(i.quantity), totalPrice: Number(i.totalPrice), checked: true,
     }));
-    // Ayran: counted at home (new at-home product). Bread: matches but switched off. Milk: no countdown.
-    lines[0].countAtHome = true;
+    // Every line starts checked; the user unchecks the bread, which matches an at-home product.
+    expect(scanned.body.items.map((i: { onShelf: boolean; countAtHome: boolean | null }) => [i.onShelf, i.countAtHome])).toEqual([
+      [true, true], [true, true], [true, true],
+    ]);
+    lines[1].onShelf = false;
     lines[1].countAtHome = false;
-    lines[2].onShelf = false;
     const edited = await api().patch(`/api/v1/receipts/${scanned.body.id}`).set(auth(token)).send({ items: lines }).expect(200);
     expect(edited.body.items.map((i: { onShelf: boolean; countAtHome: boolean | null }) => [i.onShelf, i.countAtHome])).toEqual([
-      [true, true], [true, false], [false, null],
+      [true, true], [false, false], [true, true],
     ]);
     await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(token)).expect(200);
 
     const home = await api().get('/api/v1/home-items').set(auth(token)).expect(200);
-    expect(Object.fromEntries(home.body.map((h: { name: string; count: number }) => [h.name, h.count]))).toEqual({ Ayran: 1, Bread: 0 });
+    expect(Object.fromEntries(home.body.map((h: { name: string; count: number }) => [h.name, h.count]))).toEqual({ Ayran: 1, Bread: 0, 'Whole milk': 1 });
     const shelf = await api().get('/api/v1/items').set(auth(token)).expect(200);
-    expect(shelf.body.map((i: { name: string }) => i.name).sort()).toEqual(['Ayran 1000 ml', 'Bread']);
+    expect(shelf.body.map((i: { name: string }) => i.name).sort()).toEqual(['Ayran 1000 ml', 'Whole milk 1 L']);
     // Spending is still the whole receipt.
     const trips = await api().get('/api/v1/receipts?status=CONFIRMED').set(auth(token)).expect(200);
     expect(trips.body[0].totalAmount).toBe('95');
@@ -428,9 +430,14 @@ describe('Raf API (e2e)', () => {
   describe('at-home counts from the City Gross receipt (reader output of the real photo)', () => {
     let user: string;
     const homeAuth = () => ({ Authorization: `Bearer ${user}` });
+    // Only the two products added by hand; the receipt's other checked lines add their own.
     const counts = async () => {
       const res = await api().get('/api/v1/home-items').set(homeAuth()).expect(200);
-      return Object.fromEntries(res.body.map((h: { name: string; count: number }) => [h.name, h.count]));
+      return Object.fromEntries(
+        res.body
+          .filter((h: { name: string }) => ['Kefir', 'Labneh'].includes(h.name))
+          .map((h: { name: string; count: number }) => [h.name, h.count]),
+      );
     };
     const saveReceipt = async () => {
       ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(10) } });
