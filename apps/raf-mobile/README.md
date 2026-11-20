@@ -33,7 +33,11 @@ adb install -r build/raf.apk                                   # or copy it to t
 The `EXPO_PUBLIC_*` values in `.env` are built into the APK, so the API URL must be
 one the phone can reach: this computer's LAN IP, on the same Wi-Fi (`API_URL`
 overrides it without editing `.env`). The LAN IP changes when the computer joins
-another network; rebuild the APK then. Only `arm64-v8a` is built by default; add
+another network; rebuild the APK then. The API is plain `http://`, which release
+builds block by default, so `app.json` allows it (`expo-build-properties`,
+`usesCleartextTraffic`); put the API behind HTTPS before shipping the app to others.
+If the phone still cannot connect, open the port on this computer's firewall
+(`sudo ufw allow 3100/tcp`) and check `http://<LAN-IP>:3100/health` in the phone's browser. Only `arm64-v8a` is built by default; add
 `--build-arg ABIS=arm64-v8a,armeabi-v7a,x86_64` for old phones or the emulator.
 The first build downloads the Android SDK, NDK and Gradle (several GB); later
 builds reuse them. The APK is signed with the debug key, which is fine for
