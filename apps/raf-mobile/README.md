@@ -18,6 +18,27 @@ of these modules.
 
 Checks: `npm run typecheck`, `npm run lint`.
 
+## Android APK with Docker
+
+Builds an installable release APK in Docker ([Dockerfile.android](Dockerfile.android)),
+with no Android Studio or Expo account:
+
+```bash
+hostname -I                                                    # this computer's LAN IP (first one)
+npm run apk                                                    # -> build/raf.apk, API from .env
+npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100        # another API than .env
+adb install -r build/raf.apk                                   # or copy it to the phone
+```
+
+The `EXPO_PUBLIC_*` values in `.env` are built into the APK, so the API URL must be
+one the phone can reach: this computer's LAN IP, on the same Wi-Fi (`API_URL`
+overrides it without editing `.env`). The LAN IP changes when the computer joins
+another network; rebuild the APK then. Only `arm64-v8a` is built by default; add
+`--build-arg ABIS=arm64-v8a,armeabi-v7a,x86_64` for old phones or the emulator.
+The first build downloads the Android SDK, NDK and Gradle (several GB); later
+builds reuse them. The APK is signed with the debug key, which is fine for
+installing it yourself but not for the Play Store (use EAS for that).
+
 ## Google sign-in
 
 Create OAuth client ids in Google Cloud Console (web, iOS, Android), put them in

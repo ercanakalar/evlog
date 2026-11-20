@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1.7
+#
+# Builds an installable Raf APK without Android Studio or an Expo account.
+# From apps/raf-mobile:
+#
+#   npm run apk            # -> build/raf.apk
+#
+# which runs:
+#   docker buildx build -f Dockerfile.android --output type=local,dest=build .
+#
+# EXPO_PUBLIC_* values (API URL, Google client IDs) come from .env.
+# Pass --build-arg API_URL=http://<lan-ip>:3100 to point this build at another
+# API than the one in .env (e.g. this computer's current LAN IP).
+# The first build downloads the Android SDK, NDK and Gradle (several GB) and
+# takes a while; later builds reuse them.
+
+FROM node:24-bookworm AS toolchain
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openjdk-17-jdk-headless unzip \
+  && rm -rf /var/lib/apt/lists/*
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
+    ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+ARG CMDLINE_TOOLS=13114758
+RUN mkdir -p $ANDROID_HOME/cmdline-tools \
+  && curl -fsSL -o /tmp/tools.zip https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS}_latest.zip \
+  && unzip -q /tmp/tools.zip -d /tmp/tools && mv /tmp/tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+  && rm -rf /tmp/tools /tmp/tools.zip \
+  && yes | sdkmanager --licenses > /dev/null
+RUN sdkmanager --install "platform-tools" "platforms;android-37.0" "build-tools;37.0.0" \
+    "ndk;27.1.12297006" "cmake;3.22.1" > /dev/null
+
+FROM toolchain AS build
+WORKDIR /app
+ENV CI=1 NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm NODE_ENV=development npm ci
+COPY . .
+RUN npx expo prebuild --platform android --no-install
+# arm64-v8a covers phones from the last ten years; pass
+# --build-arg ABIS=arm64-v8a,armeabi-v7a,x86_64 for older phones or emulators.
+ARG ABIS=arm64-v8a
+# Overrides EXPO_PUBLIC_API_URL from .env when given.
+ARG API_URL
+RUN --mount=type=cache,target=/root/.gradle \
+  if [ -n "$API_URL" ]; then export EXPO_PUBLIC_API_URL="$API_URL"; fi \
+  && cd android \
+  && ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=$ABIS \
+     -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" \
+  && cp app/build/outputs/apk/release/app-release.apk /raf.apk
+
+FROM scratch AS apk
+COPY --from=build /raf.apk /raf.apk

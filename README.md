@@ -115,6 +115,10 @@ npm install && npm start
 Your LAN IP changes when you join another network; update both `.env` files
 and restart Expo (`npm start -- -c`).
 
+To install Raf without Expo, build its APK in Docker:
+`cd apps/raf-mobile && npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100`
+writes `build/raf.apk` (see [apps/raf-mobile/README.md](apps/raf-mobile/README.md#android-apk-with-docker)).
+
 ### Everyday commands
 
 ```bash

@@ -66,7 +66,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "apk": "docker buildx build -f Dockerfile.android --output type=local,dest=build ."
   },
   "private": true
 }
