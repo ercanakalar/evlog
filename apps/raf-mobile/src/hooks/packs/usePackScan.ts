@@ -1,9 +1,9 @@
 import { useNavigation } from '@react-navigation/native';
 import type { BarcodeScanningResult, CameraView } from 'expo-camera';
-import { useCameraPermissions } from 'expo-camera';
 import { useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
+import { useCameraAccess } from '@/hooks/common/useCameraAccess';
 import { prepareImage } from '@/services/media/imageCapture';
 import { describeError, asAppError } from '@/store/bases/errorMapping';
 import { useListShelfQuery, useReadPackLabelMutation, useUpdateItemMutation } from '@/store/services/itemService';
@@ -27,7 +27,7 @@ export function usePackScan(camera: RefObject<CameraView | null>, scope: { recei
   const { t } = useTranslation();
   const navigation = useNavigation();
   const modal = useModal();
-  const [permission, requestPermission] = useCameraPermissions();
+  const cameraAccess = useCameraAccess();
   const shelf = useListShelfQuery();
   const [readLabel] = useReadPackLabelMutation();
   const [update, updateState] = useUpdateItemMutation();
@@ -92,8 +92,7 @@ export function usePackScan(camera: RefObject<CameraView | null>, scope: { recei
   };
 
   return {
-    permission,
-    requestPermission,
+    cameraAccess,
     loading: shelf.isLoading,
     phase,
     queue,

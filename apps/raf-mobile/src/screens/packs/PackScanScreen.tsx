@@ -25,7 +25,7 @@ export function PackScanScreen({ route }: RootScreenProps<'PackScan'>) {
   const f = useFormatters();
   const camera = useRef<CameraView>(null);
   const s = usePackScan(camera, route.params ?? {});
-  const granted = s.permission?.granted === true;
+  const { granted } = s.cameraAccess;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.scanner }}>
@@ -58,7 +58,7 @@ export function PackScanScreen({ route }: RootScreenProps<'PackScan'>) {
             <Text variant="bodyMedium" color={WHITE} style={{ textAlign: 'center' }}>
               {t('packs.needCamera')}
             </Text>
-            <Button title={t('scan.allowCamera')} variant="accent" onPress={() => void s.requestPermission()} />
+            <Button title={t('scan.allowCamera')} variant="accent" onPress={s.cameraAccess.request} />
           </View>
         )}
 

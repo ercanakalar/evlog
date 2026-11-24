@@ -16,7 +16,7 @@ export function ScanScreen() {
   const { colors } = useTheme();
   const camera = useRef<CameraView>(null);
   const s = useScanner(camera);
-  const granted = s.permission?.granted === true;
+  const { granted } = s.cameraAccess;
 
   const hint = s.busy === 'uploading'
     ? t('scan.reading')
@@ -93,7 +93,7 @@ export function ScanScreen() {
             <Text variant="bodyMedium" color={WHITE} style={{ textAlign: 'center' }}>
               {t('scan.needCamera')}
             </Text>
-            <Button title={t('scan.allowCamera')} variant="accent" onPress={() => void s.requestPermission()} />
+            <Button title={t('scan.allowCamera')} variant="accent" onPress={s.cameraAccess.request} />
             <Button title={t('scan.gallery')} variant="onDark" onPress={s.fromGallery} />
           </View>
         )}

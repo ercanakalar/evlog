@@ -1,10 +1,10 @@
 import { StackActions, useNavigation } from '@react-navigation/native';
 import type { CameraView } from 'expo-camera';
-import { useCameraPermissions } from 'expo-camera';
 import { useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
 import { MAX_RECEIPT_PARTS } from '@/constants/domain';
+import { useCameraAccess } from '@/hooks/common/useCameraAccess';
 import { PhotoPermissionError, pickImages, prepareImage } from '@/services/media/imageCapture';
 import { uploadReceipt } from '@/store/actions/receiptActions';
 import { describeError } from '@/store/bases/errorMapping';
@@ -20,7 +20,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   const dispatch = useAppDispatch();
   const navigation = useNavigation();
   const modal = useModal();
-  const [permission, requestPermission] = useCameraPermissions();
+  const cameraAccess = useCameraAccess();
   const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState(false);
   const [long, setLong] = useState(false);
@@ -73,8 +73,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   };
 
   return {
-    permission,
-    requestPermission,
+    cameraAccess,
     onReady: () => setReady(true),
     torch,
     toggleTorch: () => setTorch((v) => !v),
