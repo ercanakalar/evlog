@@ -23,6 +23,13 @@ export class HealthController {
   @Get()
   @HealthCheck()
   check() {
-    return this.health.check([() => this.db.pingCheck('database', this.prisma)]);
+    // Connecting to a hosted database can take a second or more.
+    return this.health.check([() => this.db.pingCheck('database', this.prisma, { timeout: 5000 })]);
+  }
+
+  /** Whether the API itself runs. Does not touch the database, so a hosted one can go to sleep. */
+  @Get('live')
+  live() {
+    return { status: 'ok' };
   }
 }

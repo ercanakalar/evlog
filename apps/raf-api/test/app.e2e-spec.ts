@@ -56,6 +56,11 @@ describe('Raf API (e2e)', () => {
     await ocr.stop();
   });
 
+  it('answers health checks, with and without the database', async () => {
+    expect((await api().get('/health').expect(200)).body.details.database.status).toBe('up');
+    await api().get('/health/live').expect(200, { status: 'ok' });
+  });
+
   it('rejects unknown fields and weak passwords', async () => {
     const res = await api()
       .post('/api/v1/auth/register')
