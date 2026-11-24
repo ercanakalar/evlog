@@ -1,8 +1,8 @@
 # Local development with Docker. See "Run with Docker" in README.md.
 #
-#   docker compose up -d --build api raf-api   # both APIs + the receipt reader
+#   docker compose up -d --build api raf-api   # both APIs + Evlog's receipt reader
 #   docker compose up -d --build api           # just Evlog (+ reader)
-#   docker compose up -d --build raf-api       # just Raf (+ reader)
+#   docker compose up -d --build raf-api       # just Raf (its reader is built in)
 #   docker compose up -d db raf-db             # optional: Postgres in Docker
 #   docker compose logs -f api raf-api receipt-reader
 #   docker compose down
@@ -64,7 +64,6 @@ services:
   raf-api:
     build: ./apps/raf-api
     network_mode: host
-    depends_on: [receipt-reader]
     env_file: ./apps/raf-api/.env
     environment:
       UPLOAD_DIR: /app/uploads
@@ -72,7 +71,7 @@ services:
     volumes:
       - raf-uploads:/app/uploads
 
-  # Receipt reader both APIs use. Code is mounted and reloaded on save, so
+  # Evlog's receipt reader (Raf's is built into its API). Code is mounted and reloaded on save, so
   # edits to the .py files apply without a rebuild; rebuild after changing
   # requirements.txt.
   receipt-reader:

@@ -30,25 +30,25 @@ A home app for **owners and tenants**.
 | --- | --- |
 | [`apps/api`](apps/api) | NestJS 12, Prisma 7 (`pg` driver adapter), PostgreSQL, class-validator, Zod-validated config, JWT |
 | [`apps/mobile-react-native`](apps/mobile-react-native) | Expo SDK 58, React Native 0.88, React Navigation 7, Redux Toolkit + RTK Query, i18next (EN/TR), react-hook-form + Zod |
-| [`apps/raf-api`](apps/raf-api) | Raf backend: NestJS 12, Prisma 7, its own PostgreSQL database (`raf`), Google sign-in |
+| [`apps/raf-api`](apps/raf-api) | Raf backend: NestJS 12, Prisma 7, its own PostgreSQL database (`raf`), Google sign-in, receipt reader built in (ONNX Runtime) |
 | [`apps/raf-mobile`](apps/raf-mobile) | Raf app: Expo SDK 58, same stack and conventions as the Evlog app, plus expo-camera and expo-notifications |
-| [`services/receipt-reader`](services/receipt-reader) | FastAPI + RapidOCR (PaddleOCR models, offline and free): reads receipt photos for both APIs |
+| [`services/receipt-reader`](services/receipt-reader) | FastAPI + RapidOCR (PaddleOCR models, offline and free): reads receipt photos for Evlog |
 
 ```
  Evlog app ──▶ Evlog API :3000 ──▶ PostgreSQL, database evlog
                      │
                      ▼
          receipt reader :8000 (OCR, on your computer)
-                     ▲
-                     │
+
  Raf app ────▶ Raf API   :3100 ──▶ PostgreSQL, database raf
+               (OCR built in)
 ```
 
 The phone apps run with Expo on your computer; everything else can run in Docker.
 
 ## Run with Docker
 
-You need Docker with Compose, and Node 24 for the phone apps. The APIs and the
+You need Docker with Compose, and Node 24 for the phone apps. The APIs and Evlog's
 receipt reader run in containers; Postgres can be your own (recommended if you
 already have one) or a container.
 
@@ -77,14 +77,15 @@ DATABASE_URL=postgresql://<user>:<password>@localhost:5432/evlog?schema=public
 DATABASE_URL=postgresql://<user>:<password>@localhost:5432/raf?schema=public
 ```
 
-The examples already match the Postgres containers. Keep `OCR_SERVICE_URL=http://localhost:8000`.
+The examples already match the Postgres containers. Keep Evlog's `OCR_SERVICE_URL=http://localhost:8000`
+(Raf needs none: its reader is built in).
 The containers use your computer's network, so `localhost` means your computer, as it
 does when you run the APIs with npm.
 
 ### 3. Start
 
 ```bash
-docker compose up -d --build api raf-api    # both APIs + the receipt reader
+docker compose up -d --build api raf-api    # both APIs + Evlog's receipt reader
 ```
 
 | Service | Address | Check |
@@ -94,7 +95,7 @@ docker compose up -d --build api raf-api    # both APIs + the receipt reader
 | Receipt reader | `http://localhost:8000` (this computer only) | `curl localhost:8000/health` |
 
 The first build takes several minutes: it downloads the OCR models into the
-reader's image. Later starts are quick. Each API applies its database migrations when
+reader's and Raf's images. Later starts are quick. Each API applies its database migrations when
 it starts. To add demo accounts, run the seed once with Node on your computer:
 `cd apps/api && npm install && npm run db:seed` (`demo.owner@evlog.app` / `Demo1234`),
 and the same in `apps/raf-api` (`demo@raf.app` / `Demo1234`).
@@ -145,7 +146,7 @@ Notes:
 nvm use                                                # Node 24
 docker compose up -d receipt-reader                    # or see services/receipt-reader
 cd apps/api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm start
-cd apps/raf-api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm run start:dev
+cd apps/raf-api && cp .env.example .env && npm install && npm run models && npx prisma migrate dev && npm run db:seed && npm run start:dev
 ```
 
 Then start the phone apps as in [step 4](#4-phone-apps).

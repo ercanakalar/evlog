@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { Env } from '../config/env.validation';
+import { ReaderService } from '../reader/reader.service';
 import { LabelResultDto, OcrResultDto } from './dto/ocr-result.dto';
 
 export type OcrDispatchResult =
@@ -11,7 +12,8 @@ export type OcrDispatchResult =
   | { kind: 'failed'; error: string };
 
 /**
- * Talks to the receipt reader running on your own machine.
+ * Reads photos with the reader built into this API or, when OCR_SERVICE_URL
+ * is set, with a separate receipt reader (services/receipt-reader):
  *
  *   POST {OCR_SERVICE_URL}/v1/receipts/parse   (multipart/form-data)
  *     Authorization: Bearer {OCR_SERVICE_TOKEN}
@@ -28,7 +30,10 @@ export type OcrDispatchResult =
 export class OcrClient {
   private readonly logger = new Logger(OcrClient.name);
 
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    private readonly reader: ReaderService,
+  ) {}
 
   async dispatch(input: {
     receiptId: string;
@@ -37,6 +42,7 @@ export class OcrClient {
     mimeType: string;
   }): Promise<OcrDispatchResult> {
     const base = this.config.get('OCR_SERVICE_URL', { infer: true });
+    if (!base) return this.readHere(input.receiptId, input.image);
     const publicUrl = this.config.get('PUBLIC_API_URL', { infer: true });
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(input.image)], { type: input.mimeType }), 'receipt');
@@ -74,6 +80,7 @@ export class OcrClient {
    */
   async readLabel(image: Buffer, mimeType: string): Promise<LabelResultDto> {
     const base = this.config.get('OCR_SERVICE_URL', { infer: true });
+    if (!base) return this.readLabelHere(image);
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(image)], { type: mimeType }), 'label');
     try {
@@ -84,15 +91,36 @@ export class OcrClient {
         signal: AbortSignal.timeout(this.config.get('OCR_TIMEOUT_MS', { infer: true })),
       });
       if (!response.ok) return { error: `Receipt reader answered ${response.status}` };
-      const result = plainToInstance(LabelResultDto, (await response.json()) ?? {});
-      const errors = await validate(result, { whitelist: true });
-      if (errors.length > 0) return { error: 'Reader returned an invalid label result' };
-      return result;
+      return await this.parseLabel(await response.json());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Receipt reader unreachable for a pack label: ${message}`);
       return { error: 'Receipt reader is unreachable, try again later' };
     }
+  }
+
+  private async readHere(receiptId: string, image: Buffer): Promise<OcrDispatchResult> {
+    try {
+      return await this.parse(await this.reader.readReceipt(image));
+    } catch (error) {
+      this.logger.error(`Could not read receipt ${receiptId}: ${String(error)}`);
+      return { kind: 'failed', error: 'Could not read this receipt, try again later' };
+    }
+  }
+
+  private async readLabelHere(image: Buffer): Promise<LabelResultDto> {
+    try {
+      return await this.parseLabel(await this.reader.readLabel(image));
+    } catch (error) {
+      this.logger.error(`Could not read a pack label: ${String(error)}`);
+      return { error: 'Could not read this photo, try again later' };
+    }
+  }
+
+  private async parseLabel(body: unknown): Promise<LabelResultDto> {
+    const result = plainToInstance(LabelResultDto, body ?? {});
+    const errors = await validate(result, { whitelist: true });
+    return errors.length > 0 ? { error: 'Reader returned an invalid label result' } : result;
   }
 
   /** Validates an untrusted reader payload. */

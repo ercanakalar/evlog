@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { OcrClient } from './ocr.client';
 
 describe('OcrClient.parse', () => {
-  const client = new OcrClient(new ConfigService({}) as never);
+  const client = new OcrClient(new ConfigService({}) as never, {} as never);
 
   it('accepts a well-formed result', async () => {
     const result = await client.parse({

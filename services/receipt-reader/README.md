@@ -1,7 +1,8 @@
 # Receipt reader (runs on your computer)
 
-Both APIs (Evlog and Raf) send receipt photos here and store whatever comes
-back. Reading is free and offline: [RapidOCR](https://github.com/RapidAI/RapidOCR)
+The Evlog API sends receipt photos here and stores whatever comes back. (Raf's API
+has a TypeScript port of this reader built in, and uses this one only when its
+`OCR_SERVICE_URL` is set.) Reading is free and offline: [RapidOCR](https://github.com/RapidAI/RapidOCR)
 runs PaddleOCR's Turkish models (`ocr.py`), and `receipt_parser.py` turns the
 words into items, merchant, date and total.
 
@@ -13,7 +14,7 @@ curl localhost:8000/health                     # {"status":"ok"}
 docker compose logs -f receipt-reader          # one line per receipt read
 ```
 
-`docker compose up api raf-api` starts it too. The first build downloads the
+`docker compose up api` starts it too. The first build downloads the
 OCR models into the image, so the reader needs no internet afterwards. The code is
 mounted into the container and reloads on save; rebuild only after changing
 `requirements.txt`. A receipt takes 15–30 seconds on a CPU.

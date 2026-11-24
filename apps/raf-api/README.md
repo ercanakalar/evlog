@@ -7,7 +7,8 @@ and count what you have at home.
 ```bash
 cp .env.example .env          # fill in secrets
 docker compose up -d raf-db   # from the repo root (port 5433), or use your own Postgres (database `raf`)
-npm install                   # also runs `prisma generate`
+ONNXRUNTIME_NODE_INSTALL=skip npm install   # also runs `prisma generate`; skips the GPU libraries
+npm run models                # the receipt reader's OCR models (135 MB, once)
 npx prisma migrate dev        # create tables
 npm run db:seed               # shelf-life table + demo account (demo@raf.app / Demo1234)
 npm run start:dev
@@ -18,8 +19,8 @@ To run it in Docker instead: `docker compose up -d --build raf-api` from the rep
 
 * API: `http://localhost:3100/api/v1` · Swagger UI: `http://localhost:3100/docs` (non-production) · Health: `/health`
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
-* Raf has its **own database** (`raf`); it shares nothing with the Evlog API
-  except the receipt reader in `services/receipt-reader`.
+* Raf has its **own database** (`raf`) and its own receipt reader (below); it
+  shares nothing with the Evlog API.
 * On first boot the API fills an empty shelf-life table itself; `SEED_DEMO=false npm run db:seed`
   updates the table without adding the demo account.
 
@@ -45,7 +46,28 @@ Values are typical keeping times in the style of the USDA FoodKeeper tables:
 estimates the user can override with the date on the pack. Add a row and re-run
 `npm run db:seed` to teach Raf a new product.
 
-## Receipt reader contract
+## Receipt reader
+
+Built in (`src/reader`), free and offline: PaddleOCR's PP-OCRv6 models run on ONNX
+Runtime, with its usage reporting turned off. A receipt takes about 15 seconds on a
+CPU, in a process of its own (`reader.process.ts`) so the API stays responsive; photos
+are read one at a time.
+
+| File | What it does |
+| --- | --- |
+| `image.ts` | Decodes (sharp), resizes, straightens and evens out photos, like OpenCV does |
+| `contours.ts`, `ocr.ts` | Find the lines of text and read them |
+| `receipt-parser.ts` | Words → items, checked with quantity × price = total |
+| `lexicon.ts`, `barcode.ts` | Fix letters in names and digits in barcodes |
+| `label-parser.ts` | The expiry date on a pack |
+| `reader.service.ts` | The queue; restarts the process after a crash or a photo that takes too long |
+
+It is a port of `services/receipt-reader`, whose README explains how receipts are read.
+`OCR_THREADS` limits the CPU it uses. Plan for about 1 GB of memory.
+
+## A separate reader
+
+With `OCR_SERVICE_URL` set, the API uses a separate reader instead.
 
 Same reader and contract as Evlog (`services/receipt-reader`), always with
 `kind=GROCERY`. Single-photo receipts may be answered later via the callback;
@@ -54,7 +76,7 @@ long receipts need the reader to answer each part with `200`.
 ## Tests
 
 ```bash
-npm test            # unit: product matcher, long-receipt merge, reader payload parsing
+npm test            # unit: product matcher, long-receipt merge, the receipt reader
 npm run test:e2e    # full flow against Postgres + a fake receipt reader
 ```
 

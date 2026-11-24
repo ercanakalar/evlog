@@ -39,7 +39,7 @@ export class OcrCallbackController {
     @Body() body: Record<string, unknown>,
   ) {
     const expected = this.config.get('OCR_CALLBACK_SECRET', { infer: true });
-    if (!secret || !safeEqual(secret, expected)) {
+    if (!expected || !secret || !safeEqual(secret, expected)) {
       throw new UnauthorizedException();
     }
     return this.receipts.applyCallback(receiptId, body);
