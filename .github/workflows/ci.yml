@@ -76,6 +76,7 @@ jobs:
           --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5433/raf
+      ONNXRUNTIME_NODE_INSTALL: skip # no GPU libraries
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
