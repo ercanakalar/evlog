@@ -153,3 +153,9 @@ Then start the phone apps as in [step 4](#4-phone-apps).
 
 Each app keeps its own `package-lock.json` on purpose: the API and the React
 Native app pin different React/TypeScript toolchains and are deployed separately.
+
+```bash
+cd apps/raf-mobile
+hostname -I                            # the first address is this computer's
+npm run apk -- --build-arg API_URL=http://10.34.33.47:3100
+```
