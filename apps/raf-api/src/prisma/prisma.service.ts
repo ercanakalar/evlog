@@ -18,7 +18,11 @@ const poolConfig = (databaseUrl: string) => {
   url.searchParams.delete('schema');
   return {
     schema,
-    pool: { connectionString: url.toString(), options: `-c search_path="${schema}"` },
+    pool: {
+      connectionString: url.toString(),
+      // Poolers (Neon, PgBouncer) refuse start-up options; "public" needs none.
+      ...(schema === 'public' ? {} : { options: `-c search_path="${schema}"` }),
+    },
   };
 };
 

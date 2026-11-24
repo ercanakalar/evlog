@@ -47,7 +47,10 @@ async function main() {
   url.searchParams.delete('schema');
   const prisma = new PrismaClient({
     adapter: new PrismaPg(
-      { connectionString: url.toString(), options: `-c search_path="${schema}"` },
+      {
+        connectionString: url.toString(),
+        ...(schema === 'public' ? {} : { options: `-c search_path="${schema}"` }),
+      },
       { schema },
     ),
   });
