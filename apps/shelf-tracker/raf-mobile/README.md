@@ -1,10 +1,11 @@
 # Raf mobile (Expo SDK 58 · React Native 0.88)
 
-The phone app for Raf: scan market receipts, follow how long each product
+The phone app for [Raf](../README.md): scan market receipts, follow how long each product
 lasts, keep market lists, count what is at home and see where the money goes.
+Run these commands in `apps/shelf-tracker/raf-mobile`:
 
 ```bash
-cp .env.example .env      # EXPO_PUBLIC_API_URL → the Raf API (port 3100)
+cp .env.example .env      # EXPO_PUBLIC_API_URL → the Raf API (../raf-api, port 3100)
 npm install
 npm start                 # i / a, or scan the QR code
 ```
@@ -47,7 +48,7 @@ installing it yourself but not for the Play Store (use EAS for that).
 
 Create OAuth client ids in Google Cloud Console (web, iOS, Android), put them in
 `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` here and in `GOOGLE_CLIENT_IDS` in
-`apps/raf-api/.env`. Without them the button stays and explains that Google
+`apps/shelf-tracker/raf-api/.env`. Without them the button stays and explains that Google
 sign-in is not set up yet.
 
 ## Screens
@@ -70,7 +71,7 @@ sign-in is not set up yet.
 
 ## Structure
 
-Same layout and conventions as `apps/mobile-react-native`:
+Same layout and conventions as [`apps/home-tracker/mobile-react-native`](../../home-tracker/mobile-react-native/README.md#structure):
 
 ```
 src/

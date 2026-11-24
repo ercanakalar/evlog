@@ -1,7 +1,10 @@
 # Evlog mobile (Expo SDK 58 · React Native 0.88)
 
+The phone app for [Evlog](../README.md). Run these commands in
+`apps/home-tracker/mobile-react-native`:
+
 ```bash
-cp .env.example .env      # EXPO_PUBLIC_API_URL → your API
+cp .env.example .env      # EXPO_PUBLIC_API_URL → the Evlog API (../api, port 3000)
 npm install
 npm start                 # i / a, or scan the QR code
 ```

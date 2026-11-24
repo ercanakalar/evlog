@@ -1,12 +1,12 @@
 # Raf API (NestJS 12 · Prisma 7 · PostgreSQL)
 
-Backend for **Raf**, the grocery app: scan market receipts, see how much you
+Backend for [Raf](../README.md), the grocery app: scan market receipts, see how much you
 spend and where, count down to when each product goes off, keep market lists
-and count what you have at home.
+and count what you have at home. Run these commands in `apps/shelf-tracker/raf-api`:
 
 ```bash
 cp .env.example .env          # fill in secrets
-docker compose up -d raf-db   # from the repo root (port 5433), or use your own Postgres (database `raf`)
+docker compose up -d raf-db   # port 5433, or use your own Postgres (database `raf`)
 ONNXRUNTIME_NODE_INSTALL=skip npm install   # also runs `prisma generate`; skips the GPU libraries
 npm run models                # the receipt reader's OCR models (135 MB, once)
 npx prisma migrate dev        # create tables
@@ -15,7 +15,7 @@ npm run start:dev
 ```
 
 To run it in Docker instead: `docker compose up -d --build raf-api` from the repo root
-(see [Run with Docker](../../README.md#run-with-docker)).
+(see [Run with Docker](../../../README.md#run-with-docker)).
 
 * API: `http://localhost:3100/api/v1` · Swagger UI: `http://localhost:3100/docs` (non-production) · Health: `/health` (with the database), `/health/live` (the API alone)
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
@@ -66,14 +66,15 @@ are read one at a time.
 | `label-parser.ts` | The expiry date on a pack |
 | `reader.service.ts` | The queue; restarts the process after a crash or a photo that takes too long |
 
-It is a port of `services/receipt-reader`, whose README explains how receipts are read.
+It is a port of [`services/receipt-reader`](../../../services/receipt-reader/README.md),
+whose README explains how receipts are read.
 `OCR_THREADS` limits the CPU it uses. Plan for about 1 GB of memory.
 
 ## A separate reader
 
 With `OCR_SERVICE_URL` set, the API uses a separate reader instead.
 
-Same reader and contract as Evlog (`services/receipt-reader`), always with
+Same reader and contract as Evlog ([`services/receipt-reader`](../../../services/receipt-reader/README.md)), always with
 `kind=GROCERY`. Single-photo receipts may be answered later via the callback;
 long receipts need the reader to answer each part with `200`.
 

@@ -1,8 +1,10 @@
 # Evlog API (NestJS 12 · Prisma 7 · PostgreSQL)
 
+Backend of [Evlog](../README.md). Run these commands in `apps/home-tracker/api`:
+
 ```bash
 cp .env.example .env          # fill in secrets
-docker compose up -d db       # from the repo root, or use your own Postgres (database `evlog`)
+docker compose up -d db receipt-reader    # Postgres (or use your own, database `evlog`) and the reader
 npm install                   # also runs `prisma generate`
 npx prisma migrate dev        # create tables
 npm run db:seed               # optional demo data (demo.owner@evlog.app / Demo1234)
@@ -10,7 +12,7 @@ npm start                     # watches for changes
 ```
 
 To run it in Docker instead: `docker compose up -d --build api` from the repo root
-(see [Run with Docker](../../README.md#run-with-docker)).
+(see [Run with Docker](../../../README.md#run-with-docker)).
 
 * API: `http://localhost:3000/api/v1` · Swagger UI: `http://localhost:3000/docs` (non-production) · Health: `/health`
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
@@ -40,7 +42,7 @@ To run it in Docker instead: `docker compose up -d --build api` from the repo ro
 
 ## Receipt reader contract
 
-See `services/receipt-reader`. The API calls `POST {OCR_SERVICE_URL}/v1/receipts/parse`
+See [`services/receipt-reader`](../../../services/receipt-reader/README.md). The API calls `POST {OCR_SERVICE_URL}/v1/receipts/parse`
 with the image; reply `200` with the parsed JSON (the phone gets it in the same request)
 or `202` and later `POST` the result to the `callbackUrl` with `X-Ocr-Secret`.
 

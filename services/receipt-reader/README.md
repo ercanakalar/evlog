@@ -1,6 +1,6 @@
 # Receipt reader (runs on your computer)
 
-The Evlog API sends receipt photos here and stores whatever comes back. (Raf's API
+The [Evlog API](../../apps/home-tracker/api) sends receipt photos here and stores whatever comes back. ([Raf's API](../../apps/shelf-tracker/raf-api)
 has a TypeScript port of this reader built in, and uses this one only when its
 `OCR_SERVICE_URL` is set.) Reading is free and offline: [RapidOCR](https://github.com/RapidAI/RapidOCR)
 runs PaddleOCR's Turkish models (`ocr.py`), and `receipt_parser.py` turns the
@@ -19,7 +19,8 @@ OCR models into the image, so the reader needs no internet afterwards. The code 
 mounted into the container and reloads on save; rebuild only after changing
 `requirements.txt`. A receipt takes 15–30 seconds on a CPU.
 
-The APIs find it through their `.env`:
+The Evlog API finds it through `apps/home-tracker/api/.env` (and Raf's, if you point it
+here, through `apps/shelf-tracker/raf-api/.env`):
 
 ```
 OCR_SERVICE_URL=http://localhost:8000

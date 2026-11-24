@@ -1,38 +1,39 @@
 # Evlog
 
-A home app for **owners and tenants**.
+Two home apps in one repository. Each has its own phone app, API and database.
 
-**Part 1 — Home record, ratings & listings**
-* The owner (or tenant) photographs every room; photos are time-stamped,
-  hashed and locked, and both sides confirm. It is a verification, not a contract.
-* Tenants rate the home, neighbourhood, infrastructure, heating efficiency and
-  renovations — each score must be backed by receipts (rent, utility, gas,
-  renovation) or the confirmed condition record.
-* Owners link their sahibinden.com listing and share chosen, verified data with
-  real-estate brokers.
+| Product | Folder | What it is for |
+| --- | --- | --- |
+| **Evlog** | [`apps/home-tracker`](apps/home-tracker) | Home record, ratings, listings, kitchen and appliance upkeep, for owners and tenants |
+| **Raf** | [`apps/shelf-tracker`](apps/shelf-tracker) | Grocery receipts, spending, shelf-life countdowns and market lists |
 
-**Part 2 — Kitchen, market data & appliances**
-* Scan grocery receipts: items and prices are added, "running low" is learned,
-  prices are compared with your last receipt and with anonymous market averages.
-* Appliance upkeep: maintenance schedules, reminders, invoices.
+## Folder structure
 
-**Raf — grocery receipts** (separate app, own API and database)
-* Sign in with Google or email, scan market receipts (long ones in parts), and see
-  how much you spend, when, where and on which categories.
-* Every product gets a countdown from a shelf-life table; mark it opened, use the
-  date on the pack, or mark it used up. Reminders before things go off.
-* Market lists with last prices, and "at home" counts that go up when a receipt
-  has a matching product.
-
-## Repository
+```
+evlog/
+├── apps/
+│   ├── home-tracker/               Evlog
+│   │   ├── api/                    NestJS API, port 3000
+│   │   └── mobile-react-native/    Expo phone app
+│   └── shelf-tracker/              Raf
+│       ├── raf-api/                NestJS API, port 3100, receipt reader built in
+│       └── raf-mobile/             Expo phone app
+├── services/
+│   └── receipt-reader/             OCR service that reads Evlog's receipts, port 8000
+├── .github/workflows/ci.yml        lint, type checks and tests for each package
+└── docker-compose.yml              databases, APIs and receipt reader for local development
+```
 
 | Path | Stack |
 | --- | --- |
-| [`apps/api`](apps/api) | NestJS 12, Prisma 7 (`pg` driver adapter), PostgreSQL, class-validator, Zod-validated config, JWT |
-| [`apps/mobile-react-native`](apps/mobile-react-native) | Expo SDK 58, React Native 0.88, React Navigation 7, Redux Toolkit + RTK Query, i18next (EN/TR), react-hook-form + Zod |
-| [`apps/raf-api`](apps/raf-api) | Raf backend: NestJS 12, Prisma 7, its own PostgreSQL database (`raf`), Google sign-in, receipt reader built in (ONNX Runtime) |
-| [`apps/raf-mobile`](apps/raf-mobile) | Raf app: Expo SDK 58, same stack and conventions as the Evlog app, plus expo-camera and expo-notifications |
-| [`services/receipt-reader`](services/receipt-reader) | FastAPI + RapidOCR (PaddleOCR models, offline and free): reads receipt photos for Evlog |
+| [`apps/home-tracker/api`](apps/home-tracker/api) | NestJS 12, Prisma 7 (`pg` driver adapter), PostgreSQL, class-validator, Zod-validated config, JWT |
+| [`apps/home-tracker/mobile-react-native`](apps/home-tracker/mobile-react-native) | Expo SDK 58, React Native 0.88, React Navigation 7, Redux Toolkit + RTK Query, i18next (EN/TR), react-hook-form + Zod |
+| [`apps/shelf-tracker/raf-api`](apps/shelf-tracker/raf-api) | NestJS 12, Prisma 7, PostgreSQL, Google sign-in, receipt reader on ONNX Runtime |
+| [`apps/shelf-tracker/raf-mobile`](apps/shelf-tracker/raf-mobile) | Same stack and conventions as the Evlog app, plus expo-camera and expo-notifications |
+| [`services/receipt-reader`](services/receipt-reader) | FastAPI + RapidOCR (PaddleOCR models, offline and free) |
+
+Each package keeps its own `package-lock.json` on purpose: the APIs and the phone
+apps pin different React/TypeScript toolchains and are deployed separately.
 
 ```
  Evlog app ──▶ Evlog API :3000 ──▶ PostgreSQL, database evlog
@@ -48,9 +49,8 @@ The phone apps run with Expo on your computer; everything else can run in Docker
 
 ## Run with Docker
 
-You need Docker with Compose, and Node 24 for the phone apps. The APIs and Evlog's
-receipt reader run in containers; Postgres can be your own (recommended if you
-already have one) or a container.
+You need Docker with Compose, and Node 24 for the phone apps. Run the commands in
+this section from the repository root.
 
 ### 1. Databases
 
@@ -64,23 +64,23 @@ own Postgres first if it already uses port 5432.
 ### 2. Settings
 
 ```bash
-cp apps/api/.env.example apps/api/.env
-cp apps/raf-api/.env.example apps/raf-api/.env
+cp apps/home-tracker/api/.env.example apps/home-tracker/api/.env
+cp apps/shelf-tracker/raf-api/.env.example apps/shelf-tracker/raf-api/.env
 ```
 
-Set `DATABASE_URL` in each file. With your own Postgres:
+The examples match the Postgres containers. With your own Postgres, set
+`DATABASE_URL` in each file:
 
 ```
-# apps/api/.env
+# apps/home-tracker/api/.env
 DATABASE_URL=postgresql://<user>:<password>@localhost:5432/evlog?schema=public
-# apps/raf-api/.env
+# apps/shelf-tracker/raf-api/.env
 DATABASE_URL=postgresql://<user>:<password>@localhost:5432/raf?schema=public
 ```
 
-The examples already match the Postgres containers. Keep Evlog's `OCR_SERVICE_URL=http://localhost:8000`
-(Raf needs none: its reader is built in).
-The containers use your computer's network, so `localhost` means your computer, as it
-does when you run the APIs with npm.
+Keep Evlog's `OCR_SERVICE_URL=http://localhost:8000`. Raf needs none: its reader is
+built in. The API containers use your computer's network, so `localhost` means your
+computer, as it does when you run the APIs with npm.
 
 ### 3. Start
 
@@ -88,37 +88,51 @@ does when you run the APIs with npm.
 docker compose up -d --build api raf-api    # both APIs + Evlog's receipt reader
 ```
 
-| Service | Address | Check |
-| --- | --- | --- |
-| Evlog API | `http://localhost:3000/api/v1` | `curl localhost:3000/health` |
-| Raf API | `http://localhost:3100/api/v1` | `curl localhost:3100/health` |
-| Receipt reader | `http://localhost:8000` (this computer only) | `curl localhost:8000/health` |
+| Compose service | Built from | Address | Check |
+| --- | --- | --- | --- |
+| `api` | `apps/home-tracker/api` | `http://localhost:3000/api/v1` | `curl localhost:3000/health` |
+| `raf-api` | `apps/shelf-tracker/raf-api` | `http://localhost:3100/api/v1` | `curl localhost:3100/health` |
+| `receipt-reader` | `services/receipt-reader` | `http://localhost:8000` (this computer only) | `curl localhost:8000/health` |
 
 The first build takes several minutes: it downloads the OCR models into the
-reader's and Raf's images. Later starts are quick. Each API applies its database migrations when
-it starts. To add demo accounts, run the seed once with Node on your computer:
-`cd apps/api && npm install && npm run db:seed` (`demo.owner@evlog.app` / `Demo1234`),
-and the same in `apps/raf-api` (`demo@raf.app` / `Demo1234`).
+reader's and Raf's images. Later starts are quick. Each API applies its database
+migrations when it starts.
+
+To add demo accounts, run the seeds once with Node on your computer:
+
+```bash
+(cd apps/home-tracker/api && npm install && npm run db:seed)        # demo.owner@evlog.app, demo.tenant@evlog.app / Demo1234
+(cd apps/shelf-tracker/raf-api && ONNXRUNTIME_NODE_INSTALL=skip npm install && npm run db:seed)    # demo@raf.app / Demo1234
+```
 
 ### 4. Phone apps
 
 The apps run with Expo, outside Docker. Point each at your computer's LAN IP
-(find it with `hostname -I`); the phone must be on the same Wi-Fi.
+(find it with `hostname -I`, the first address); the phone must be on the same Wi-Fi.
+Start each app in its own terminal:
 
 ```bash
-cd apps/mobile-react-native && cp .env.example .env    # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000
+cd apps/home-tracker/mobile-react-native
+cp .env.example .env          # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000
 npm install && npm start
+```
 
-cd apps/raf-mobile && cp .env.example .env             # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3100
+```bash
+cd apps/shelf-tracker/raf-mobile
+cp .env.example .env          # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3100
 npm install && npm start
 ```
 
 Your LAN IP changes when you join another network; update both `.env` files
 and restart Expo (`npm start -- -c`).
 
-To install Raf without Expo, build its APK in Docker:
-`cd apps/raf-mobile && npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100`
-writes `build/raf.apk` (see [apps/raf-mobile/README.md](apps/raf-mobile/README.md#android-apk-with-docker)).
+To install Raf without Expo, build its APK in Docker. This writes `build/raf.apk`
+(see [Android APK with Docker](apps/shelf-tracker/raf-mobile/README.md#android-apk-with-docker)):
+
+```bash
+cd apps/shelf-tracker/raf-mobile
+npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100
+```
 
 ### Everyday commands
 
@@ -137,25 +151,48 @@ rebuild it only after changing `requirements.txt`:
 Notes:
 * Run each API either in Docker or with npm, not both: they use the same port.
 * Photos uploaded through the containers are kept in Docker volumes
-  (`evlog_uploads`, `evlog_raf-uploads`), separate from `apps/*/uploads` used when the APIs run with npm.
+  (`evlog_uploads`, `evlog_raf-uploads`), separate from the `uploads/` folder in each
+  API used when it runs with npm.
 * `docker compose down -v` also deletes those volumes and the Postgres containers' data.
 
 ## Run without Docker
 
+Evlog's API needs the receipt reader; it is easiest to keep that one in Docker
+(or see [its README](services/receipt-reader)).
+
 ```bash
 nvm use                                                # Node 24
-docker compose up -d receipt-reader                    # or see services/receipt-reader
-cd apps/api && cp .env.example .env && npm install && npx prisma migrate dev && npm run db:seed && npm start
-cd apps/raf-api && cp .env.example .env && npm install && npm run models && npx prisma migrate dev && npm run db:seed && npm run start:dev
+docker compose up -d receipt-reader
+```
+
+Evlog API:
+
+```bash
+cd apps/home-tracker/api
+cp .env.example .env && npm install
+npx prisma migrate dev && npm run db:seed
+npm start
+```
+
+Raf API, in another terminal:
+
+```bash
+cd apps/shelf-tracker/raf-api
+cp .env.example .env && ONNXRUNTIME_NODE_INSTALL=skip npm install && npm run models
+npx prisma migrate dev && npm run db:seed
+npm run start:dev
 ```
 
 Then start the phone apps as in [step 4](#4-phone-apps).
 
-Each app keeps its own `package-lock.json` on purpose: the API and the React
-Native app pin different React/TypeScript toolchains and are deployed separately.
+## Documentation
 
-```bash
-cd apps/raf-mobile
-hostname -I                            # the first address is this computer's
-npm run apk -- --build-arg API_URL=http://10.34.33.47:3100
-```
+| Read | For |
+| --- | --- |
+| [apps/home-tracker](apps/home-tracker/README.md) | What Evlog does and how its parts fit |
+| [apps/home-tracker/api](apps/home-tracker/api/README.md) | Evlog API: modules, validation, reader contract, sahibinden.com, tests |
+| [apps/home-tracker/mobile-react-native](apps/home-tracker/mobile-react-native/README.md) | Evlog phone app: structure and conventions |
+| [apps/shelf-tracker](apps/shelf-tracker/README.md) | What Raf does and how its parts fit |
+| [apps/shelf-tracker/raf-api](apps/shelf-tracker/raf-api/README.md) | Raf API: modules, shelf life, built-in reader, tests |
+| [apps/shelf-tracker/raf-mobile](apps/shelf-tracker/raf-mobile/README.md) | Raf phone app: screens, structure, APK build, Google sign-in |
+| [services/receipt-reader](services/receipt-reader/README.md) | How receipts and pack labels are read |
