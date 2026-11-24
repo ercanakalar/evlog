@@ -231,20 +231,24 @@ export class HomeItemsService {
     const receipt = await this.receiptLines(tx, receiptId);
     const lines = receipt.items.filter((line) => line.countAtHome !== false);
     const homeItems = await tx.homeItem.findMany({ where: { userId } });
+    const missing: Prisma.HomeItemCreateManyInput[] = [];
     for (const line of lines.filter((l) => l.countAtHome === true && !l.needsReview)) {
-      if (homeItems.some((h) => namesMatch(h.name, line.name) || namesMatch(h.name, line.rawName))) continue;
+      const known = [...homeItems, ...missing];
+      if (known.some((h) => namesMatch(h.name, line.name) || namesMatch(h.name, line.rawName))) continue;
       const name = homeName(line.name);
       const normalizedName = normalizeProductName(name);
-      if (!normalizedName || homeItems.some((h) => h.normalizedName === normalizedName)) continue;
+      if (!normalizedName || known.some((h) => h.normalizedName === normalizedName)) continue;
       const unit: HomeUnit = line.unit?.toLowerCase() === 'kg' ? 'KG' : 'PIECE';
-      homeItems.push(await tx.homeItem.create({ data: { userId, name, normalizedName, unit, count: 0 } }));
+      missing.push({ userId, name, normalizedName, unit, count: 0 });
     }
+    // Together, not one by one: the database can be far away.
+    if (missing.length > 0) homeItems.push(...(await tx.homeItem.createManyAndReturn({ data: missing })));
     const matches = matchLines(homeItems, lines);
-    for (const { home, line, amount } of matches) {
-      await tx.homeItemChange.create({
-        data: { homeItemId: home.id, receiptId, receiptItemId: line.id, amount },
-      });
-    }
+    await tx.homeItemChange.createMany({
+      data: matches.map(({ home, line, amount }) => ({
+        homeItemId: home.id, receiptId, receiptItemId: line.id, amount,
+      })),
+    });
     for (const [homeId, added] of totals(matches)) {
       await tx.homeItem.update({
         where: { id: homeId },

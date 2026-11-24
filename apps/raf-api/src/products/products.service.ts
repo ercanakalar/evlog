@@ -56,11 +56,16 @@ export class ProductsService implements OnApplicationBootstrap {
       );
     });
     if (changed.length === 0) return;
-    await this.prisma.$transaction(
-      changed.map((row) =>
-        this.prisma.shelfLife.upsert({ where: { keyword: row.keyword }, update: row, create: row }),
-      ),
-    );
+    // New rows go in together: on a new database that is all of them.
+    await this.prisma.$transaction([
+      this.prisma.shelfLife.createMany({
+        data: changed.filter((row) => !existing.has(row.keyword)),
+        skipDuplicates: true,
+      }),
+      ...changed
+        .filter((row) => existing.has(row.keyword))
+        .map((row) => this.prisma.shelfLife.update({ where: { keyword: row.keyword }, data: row })),
+    ]);
     this.loadedAt = 0; // reload the cache with the new rows
     this.logger.log(`Shelf-life table: ${changed.length} entries added or updated`);
   }
@@ -77,9 +82,15 @@ export class ProductsService implements OnApplicationBootstrap {
       return !current || current.keywords.join('|') !== row.keywords.join('|');
     });
     if (changed.length === 0) return;
-    await this.prisma.$transaction(
-      changed.map((row) => this.prisma.brand.upsert({ where: { name: row.name }, update: row, create: row })),
-    );
+    await this.prisma.$transaction([
+      this.prisma.brand.createMany({
+        data: changed.filter((row) => !existing.has(row.name)),
+        skipDuplicates: true,
+      }),
+      ...changed
+        .filter((row) => existing.has(row.name))
+        .map((row) => this.prisma.brand.update({ where: { name: row.name }, data: row })),
+    ]);
     this.loadedAt = 0;
     this.logger.log(`Brands: ${changed.length} added or updated`);
     await this.backfill();

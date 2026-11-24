@@ -21,6 +21,10 @@ To run it in Docker instead: `docker compose up -d --build raf-api` from the rep
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
 * Raf has its **own database** (`raf`) and its own receipt reader (below); it
   shares nothing with the Evlog API.
+* A hosted database (such as Neon) works; keep the API close to it. Saving a long
+  receipt is about 80 queries: instant in the same region, 13 s at 160 ms away.
+  Never run `prisma migrate dev` against it (it can reset the database);
+  `prisma migrate deploy` is safe and runs when the container starts.
 * On first boot the API fills an empty shelf-life table itself; `SEED_DEMO=false npm run db:seed`
   updates the table without adding the demo account.
 

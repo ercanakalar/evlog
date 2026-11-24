@@ -20,6 +20,8 @@ const poolConfig = (databaseUrl: string) => {
     schema,
     pool: {
       connectionString: url.toString(),
+      // Reconnecting to a hosted database takes about a second; the default is 10 s.
+      idleTimeoutMillis: 60_000,
       // Poolers (Neon, PgBouncer) refuse start-up options; "public" needs none.
       ...(schema === 'public' ? {} : { options: `-c search_path="${schema}"` }),
     },
@@ -33,7 +35,12 @@ export class PrismaService
 {
   constructor(config: ConfigService<Env, true>) {
     const { pool, schema } = poolConfig(config.get('DATABASE_URL', { infer: true }));
-    super({ adapter: new PrismaPg(pool, { schema }) });
+    super({
+      adapter: new PrismaPg(pool, { schema }),
+      // Saving a long receipt is dozens of queries, which adds up on a hosted
+      // database; the default limit is 5 seconds.
+      transactionOptions: { maxWait: 10_000, timeout: 30_000 },
+    });
   }
 
   async onModuleInit(): Promise<void> {

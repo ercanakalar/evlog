@@ -106,10 +106,11 @@ export class ItemsService {
       where: { receiptId, onShelf: true, shelfLifeDays: { not: null } },
       select: { id: true, shelfLifeDays: true },
     });
-    for (const item of items) {
-      await tx.receiptItem.update({
-        where: { id: item.id },
-        data: { expiresAt: addDays(boughtAt, item.shelfLifeDays!) },
+    // One query per shelf life, not per product: the database can be far away.
+    for (const days of new Set(items.map((item) => item.shelfLifeDays!))) {
+      await tx.receiptItem.updateMany({
+        where: { id: { in: items.filter((item) => item.shelfLifeDays === days).map((item) => item.id) } },
+        data: { expiresAt: addDays(boughtAt, days) },
       });
     }
   }
