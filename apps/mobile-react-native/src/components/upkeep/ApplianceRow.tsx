@@ -1,12 +1,12 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { Badge, Card, Row, SpaceBetween, Text } from '@/components/ui';
+import { Badge, Row, Rule, SpaceBetween, Text } from '@/components/ui';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useTheme } from '@/theme';
 import type { Appliance } from '@/types/api/models';
 
-export function ApplianceRow({ appliance }: { appliance: Appliance }) {
+export function ApplianceRow({ appliance, divider }: { appliance: Appliance; divider?: boolean }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const f = useFormatters();
@@ -23,12 +23,13 @@ export function ApplianceRow({ appliance }: { appliance: Appliance }) {
       : t('upkeep.noReceipt');
 
   return (
-    <Card tone="muted" style={{ padding: 12 }}>
-      <SpaceBetween>
+    <View>
+      {divider ? <Rule /> : null}
+      <SpaceBetween style={{ paddingVertical: 10, gap: 10 }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text variant="label">{appliance.name}</Text>
           {task ? (
-            <Text variant="caption" color={colors.primary}>
+            <Text variant="caption" color={colors.textSoft}>
               {task.title} · {f.interval(task.intervalDays)}
             </Text>
           ) : null}
@@ -41,6 +42,6 @@ export function ApplianceRow({ appliance }: { appliance: Appliance }) {
         </View>
         {due ? <Badge label={due.label} tone={due.tone} /> : null}
       </SpaceBetween>
-    </Card>
+    </View>
   );
 }

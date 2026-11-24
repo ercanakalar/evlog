@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { shareText } from '@/services/linking';
 import { useGetDashboardQuery } from '@/store/services/homeService';
 import {
@@ -48,6 +48,7 @@ export function useListings() {
 /** Sharing toggles, broker invites and "Send update" for one listing. */
 export function useListingCard(listing: Listing) {
   const { t } = useTranslation();
+  const modal = useModal();
   const showError = useErrorAlert();
   const { home } = useCurrentHome();
   const dashboard = useGetDashboardQuery(home.id);
@@ -78,7 +79,7 @@ export function useListingCard(listing: Listing) {
   const send = () =>
     sendUpdate({ id: listing.id, homeId: home.id })
       .unwrap()
-      .then(({ recipients }) => Alert.alert(t('listing.sent'), t('listing.sentBody', { count: recipients })))
+      .then(({ recipients }) => modal.alert(t('listing.sent'), t('listing.sentBody', { count: recipients })))
       .catch((error: unknown) => showError(t('listing.sendFailed'), error));
 
   const record = dashboard.data?.conditionRecord;

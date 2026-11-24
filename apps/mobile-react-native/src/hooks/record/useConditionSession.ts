@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { CameraPermissionError, captureImage } from '@/services/media/imageCapture';
 import {
   useAddPhotoMutation,
@@ -14,6 +14,7 @@ import { useErrorAlert } from '../common/useErrorAlert';
 export function useConditionSession(sessionId: string) {
   const { t } = useTranslation();
   const showError = useErrorAlert();
+  const modal = useModal();
   const { home, role } = useCurrentHome();
   const session = useGetSessionQuery(sessionId);
   const [addPhoto, { isLoading: uploading }] = useAddPhotoMutation();
@@ -28,22 +29,21 @@ export function useConditionSession(sessionId: string) {
       const file = await captureImage('camera');
       if (file) await addPhoto({ sessionId, room, file }).unwrap();
     } catch (error) {
-      if (error instanceof CameraPermissionError) Alert.alert(t('receipts.cameraDenied'));
+      if (error instanceof CameraPermissionError) modal.alert(t('receipts.cameraDenied'));
       else showError(t('record.photoFailed'), error);
     }
   };
 
   const lock = () =>
-    Alert.alert(t('record.lockTitle'), t('record.lockBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('record.lock'),
-        onPress: () =>
-          void runAction({ sessionId, homeId: home.id, action: 'lock' })
-            .unwrap()
-            .catch((error: unknown) => showError(t('record.lockFailed'), error)),
-      },
-    ]);
+    modal.confirm({
+      title: t('record.lockTitle'),
+      message: t('record.lockBody'),
+      confirmLabel: t('record.lock'),
+      onConfirm: () =>
+        runAction({ sessionId, homeId: home.id, action: 'lock' })
+          .unwrap()
+          .catch((error: unknown) => showError(t('record.lockFailed'), error)),
+    });
 
   const confirm = () =>
     runAction({ sessionId, homeId: home.id, action: 'confirm' })

@@ -14,7 +14,7 @@ export function ReceiptListScreen({ navigation }: RootScreenProps<'ReceiptList'>
   return (
     <Screen refreshing={r.isRefreshing} onRefresh={r.refresh}>
       <ScreenHeader back title={t('receipts.title')} />
-      {r.receipts.length === 0 ? <Empty text={t('receipts.empty')} /> : null}
+      {r.receipts.length === 0 ? <Empty icon="file-text" text={t('receipts.empty')} /> : null}
       {r.receipts.map((receipt) => (
         <ReceiptRow
           key={receipt.id}

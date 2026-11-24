@@ -1,0 +1,36 @@
+import { Transform } from 'class-transformer';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { HomeUnit } from '../../generated/prisma/enums';
+
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+
+export class CreateHomeItemDto {
+  @Transform(trim) @IsString() @IsNotEmpty() @MaxLength(120)
+  name: string;
+
+  /** PIECE (default) or KG. */
+  @IsOptional() @IsEnum(HomeUnit)
+  unit?: HomeUnit;
+
+  /** How many are at home now: pieces (whole numbers) or kilograms. Defaults to 0. */
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) @Max(9999)
+  count?: number;
+}
+
+export class UpdateHomeItemDto {
+  @IsOptional() @Transform(trim) @IsString() @IsNotEmpty() @MaxLength(120)
+  name?: string;
+
+  /** Switching unit keeps the number; a KG amount is rounded to whole pieces. */
+  @IsOptional() @IsEnum(HomeUnit)
+  unit?: HomeUnit;
+
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) @Max(9999)
+  count?: number;
+}
+
+export class AddToListDto {
+  /** Name for the market list made if the user has none (in the app's language). */
+  @IsOptional() @Transform(trim) @IsString() @IsNotEmpty() @MaxLength(60)
+  newListName?: string;
+}

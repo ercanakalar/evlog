@@ -3,23 +3,36 @@ import { radius, space } from '@/constants/layout';
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 
-export function Field({ label, error, style, ...props }: TextInputProps & { label?: string; error?: string }) {
-  const { colors } = useTheme();
+type FieldProps = TextInputProps & {
+  /** Shown above the input; falls back to the placeholder for screen readers. */
+  label?: string;
+  /** Keep the label for screen readers only (e.g. "Add a product" rows). */
+  hideLabel?: boolean;
+  error?: string;
+};
+
+export function Field({ label, hideLabel, error, style, ...props }: FieldProps) {
+  const { colors, fonts } = useTheme();
   return (
-    <View style={{ gap: space.xs }}>
-      {label ? <Text variant="label">{label}</Text> : null}
+    <View style={{ gap: 5, flex: hideLabel ? 1 : undefined }}>
+      {hideLabel || !label ? null : <Text variant="smallMedium">{label}</Text>}
       <TextInput
         placeholderTextColor={colors.textMuted}
         accessibilityLabel={label ?? props.placeholder}
         {...props}
         style={[
           styles.input,
-          { backgroundColor: colors.card, color: colors.text, borderColor: error ? colors.dangerText : colors.border },
+          {
+            fontFamily: fonts.body,
+            backgroundColor: colors.card,
+            color: colors.text,
+            borderColor: error ? colors.urgentText : colors.inputBorder,
+          },
           style,
         ]}
       />
       {error ? (
-        <Text variant="caption" color={colors.dangerText}>
+        <Text variant="small" color={colors.urgentText}>
           {error}
         </Text>
       ) : null}
@@ -29,10 +42,10 @@ export function Field({ label, error, style, ...props }: TextInputProps & { labe
 
 const styles = StyleSheet.create({
   input: {
+    height: 46,
     borderWidth: 1,
     borderRadius: radius.md,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
+    paddingHorizontal: space.md + 2,
     fontSize: 15,
   },
 });

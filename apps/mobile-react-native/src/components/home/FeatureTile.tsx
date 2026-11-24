@@ -21,7 +21,7 @@ export function FeatureTile({
   return (
     <View style={{ flex: 1 }}>
       <Card
-        tone={warm ? 'warm' : 'default'}
+        tone={warm ? 'warm' : 'paper'}
         onPress={onPress}
         accessibilityLabel={`${title}, ${subtitle}`}
         style={{ minHeight: 96, justifyContent: 'space-between' }}>

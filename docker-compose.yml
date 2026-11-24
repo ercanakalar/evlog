@@ -1,10 +1,21 @@
-# Local development: Postgres + the API.
-#   docker compose up -d db          # just the database
-#   docker compose up --build        # database + API
-#   docker compose up -d receipt-reader  # just the receipt reader
+# Local development with Docker. See "Run with Docker" in README.md.
+#
+#   docker compose up -d --build api raf-api   # both APIs + Evlog's receipt reader
+#   docker compose up -d --build api           # just Evlog (+ reader)
+#   docker compose up -d --build raf-api       # just Raf (its reader is built in)
+#   docker compose up -d db raf-db             # optional: Postgres in Docker
+#   docker compose logs -f api raf-api receipt-reader
+#   docker compose down
+#
+# The APIs use the host's network, so they read DATABASE_URL and
+# OCR_SERVICE_URL from apps/*/.env exactly like running them with npm does
+# (localhost works) and phones reach them on this computer's LAN IP.
 services:
+  # Postgres in Docker, for when you don't run your own. Only started when
+  # named (`docker compose up -d db raf-db`); point DATABASE_URL at it.
   db:
     image: postgres:18-alpine
+    profiles: [db]
     environment:
       POSTGRES_USER: evlog
       POSTGRES_PASSWORD: evlog
@@ -19,26 +30,51 @@ services:
       timeout: 3s
       retries: 10
 
+  # Raf runs on its own Postgres server and port.
+  raf-db:
+    image: postgres:18-alpine
+    profiles: [db]
+    environment:
+      POSTGRES_USER: raf
+      POSTGRES_PASSWORD: raf
+      POSTGRES_DB: raf
+    ports:
+      - '5433:5432'
+    volumes:
+      - raf-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U raf']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Evlog API on port 3000 (PORT in apps/api/.env).
   api:
     build: ./apps/api
-    depends_on:
-      db:
-        condition: service_healthy
+    network_mode: host
+    depends_on: [receipt-reader]
     env_file: ./apps/api/.env
     environment:
-      DATABASE_URL: postgresql://evlog:evlog@db:5432/evlog?schema=public
-      OCR_SERVICE_URL: http://receipt-reader:8000
       UPLOAD_DIR: /app/uploads
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     command: sh -c "npx prisma migrate deploy && node dist/main"
-    ports:
-      - '3000:3000'
     volumes:
       - uploads:/app/uploads
 
-  # Receipt reader. Code is mounted and reloaded on save, so edits to
-  # app.py apply without a rebuild; rebuild after changing requirements.txt.
+  # Raf API on port 3100 (PORT in apps/raf-api/.env).
+  raf-api:
+    build: ./apps/raf-api
+    restart: unless-stopped
+    network_mode: host
+    env_file: ./apps/raf-api/.env
+    environment:
+      UPLOAD_DIR: /app/uploads
+    command: sh -c "npx prisma migrate deploy && node dist/main"
+    volumes:
+      - raf-uploads:/app/uploads
+
+  # Evlog's receipt reader (Raf's is built into its API). Code is mounted and reloaded on save, so
+  # edits to the .py files apply without a rebuild; rebuild after changing
+  # requirements.txt.
   receipt-reader:
     build: ./services/receipt-reader
     restart: unless-stopped
@@ -48,9 +84,11 @@ services:
     volumes:
       - ./services/receipt-reader:/app
     ports:
-      # Only this computer can reach it; the API calls http://localhost:8000.
+      # Only this computer can reach it; the APIs call http://localhost:8000.
       - '127.0.0.1:8000:8000'
 
 volumes:
   pgdata:
   uploads:
+  raf-pgdata:
+  raf-uploads:

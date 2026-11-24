@@ -1,5 +1,5 @@
 import type { EntityState } from '@reduxjs/toolkit';
-import type { Appliance, KitchenSummary, Upkeep } from '@/types/api/models';
+import type { Appliance, Upkeep } from '@/types/api/models';
 import { applianceAdapter } from '../adapters/applianceAdapter';
 
 /** Drops undefined values so query strings stay clean. */
@@ -16,10 +16,3 @@ export const transformUpkeep = (raw: Upkeep): NormalizedUpkeep => ({
   appliances: applianceAdapter.setAll(applianceAdapter.getInitialState(), raw.appliances),
 });
 
-/** Kitchen: newest price changes first, unchanged ones last. */
-export const transformKitchen = (raw: KitchenSummary): KitchenSummary => ({
-  ...raw,
-  priceWatch: [...raw.priceWatch].sort(
-    (a, b) => Math.abs(b.changePercent ?? 0) - Math.abs(a.changePercent ?? 0),
-  ),
-});

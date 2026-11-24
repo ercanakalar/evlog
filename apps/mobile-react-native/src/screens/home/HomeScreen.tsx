@@ -16,7 +16,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const roles = h.roles.length > 0 ? h.roles : [{ home: h.home, role: h.role }];
 
   return (
-    <Screen withTabBar refreshing={h.isRefreshing} onRefresh={h.refresh}>
+    <Screen refreshing={h.isRefreshing} onRefresh={h.refresh}>
       <SpaceBetween style={{ marginTop: 12 }}>
         <Text variant="caption" muted>
           {h.home.district}, {h.home.city} · {h.home.roomLayout}
@@ -47,12 +47,21 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
             onPress={() => navigation.navigate('Listing')}
           />
         ) : null}
-        <FeatureTile
-          icon="shopping-bag"
-          title={t('home.kitchen')}
-          subtitle={t('home.low', { count: d.kitchen.lowCount })}
-          onPress={() => navigation.navigate('Kitchen')}
-        />
+        {h.groceries ? (
+          <FeatureTile
+            icon="shopping-bag"
+            title={t('home.groceries')}
+            subtitle={
+              !h.groceries.connected
+                ? t('home.connectGroceries')
+                : h.groceries.useSoon
+                  ? t('home.useSoon', { count: h.groceries.useSoon })
+                  : t('home.nothingSoon')
+            }
+            warm={!!h.groceries.useSoon}
+            onPress={() => navigation.navigate('Groceries')}
+          />
+        ) : null}
         <FeatureTile
           icon="tool"
           title={t('home.upkeep')}

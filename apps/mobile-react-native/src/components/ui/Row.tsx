@@ -7,5 +7,5 @@ export function Row({ children, style }: { children: ReactNode; style?: StylePro
 }
 
 export function SpaceBetween({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <Row style={[{ justifyContent: 'space-between' }, style]}>{children}</Row>;
+  return <Row style={[{ justifyContent: 'space-between', gap: space.md }, style]}>{children}</Row>;
 }

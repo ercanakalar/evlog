@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { QUICK_ADD_APPLIANCES } from '@/constants/domain';
 import { applianceSelectors } from '@/store/adapters/applianceAdapter';
 import {
@@ -15,6 +15,7 @@ import { useReceiptScanner } from '../receipts/useReceiptScanner';
 export function useUpkeep() {
   const { t } = useTranslation();
   const showError = useErrorAlert();
+  const modal = useModal();
   const { home } = useCurrentHome();
   const upkeep = useGetUpkeepQuery(home.id);
   const [addAppliance] = useAddApplianceMutation();
@@ -27,16 +28,17 @@ export function useUpkeep() {
   );
 
   const promptAddAppliance = () =>
-    Alert.alert(t('upkeep.add'), t('upkeep.addBody'), [
-      ...QUICK_ADD_APPLIANCES.map((type) => ({
-        text: t(`upkeep.appliance.${type}`),
+    modal.choose({
+      title: t('upkeep.add'),
+      message: t('upkeep.addBody'),
+      choices: QUICK_ADD_APPLIANCES.map((type) => ({
+        label: t(`upkeep.appliance.${type}`),
         onPress: () =>
           void addAppliance({ homeId: home.id, type, name: t(`upkeep.appliance.${type}`) })
             .unwrap()
             .catch((error: unknown) => showError(t('upkeep.addFailed'), error)),
       })),
-      { text: t('common.cancel'), style: 'cancel' as const },
-    ]);
+    });
 
   const markDone = (taskId: string) =>
     completeTask({ homeId: home.id, taskId })

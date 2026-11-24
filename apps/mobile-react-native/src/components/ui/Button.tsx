@@ -5,10 +5,19 @@ import { useTheme } from '@/theme';
 import type { ButtonProps } from '@/types/components/ui';
 import { Text } from './Text';
 
-export function Button({ title, onPress, variant = 'primary', icon, loading, disabled, style }: ButtonProps) {
+/** Full-width action. `primary` is ink, `accent` is the lime highlighter. */
+export function Button({ title, onPress, variant = 'primary', trailing, icon, loading, disabled, style, compact }: ButtonProps) {
   const { colors } = useTheme();
-  const filled = variant === 'primary';
-  const fg = filled ? colors.onPrimary : colors.text;
+  const [bg, fg, border] = {
+    primary: [colors.ink, colors.onInk, 'transparent'],
+    accent: [colors.accent, colors.onAccent, 'transparent'],
+    outline: [colors.card, colors.text, colors.text],
+    ghost: ['transparent', colors.text, 'transparent'],
+    danger: ['transparent', colors.urgentText, 'transparent'],
+    dangerFilled: [colors.urgentBar, '#FCFCFA', 'transparent'],
+    // Outline on the dark camera screen, in both themes.
+    onDark: ['transparent', '#FCFCFA', '#FCFCFA'],
+  }[variant];
   return (
     <Pressable
       accessibilityRole="button"
@@ -18,26 +27,20 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        {
-          backgroundColor: filled ? colors.primary : 'transparent',
-          borderColor: variant === 'outline' ? colors.text : 'transparent',
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
-        },
+        compact && styles.compact,
+        { backgroundColor: bg, borderColor: border, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
         style,
       ]}>
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <>
-          <Text variant="label" color={fg} style={icon ? { flex: 1 } : undefined}>
+        <View style={styles.content}>
+          {icon ? <Feather name={icon} size={compact ? 16 : 18} color={fg} /> : null}
+          <Text variant="label" color={fg} style={{ fontSize: compact ? 14 : 15 }}>
             {title}
           </Text>
-          {icon ? (
-            <View style={[styles.icon, { backgroundColor: filled ? colors.onPrimary : colors.primary }]}>
-              <Feather name={icon} size={16} color={filled ? colors.primary : colors.onPrimary} />
-            </View>
-          ) : null}
-        </>
+          {trailing}
+        </View>
       )}
     </Pressable>
   );
@@ -45,15 +48,13 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 50,
-    borderRadius: radius.pill,
+    minHeight: 52,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
-    paddingHorizontal: space.xl,
-    paddingVertical: space.sm,
-    flexDirection: 'row',
+    paddingHorizontal: space.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: space.sm,
   },
-  icon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  compact: { minHeight: 46, borderRadius: radius.md },
+  content: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
 });

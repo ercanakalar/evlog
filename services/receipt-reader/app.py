@@ -13,17 +13,23 @@ It speaks the HTTP contract the Evlog API expects:
 Answer 200 with the result straight away (simplest), or 202 and POST the
 result later to callbackUrl with header  X-Ocr-Secret: <OCR_CALLBACK_SECRET>.
 
-Result body (every field optional except items):
+Result body (every field optional except items; "barcode" when one is
+printed beside the item and its check digit is right):
     {
       "merchantName": "Migros",
       "issuedAt": "2026-11-15T14:32:00+03:00",
       "currency": "TRY",
       "total": 842.50,
       "items": [{"name": "SÜT 1LT", "quantity": 1, "unit": "L",
-                 "unitPrice": 42.75, "totalPrice": 42.75}],
+                 "unitPrice": 42.75, "totalPrice": 42.75, "barcode": "8690565007679"}],
       "confidence": 0.93
     }
 or, when the image cannot be read:  {"error": "Image too blurry", "items": []}
+
+    POST /v1/labels/parse              multipart/form-data
+      Authorization: Bearer <OCR_SERVICE_TOKEN>
+      file          a photo of a product pack
+    -> {"expiresOn": "2027-03-12" | null, "barcode": "869..." | null, "dates": [...]}
 
 Reading is free and local: OCR (ocr.py) finds the words, receipt_parser.py
 turns them into items. To add a YOLO model later, crop the receipt in
@@ -40,6 +46,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+import label_parser
 import ocr
 import receipt_parser
 
@@ -72,6 +79,51 @@ def read_receipt(image: bytes, kind: str) -> dict:
         result.get("confidence"), time.monotonic() - started,
     )
     return result
+
+
+def read_label(image: bytes) -> dict:
+    """
+    Reads the photo as taken; when no expiry date is found, tries it turned
+    and with evened-out lighting before giving up (see ocr.label_views).
+    """
+    started = time.monotonic()
+    try:
+        img = ocr.decode(image)
+    except ValueError:
+        return {"error": "Unsupported image format, send a JPEG or PNG"}
+    result, view, words = None, "", []
+    for view, variant in ocr.label_views(img):
+        words = ocr.recognize_array(variant)
+        result = label_parser.parse_label(words)
+        if result["expiresOn"]:
+            break
+    logger.info("Read pack label (%s): %d words, expires %s, barcode %s, %.1fs",
+                view, len(words), result["expiresOn"], result["barcode"], time.monotonic() - started)
+    if not result["expiresOn"]:
+        result["error"] = "No expiry date found. Photograph the date printed on the pack, close up."
+    return result
+
+
+@app.post("/v1/labels/parse")
+async def parse_pack_label(
+    file: UploadFile = File(...),
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """
+    Reads a photo of a product pack. Answers
+      {"expiresOn": "2027-03-12", "barcode": "8690565007679", "dates": [...]}
+    with "expiresOn" null and an "error" when no expiry date was found.
+    """
+    if not authorization or not hmac.compare_digest(authorization, f"Bearer {TOKEN}"):
+        raise HTTPException(status_code=401)
+    image = await file.read(MAX_BYTES + 1)
+    if len(image) > MAX_BYTES:
+        raise HTTPException(status_code=413)
+    try:
+        return await run_in_threadpool(read_label, image)
+    except Exception:
+        logger.exception("Failed to read a pack label")
+        return {"expiresOn": None, "error": "Could not read this photo"}
 
 
 @app.get("/health")

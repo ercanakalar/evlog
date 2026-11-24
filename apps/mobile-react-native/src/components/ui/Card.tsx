@@ -1,16 +1,21 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { radius, space } from '@/constants/layout';
+import { radius } from '@/constants/layout';
 import { useTheme } from '@/theme';
 import type { CardProps } from '@/types/components/ui';
 
-export function Card({ children, tone = 'default', style, onPress, accessibilityLabel }: CardProps) {
+/**
+ * A slip of paper. `ink` is the dark variant (receipt header, account),
+ * `accent` the highlighter; `muted`, `success` and `warm` mark state.
+ */
+export function Card({ children, tone = 'paper', style, onPress, accessibilityLabel }: CardProps) {
   const { colors } = useTheme();
   const backgroundColor = {
-    default: colors.card,
-    primary: colors.primary,
-    warm: colors.warmBg,
-    success: colors.successBg,
+    paper: colors.card,
+    ink: colors.ink,
+    accent: colors.accent,
     muted: colors.cardMuted,
+    success: colors.successBg,
+    warm: colors.warmBg,
   }[tone];
   const body = <View style={[styles.card, { backgroundColor }, style]}>{children}</View>;
   if (!onPress) return body;
@@ -26,5 +31,5 @@ export function Card({ children, tone = 'default', style, onPress, accessibility
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: radius.lg, padding: space.lg, gap: space.sm },
+  card: { borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, gap: 6 },
 });

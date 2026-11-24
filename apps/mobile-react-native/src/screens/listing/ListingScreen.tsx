@@ -21,7 +21,7 @@ export function ListingScreen() {
       {l.listings.map((listing) => (
         <ListingSection key={listing.id} listing={listing} />
       ))}
-      {l.listings.length === 0 ? <Empty text={t('listing.empty')} /> : null}
+      {l.listings.length === 0 ? <Empty icon="link" text={t('listing.empty')} /> : null}
       <Card>
         <Field
           label={t('listing.linkLabel')}

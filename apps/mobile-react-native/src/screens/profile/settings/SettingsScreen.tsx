@@ -1,49 +1,40 @@
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
-import { Card, Chip, Row, Screen, ScreenHeader, SectionHeader, Text } from '@/components/ui';
+import { FontRow, PaletteRow, SettingGroup, SwitchRow, ValueRow } from '@/components/settings/SettingRows';
+import { Screen, ScreenHeader, Text } from '@/components/ui';
 import { useSettings } from '@/hooks/profile/useSettings';
-import { useTheme } from '@/theme';
-import type { LanguagePreference, ThemePreference } from '@/types/store/state';
 
-const THEMES: ThemePreference[] = ['system', 'light', 'dark'];
-const LANGUAGES: LanguagePreference[] = ['system', 'en', 'tr'];
-
+/** App-wide preferences: appearance and language apply to every tab, Groceries included. */
 export function SettingsScreen() {
   const { t } = useTranslation();
-  const { colors } = useTheme();
   const s = useSettings();
   return (
-    <Screen>
-      <ScreenHeader back title={t('settings.title')} />
-      <SectionHeader title={t('settings.appearance')} />
-      <Row>
-        {THEMES.map((theme) => (
-          <Chip key={theme} label={t(`settings.theme.${theme}`)} selected={s.theme === theme} onPress={() => s.setTheme(theme)} />
-        ))}
-      </Row>
-      <SectionHeader title={t('settings.language')} />
-      <Row>
-        {LANGUAGES.map((lang) => (
-          <Chip key={lang} label={t(`settings.languages.${lang}`)} selected={s.language === lang} onPress={() => s.setLanguage(lang)} />
-        ))}
-      </Row>
-      <SectionHeader title={t('settings.privacy')} />
-      <Card>
-        <Row>
-          <View style={{ flex: 1 }}>
-            <Text variant="label">{t('settings.usageReporting')}</Text>
-            <Text variant="caption" muted>
-              {t('settings.usageReportingHint')}
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabel={t('settings.usageReporting')}
-            value={s.usageReporting}
-            onValueChange={s.setUsageReporting}
-            trackColor={{ true: colors.primary }}
+    <Screen header={<ScreenHeader back title={t('settings.title')} />} gap={18}>
+      <SettingGroup title={t('settings.appearance')}>
+        <ValueRow label={t('settings.mode')} value={t(`settings.theme.${s.theme}`)} onPress={s.pickTheme} />
+        <PaletteRow divider label={t('settings.palette')} value={s.palette} onChange={s.setPalette} nameOf={(p) => t(`settings.palettes.${p}`)} />
+        <FontRow divider label={t('settings.font')} value={s.font} onChange={s.setFont} nameOf={(f) => t(`settings.fonts.${f}`)} />
+      </SettingGroup>
+
+      <SettingGroup title={t('settings.language')}>
+        <ValueRow label={t('settings.language')} value={t(`settings.languages.${s.language}`)} onPress={s.pickLanguage} />
+      </SettingGroup>
+
+      {s.groceriesAvailable ? (
+        <SettingGroup title={t('settings.accounts')}>
+          <ValueRow
+            label={t('settings.groceries')}
+            value={s.groceriesConnected ? '' : t('settings.notConnected')}
+            onPress={s.openGroceries}
           />
-        </Row>
-      </Card>
+        </SettingGroup>
+      ) : null}
+
+      <SettingGroup title={t('settings.privacy')}>
+        <SwitchRow label={t('settings.usageReporting')} value={s.usageReporting} onChange={s.setUsageReporting} />
+        <Text variant="small" muted style={{ paddingBottom: 12 }}>
+          {t('settings.usageReportingHint')}
+        </Text>
+      </SettingGroup>
     </Screen>
   );
 }

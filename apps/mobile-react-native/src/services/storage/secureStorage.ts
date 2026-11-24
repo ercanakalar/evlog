@@ -24,17 +24,24 @@ const isTokens = (value: unknown): value is StoredTokens =>
   typeof (value as StoredTokens).accessToken === 'string' &&
   typeof (value as StoredTokens).refreshToken === 'string';
 
-export const secureStorage = {
-  async loadTokens(): Promise<StoredTokens | null> {
-    try {
-      const raw = await backend.getItemAsync(StorageKeys.tokens);
-      const parsed: unknown = raw ? JSON.parse(raw) : null;
-      return isTokens(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
-  },
-  saveTokens: (tokens: StoredTokens) =>
-    backend.setItemAsync(StorageKeys.tokens, JSON.stringify(tokens)),
-  clearTokens: () => backend.deleteItemAsync(StorageKeys.tokens),
-};
+/** Token storage under one SecureStore key; each API account has its own. */
+function tokenStorage(key: string) {
+  return {
+    async loadTokens(): Promise<StoredTokens | null> {
+      try {
+        const raw = await backend.getItemAsync(key);
+        const parsed: unknown = raw ? JSON.parse(raw) : null;
+        return isTokens(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    },
+    saveTokens: (tokens: StoredTokens) => backend.setItemAsync(key, JSON.stringify(tokens)),
+    clearTokens: () => backend.deleteItemAsync(key),
+  };
+}
+
+/** The Evlog account. */
+export const secureStorage = tokenStorage(StorageKeys.tokens);
+/** The groceries (Raf API) account. */
+export const groceriesTokenStorage = tokenStorage(StorageKeys.groceriesTokens);
