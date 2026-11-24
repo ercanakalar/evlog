@@ -66,7 +66,7 @@ sign-in is not set up yet.
 | Trips | Saved receipts by month with totals, filtered by market. |
 | Receipt detail | The trip as a receipt, grouped by category, with days left per product and the original photo. |
 | Spending | Six months of totals; a month by category or by market. |
-| Settings | Expiry reminders and lead time, at-home tracking, currency, language, appearance, log out, delete account. |
+| Settings | Expiry reminders and lead time, at-home tracking, currency, language, appearance (theme, colour palette, font style), log out, delete account. |
 
 ## Structure
 
@@ -75,12 +75,12 @@ Same layout and conventions as `apps/mobile-react-native`:
 ```
 src/
 ├── navigators/   RootNavigator (signed out / in), TabNavigator + TabBar (dark bar, scan button), linking
-├── screens/      auth, home, shelf, scan, receipts, product, lists, trips, spending, settings
+├── screens/      auth, home, shelf, scan, packs, receipts, product, lists, trips, spending, settings
 ├── components/   ui/ (design kit: ReceiptPaper, TickBar, Segmented, Switch, Chip…) + one folder per feature
 ├── hooks/        screen logic, one folder per feature (+ app/ for bootstrap and expiry reminders)
 ├── store/        RTK Query services (auth, me, receipts, items, home items, lists, insights), slices, middlewares
 ├── services/     SecureStore / AsyncStorage, camera & photo prep, local reminders
-├── theme/        Raf palette (light + dark) and fonts (Inter, Space Grotesk, JetBrains Mono)
+├── theme/        colour palettes (each light + dark) and font styles, both chosen in Settings
 └── i18n/         English and Turkish
 ```
 
