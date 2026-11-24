@@ -12,11 +12,12 @@ export function Badge({ label, tone = 'neutral', icon }: { label: string; tone?:
     success: [colors.successBg, colors.successText],
     danger: [colors.dangerBg, colors.dangerText],
     ink: [colors.ink, colors.onInk],
+    accent: [colors.accent, colors.onAccent],
   }[tone];
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
       {icon ? <Feather name={icon} size={11} color={fg} /> : null}
-      <Text variant="caption" color={fg} style={{ fontWeight: '600' }}>
+      <Text variant="caption" color={fg}>
         {label}
       </Text>
     </View>

@@ -11,10 +11,10 @@ export function ConditionRecordScreen() {
   if (!r.sessions) return <ErrorView error={r.error} onRetry={r.refresh} />;
 
   return (
-    <Screen withTabBar refreshing={r.isRefreshing} onRefresh={r.refresh}>
+    <Screen refreshing={r.isRefreshing} onRefresh={r.refresh}>
       <ScreenHeader title={t('record.title')} />
       <Text muted>{t('record.intro')}</Text>
-      {r.sessions.length === 0 ? <Empty text={t('record.empty')} /> : null}
+      {r.sessions.length === 0 ? <Empty icon="camera" text={t('record.empty')} /> : null}
       {r.sessions.map((s) => (
         <SessionCard key={s.id} session={s} onPress={() => r.open(s.id)} />
       ))}

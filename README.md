@@ -11,13 +11,13 @@ A home app for **owners and tenants**.
 * Owners link their sahibinden.com listing and share chosen, verified data with
   real-estate brokers.
 
-**Part 2 — Kitchen, market data & appliances**
-* Scan grocery receipts: items and prices are added, "running low" is learned,
-  prices are compared with your last receipt and with anonymous market averages.
+**Part 2 — Appliances**
 * Appliance upkeep: maintenance schedules, reminders, invoices.
+* (The Evlog API still has its kitchen endpoints, which read grocery receipts; the app now
+  uses the Groceries tab below for that.)
 
-**Raf — grocery receipts** (separate app, own API and database)
-* Sign in with Google or email, scan market receipts (long ones in parts), and see
+**Groceries (Raf)** — a tab in the Evlog app, with its own API, database and account
+* Connect once (Google or email; your Evlog email is filled in), scan market receipts (long ones in parts), and see
   how much you spend, when, where and on which categories.
 * Every product gets a countdown from a shelf-life table; mark it opened, use the
   date on the pack, or mark it used up. Reminders before things go off.
@@ -29,22 +29,21 @@ A home app for **owners and tenants**.
 | Path | Stack |
 | --- | --- |
 | [`apps/api`](apps/api) | NestJS 12, Prisma 7 (`pg` driver adapter), PostgreSQL, class-validator, Zod-validated config, JWT |
-| [`apps/mobile-react-native`](apps/mobile-react-native) | Expo SDK 58, React Native 0.88, React Navigation 7, Redux Toolkit + RTK Query, i18next (EN/TR), react-hook-form + Zod |
+| [`apps/mobile-react-native`](apps/mobile-react-native) | The one phone app (Evlog + the Groceries tab): Expo SDK 58, React Native 0.88, React Navigation 7, Redux Toolkit + RTK Query, i18next (EN/TR), react-hook-form + Zod, expo-camera, expo-notifications |
 | [`apps/raf-api`](apps/raf-api) | Raf backend: NestJS 12, Prisma 7, its own PostgreSQL database (`raf`), Google sign-in, receipt reader built in (ONNX Runtime) |
-| [`apps/raf-mobile`](apps/raf-mobile) | Raf app: Expo SDK 58, same stack and conventions as the Evlog app, plus expo-camera and expo-notifications |
 | [`services/receipt-reader`](services/receipt-reader) | FastAPI + RapidOCR (PaddleOCR models, offline and free): reads receipt photos for Evlog |
 
 ```
- Evlog app ──▶ Evlog API :3000 ──▶ PostgreSQL, database evlog
-                     │
-                     ▼
-         receipt reader :8000 (OCR, on your computer)
-
- Raf app ────▶ Raf API   :3100 ──▶ PostgreSQL, database raf
-               (OCR built in)
+            ┌─▶ Evlog API :3000 ──▶ PostgreSQL, database evlog
+            │         │
+ Evlog app ─┤         ▼
+            │   receipt reader :8000 (OCR, on your computer)
+            │
+            └─▶ Raf API   :3100 ──▶ PostgreSQL, database raf
+     (Groceries tab, OCR built in)
 ```
 
-The phone apps run with Expo on your computer; everything else can run in Docker.
+The phone app runs with Expo on your computer; everything else can run in Docker.
 
 ## Run with Docker
 
@@ -102,23 +101,23 @@ and the same in `apps/raf-api` (`demo@raf.app` / `Demo1234`).
 
 ### 4. Phone apps
 
-The apps run with Expo, outside Docker. Point each at your computer's LAN IP
-(find it with `hostname -I`); the phone must be on the same Wi-Fi.
+There is one phone app. It runs with Expo, outside Docker, and talks to both APIs:
+point it at your computer's LAN IP (find it with `hostname -I`); the phone must be
+on the same Wi-Fi.
 
 ```bash
-cd apps/mobile-react-native && cp .env.example .env    # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000
-npm install && npm start
-
-cd apps/raf-mobile && cp .env.example .env             # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3100
+cd apps/mobile-react-native && cp .env.example .env
+# EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000       Evlog API
+# EXPO_PUBLIC_RAF_API_URL=http://<LAN-IP>:3100   Raf API (Groceries tab; leave empty to hide it)
 npm install && npm start
 ```
 
-Your LAN IP changes when you join another network; update both `.env` files
-and restart Expo (`npm start -- -c`).
+Your LAN IP changes when you join another network; update `.env` and restart
+Expo (`npm start -- -c`).
 
-To install Raf without Expo, build its APK in Docker:
-`cd apps/raf-mobile && npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100`
-writes `build/raf.apk` (see [apps/raf-mobile/README.md](apps/raf-mobile/README.md#android-apk-with-docker)).
+To install the app without Expo, build its APK in Docker:
+`cd apps/mobile-react-native && npm run apk -- --build-arg API_URL=http://<LAN-IP>:3000 --build-arg RAF_API_URL=http://<LAN-IP>:3100`
+writes `build/evlog.apk` (see [apps/mobile-react-native/README.md](apps/mobile-react-native/README.md#android-apk-with-docker)).
 
 ### Everyday commands
 
@@ -155,7 +154,7 @@ Each app keeps its own `package-lock.json` on purpose: the API and the React
 Native app pin different React/TypeScript toolchains and are deployed separately.
 
 ```bash
-cd apps/raf-mobile
+cd apps/mobile-react-native
 hostname -I                            # the first address is this computer's
-npm run apk -- --build-arg API_URL=http://10.34.33.47:3100
+npm run apk -- --build-arg API_URL=http://10.34.33.47:3000 --build-arg RAF_API_URL=http://10.34.33.47:3100
 ```

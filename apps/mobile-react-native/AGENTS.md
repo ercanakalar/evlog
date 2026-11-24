@@ -29,6 +29,8 @@ Run lint and typecheck before declaring any task done.
 - Screens stay thin: put logic in `src/hooks/<feature>`, server calls in `src/store/services` (inject into `baseApi`).
 - Every user-visible string goes through i18next; add keys to `src/i18n/locales/en.ts` and `tr.ts` (tr is type-checked against en).
 - Validate forms with the Zod schemas in `src/utils/validation.ts`.
+- Groceries (the Raf features) lives under `groceries/` subfolders of the same folders (`screens/groceries`, `hooks/groceries`, `store/groceries`, …). It calls the Raf API through `groceriesApi` with its own account (`groceriesAuth`); use `useTranslation('groceries')` there.
+- Use the design kit in `src/components/ui` and theme tokens (`colors.ink`, `colors.accent`, `fonts.*`); never hard-code a brand colour.
 
 ## Building with EAS
 

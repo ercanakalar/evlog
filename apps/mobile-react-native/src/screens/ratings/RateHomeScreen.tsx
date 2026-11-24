@@ -16,7 +16,7 @@ export function RateHomeScreen() {
   if (r.eligibility.alreadyRated) return <PublishedRatingsScreen banner={t('ratings.thanks')} />;
 
   return (
-    <Screen withTabBar refreshing={r.isRefreshing} onRefresh={r.refresh}>
+    <Screen refreshing={r.isRefreshing} onRefresh={r.refresh}>
       <ScreenHeader title={t('ratings.rateTitle')} />
       <VerificationBanner
         verified={r.eligibility.tenancyVerified}

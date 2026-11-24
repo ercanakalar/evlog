@@ -3,6 +3,15 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { ErrorView } from '@/components/ui';
 import { useCurrentHomeState } from '@/hooks/common/useCurrentHome';
+import { useExpiryReminders } from '@/hooks/groceries/useExpiryReminders';
+import { PackScanScreen } from '@/screens/groceries/packs/PackScanScreen';
+import { ProductScreen } from '@/screens/groceries/product/ProductScreen';
+import { ReceiptReviewScreen as GroceryReceiptScreen } from '@/screens/groceries/receipts/ReceiptReviewScreen';
+import { ScanScreen } from '@/screens/groceries/scan/ScanScreen';
+import { SettingsScreen as GrocerySettingsScreen } from '@/screens/groceries/settings/SettingsScreen';
+import { HomeItemScreen } from '@/screens/groceries/shelf/HomeItemScreen';
+import { SpendingScreen } from '@/screens/groceries/spending/SpendingScreen';
+import { TripDetailScreen } from '@/screens/groceries/trips/TripDetailScreen';
 import { ListingScreen } from '@/screens/listing/ListingScreen';
 import { OnboardingScreen } from '@/screens/onboarding/OnboardingScreen';
 import { SignInScreen } from '@/screens/profile/auth/SignInScreen';
@@ -13,6 +22,7 @@ import { SettingsScreen } from '@/screens/profile/settings/SettingsScreen';
 import { ReceiptListScreen } from '@/screens/receipts/ReceiptListScreen';
 import { ReceiptReviewScreen } from '@/screens/receipts/ReceiptReviewScreen';
 import { ConditionSessionScreen } from '@/screens/record/ConditionSessionScreen';
+import { selectAuthStatus as selectGroceriesStatus } from '@/store/groceries/authSlice';
 import { useAppSelector } from '@/store/hooks';
 import { selectAuthStatus } from '@/store/slices/authSlice';
 import type { RootStackParamList } from '@/types/screens/navigation';
@@ -23,12 +33,16 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 /**
  * Which screens exist depends on the auth state and on whether the user has
  * a home yet; React Navigation moves to the right group when that changes.
+ * Grocery screens also need the groceries (Raf) account.
  */
-export function RootNavigator() {
+export function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const status = useAppSelector(selectAuthStatus);
+  const groceriesStatus = useAppSelector(selectGroceriesStatus);
   const { current, isLoading, error, refetch } = useCurrentHomeState();
   const signedIn = status === 'signedIn';
-  const loading = status === 'restoring' || (signedIn && isLoading);
+  const groceries = signedIn && groceriesStatus === 'signedIn';
+  const loading = !fontsReady || status === 'restoring' || groceriesStatus === 'restoring' || (signedIn && isLoading);
+  useExpiryReminders(groceries);
 
   useEffect(() => {
     if (!loading) void SplashScreen.hideAsync();
@@ -60,6 +74,22 @@ export function RootNavigator() {
           <Stack.Screen name="Profile" component={ProfileScreen} />
         </Stack.Group>
       )}
+      {current && groceries ? (
+        <Stack.Group navigationKey="groceries">
+          <Stack.Screen name="GroceryScan" component={ScanScreen} options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="GroceryReceipt" component={GroceryReceiptScreen} />
+          <Stack.Screen name="GroceryProduct" component={ProductScreen} />
+          <Stack.Screen name="GroceryHomeItem" component={HomeItemScreen} />
+          <Stack.Screen
+            name="GroceryPackScan"
+            component={PackScanScreen}
+            options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+          />
+          <Stack.Screen name="GroceryTrip" component={TripDetailScreen} />
+          <Stack.Screen name="GrocerySpending" component={SpendingScreen} />
+          <Stack.Screen name="GrocerySettings" component={GrocerySettingsScreen} />
+        </Stack.Group>
+      ) : null}
       {/* Available in every state. */}
       <Stack.Group navigationKey={signedIn ? 'user' : 'guest'}>
         <Stack.Screen name="Settings" component={SettingsScreen} />

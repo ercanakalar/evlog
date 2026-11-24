@@ -48,6 +48,7 @@ jobs:
         working-directory: apps/mobile-react-native
     env:
       EXPO_PUBLIC_API_URL: http://localhost:3000
+      EXPO_PUBLIC_RAF_API_URL: http://localhost:3100
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -90,24 +91,6 @@ jobs:
       - run: npm test
       - run: npm run test:e2e
       - run: npm run build
-
-  raf-mobile:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/raf-mobile
-    env:
-      EXPO_PUBLIC_API_URL: http://localhost:3100
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: apps/raf-mobile/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
 
   receipt-reader:
     runs-on: ubuntu-latest

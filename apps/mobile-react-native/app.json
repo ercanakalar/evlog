@@ -36,11 +36,25 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Evlog uses the camera to photograph rooms and to read receipts, barcodes and pack dates.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "cameraPermission": "Evlog uses the camera to photograph rooms for the condition record and to scan receipts.",
           "photosPermission": "Evlog reads receipt photos you choose from your library.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#15181A"
         }
       ],
       [
@@ -50,7 +64,17 @@
           "configureAndroidBackup": true
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true

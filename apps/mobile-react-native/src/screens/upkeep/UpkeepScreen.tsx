@@ -12,7 +12,7 @@ export function UpkeepScreen() {
   if (u.error && u.appliances.length === 0) return <ErrorView error={u.error} onRetry={u.refresh} />;
 
   return (
-    <Screen withTabBar refreshing={u.isRefreshing} onRefresh={u.refresh}>
+    <Screen refreshing={u.isRefreshing} onRefresh={u.refresh}>
       <ScreenHeader
         title={t('upkeep.title')}
         action={<IconButton icon="plus" label={t('upkeep.add')} onPress={u.promptAddAppliance} />}
@@ -26,12 +26,15 @@ export function UpkeepScreen() {
         />
       ) : null}
       <SectionHeader title={t('upkeep.all')} />
-      <Card style={{ padding: 6, gap: 6 }}>
-        {u.appliances.length === 0 ? <Empty text={t('upkeep.empty')} /> : null}
-        {u.appliances.map((a) => (
-          <ApplianceRow key={a.id} appliance={a} />
-        ))}
-      </Card>
+      {u.appliances.length === 0 ? (
+        <Empty icon="tool" text={t('upkeep.empty')} />
+      ) : (
+        <Card style={{ paddingVertical: 2, gap: 0 }}>
+          {u.appliances.map((a, i) => (
+            <ApplianceRow key={a.id} appliance={a} divider={i > 0} />
+          ))}
+        </Card>
+      )}
     </Screen>
   );
 }

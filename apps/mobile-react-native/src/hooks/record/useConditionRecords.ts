@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
+import { useModal } from '@/components/ui';
 import { useListSessionsQuery, useStartSessionMutation } from '@/store/services/conditionRecordService';
 import type { ConditionSessionType } from '@/types/api/models';
 import { useCurrentHome } from '../common/useCurrentHome';
@@ -12,6 +12,7 @@ export function useConditionRecords() {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const showError = useErrorAlert();
+  const modal = useModal();
   const { home } = useCurrentHome();
   const sessions = useListSessionsQuery(home.id);
   const [start, { isLoading: starting }] = useStartSessionMutation();
@@ -26,10 +27,11 @@ export function useConditionRecords() {
       .catch((error: unknown) => showError(t('record.startFailed'), error));
 
   const startNew = () =>
-    Alert.alert(t('record.newSession'), t('record.chooseType'), [
-      ...TYPES.map((type) => ({ text: t(`record.type.${type}`), onPress: () => void begin(type) })),
-      { text: t('common.cancel'), style: 'cancel' as const },
-    ]);
+    modal.choose({
+      title: t('record.newSession'),
+      message: t('record.chooseType'),
+      choices: TYPES.map((type) => ({ label: t(`record.type.${type}`), onPress: () => void begin(type) })),
+    });
 
   return {
     sessions: sessions.data,

@@ -139,25 +139,6 @@ export interface PublishedRating {
   scores: { category: RatingCategory; score: number; _count: { evidence: number } }[];
 }
 
-export interface KitchenSummary {
-  lastScan: { receiptId: string; issuedAt: string | null; itemCount: number; total: string | null; currency: string } | null;
-  runningLow: {
-    id: string;
-    name: string;
-    lastPurchasedAt: string;
-    daysSincePurchase: number;
-    usualDurationDays: number | null;
-  }[];
-  priceWatch: {
-    name: string;
-    normalizedName: string;
-    unit: string | null;
-    price: string;
-    previousPrice: string | null;
-    changePercent: number | null;
-  }[];
-}
-
 export interface Appliance {
   id: string;
   type: ApplianceType;

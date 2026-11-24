@@ -11,14 +11,14 @@ export function PublishedRatingsScreen({ banner }: { banner?: string }) {
   if (!r.ratings) return <ErrorView error={r.error} onRetry={r.refresh} />;
 
   return (
-    <Screen withTabBar refreshing={r.isRefreshing} onRefresh={r.refresh}>
+    <Screen refreshing={r.isRefreshing} onRefresh={r.refresh}>
       <ScreenHeader title={t('ratings.title')} />
       {banner ? (
         <Card tone="success">
           <Text variant="label">{banner}</Text>
         </Card>
       ) : null}
-      {r.ratings.length === 0 ? <Empty text={t('ratings.empty')} /> : null}
+      {r.ratings.length === 0 ? <Empty icon="star" text={t('ratings.empty')} /> : null}
       {r.ratings.map((rating) => (
         <PublishedRatingCard key={rating.id} rating={rating} />
       ))}

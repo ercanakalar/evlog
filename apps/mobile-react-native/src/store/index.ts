@@ -1,6 +1,9 @@
 import { combineReducers, configureStore, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { AppState } from 'react-native';
+import { groceriesApi } from './groceries/api';
+import { registerGroceriesAuthListeners } from './groceries/authListeners';
+import groceriesAuth from './groceries/authSlice';
 import { registerAuthListeners } from './middlewares/authMiddleware';
 import { consentMiddleware } from './middlewares/consentMiddleware';
 import { baseApi } from './middlewares/createApi';
@@ -17,6 +20,9 @@ const rootReducer = combineReducers({
   settings,
   consent,
   [baseApi.reducerPath]: baseApi.reducer,
+  // Groceries talks to the Raf API with its own account.
+  groceriesAuth,
+  [groceriesApi.reducerPath]: groceriesApi.reducer,
 });
 
 export const store = configureStore({
@@ -25,10 +31,11 @@ export const store = configureStore({
     getDefault()
       // The listener runs first so its effects see every action.
       .prepend(listenerMiddleware.middleware)
-      .concat(baseApi.middleware, consentMiddleware),
+      .concat(baseApi.middleware, groceriesApi.middleware, consentMiddleware),
 });
 
 registerAuthListeners();
+registerGroceriesAuthListeners();
 registerPersistenceListeners();
 
 // RTK Query's refetchOnFocus / refetchOnReconnect, driven by AppState on native.

@@ -1,4 +1,5 @@
 import { secureStorage } from '@/services/storage/secureStorage';
+import { signOut as signOutOfGroceries } from '../groceries/actions/sessionActions';
 import { authenticationService } from '../services/authenticationService';
 import { credentialsReceived, signedOut } from '../slices/authSlice';
 import { createAppAsyncThunk } from './createAppAsyncThunk';
@@ -18,4 +19,6 @@ export const signOut = createAppAsyncThunk('session/signOut', async (_arg, { dis
       .catch(() => undefined);
   }
   dispatch(signedOut());
+  // One app, one sign-out: leave the groceries account too.
+  if (getState().groceriesAuth.status === 'signedIn') await dispatch(signOutOfGroceries());
 });
