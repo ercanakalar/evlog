@@ -47,7 +47,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Raf reads receipt photos you choose from your library.",
-          "cameraPermission": false,
+          "cameraPermission": "Raf uses the camera to read your grocery receipts.",
           "microphonePermission": false
         }
       ],
