@@ -20,13 +20,13 @@ jobs:
         image: postgres:18-alpine
         env:
           POSTGRES_USER: evlog
-          POSTGRES_PASSWORD: evlog
+          POSTGRES_PASSWORD: postgresql
           POSTGRES_DB: evlog
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://evlog:evlog@localhost:5432/evlog
+      TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5432/evlog
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -58,3 +58,66 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+
+  raf-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/raf-api
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: evlog
+          POSTGRES_PASSWORD: postgresql
+          POSTGRES_DB: raf
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5433/raf
+      ONNXRUNTIME_NODE_INSTALL: skip # no GPU libraries
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/raf-api/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run build
+
+  raf-mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/raf-mobile
+    env:
+      EXPO_PUBLIC_API_URL: http://localhost:3100
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/raf-mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+  receipt-reader:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/receipt-reader
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      # The parser and lexicon are plain Python; the OCR models are not needed.
+      - run: python -m unittest discover -s tests -v

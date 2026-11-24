@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+uploads/
+src/generated/
+.env
+*.tsbuildinfo
+uploads-test/
+# OCR models (npm run models)
+models/

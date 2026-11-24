@@ -1,0 +1,266 @@
+// Raf data model: grocery receipts, shelf-life countdown, market lists,
+// at-home counts and spending.
+// Money is stored as Decimal(12,2); every timestamp is UTC (timestamptz).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  /// Null for accounts created with Google.
+  passwordHash String?
+  /// Google account id ("sub" claim), set once the user signs in with Google.
+  googleSub    String?  @unique
+  fullName     String
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  // Settings
+  currency          String  @default("TRY") @db.Char(3)
+  expiryReminders   Boolean @default(true)
+  /// Remind this many days before a product's estimated expiry.
+  reminderLeadDays  Int     @default(2)
+  trackHomeItems    Boolean @default(true)
+  /// Raise at-home counts when a confirmed receipt has a matching product.
+  countFromReceipts Boolean @default(true)
+
+  sessions      AuthSession[]
+  receipts      Receipt[]
+  shoppingLists ShoppingList[]
+  homeItems     HomeItem[]
+}
+
+/// One row per logged-in device. Only a hash of the refresh token is stored.
+model AuthSession {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String
+  userAgent        String?
+  expiresAt        DateTime  @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ───────────────────────────── Products ─────────────────────────────
+
+enum Category {
+  DAIRY_EGGS
+  MEAT_FISH
+  FRUIT_VEG
+  BAKERY
+  PANTRY
+  DRINKS
+  HOUSEHOLD
+  OTHER
+}
+
+enum Storage {
+  FRIDGE
+  FREEZER
+  PANTRY
+}
+
+/// Shelf-life reference data. A receipt line matches the entry whose keyword
+/// it contains (longest keyword wins). Seeded from prisma/shelf-life.ts.
+model ShelfLife {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  /// Normalised keyword, e.g. "sut" or "tavuk gogus".
+  keyword             String   @unique
+  /// Clean product name shown instead of the receipt text.
+  displayName         String
+  category            Category
+  storage             Storage
+  /// Days an unopened product keeps after purchase; null = does not expire.
+  shelfLifeDays       Int?
+  /// Days it keeps once opened; null = same as unopened.
+  openedShelfLifeDays Int?
+  source              String
+}
+
+// ───────────────────────────── Receipts (trips) ─────────────────────────────
+
+enum ReceiptStatus {
+  PENDING /// stored, not yet sent to the reader
+  PROCESSING /// reader accepted it, waiting for the callback
+  PARSED /// fields filled, user has not confirmed yet
+  FAILED
+  CONFIRMED /// user reviewed the fields; counts as a trip
+}
+
+/// One receipt is one trip to the market.
+model Receipt {
+  id                 String        @id @default(uuid(7)) @db.Uuid
+  userId             String        @db.Uuid
+  status             ReceiptStatus @default(PENDING)
+  /// A long receipt is photographed in parts, top to bottom.
+  imageKeys          String[]
+  mimeType           String
+  sha256             String
+  merchantName       String?
+  issuedAt           DateTime?     @db.Timestamptz(3)
+  totalAmount        Decimal?      @db.Decimal(12, 2)
+  currency           String        @default("TRY") @db.Char(3)
+  ocrRaw             Json?
+  ocrError           String?
+  confirmedAt        DateTime?     @db.Timestamptz(3)
+  /// Saved with a record of what it added at home (HomeItemChange). Receipts
+  /// saved before that record existed are reversed by matching again.
+  homeCountsRecorded Boolean       @default(false)
+  createdAt          DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime      @updatedAt @db.Timestamptz(3)
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       ReceiptItem[]
+  homeChanges HomeItemChange[]
+
+  @@unique([userId, sha256])
+  @@index([userId, status, issuedAt])
+}
+
+model ReceiptItem {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  receiptId           String    @db.Uuid
+  position            Int
+  /// Clean name ("Whole milk 1 L"); editable.
+  name                String
+  /// EAN-13 / EAN-8 printed beside the line, when the reader could verify it.
+  barcode             String?
+  /// Text as printed on the receipt ("TAM YAGLI SUT 1L").
+  rawName             String
+  /// Normalised name; matches purchases, lists and at-home items.
+  normalizedName      String
+  quantity            Decimal   @default(1) @db.Decimal(10, 3)
+  unit                String?
+  unitPrice           Decimal?  @db.Decimal(12, 2)
+  totalPrice          Decimal   @db.Decimal(12, 2)
+  category            Category  @default(OTHER)
+  shelfLifeDays       Int?
+  openedShelfLifeDays Int?
+  /// The product could not be matched with confidence; the user should check it.
+  needsReview         Boolean   @default(false)
+  /// Estimated expiry, set when the receipt is confirmed.
+  expiresAt           DateTime? @db.Timestamptz(3)
+  /// The user typed the date printed on the pack.
+  packDate            Boolean   @default(false)
+  openedAt            DateTime? @db.Timestamptz(3)
+  usedUpAt            DateTime? @db.Timestamptz(3)
+  /// Brand found in the printed name ("SUTAS AYRAN 1000ML" -> Sütaş).
+  brandId             String?   @db.Uuid
+  /// Pack size printed in the name: 1000 + "ml", 1 + "L", 15 + "pack".
+  packAmount          Decimal?  @db.Decimal(10, 3)
+  packUnit            String?
+  /// The user keeps a countdown for it: it is on the shelf and can expire.
+  onShelf             Boolean   @default(true)
+  /// Count it at home: true adds it (creating the at-home product if needed;
+  /// new lines start true), false skips it, null (lines saved before this
+  /// choice existed) counts it only if it matches an at-home product.
+  countAtHome         Boolean?
+
+  receipt     Receipt          @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  brand       Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  homeChanges HomeItemChange[]
+
+  @@unique([receiptId, position])
+  @@index([normalizedName])
+  @@index([brandId])
+}
+
+/// Product brands, kept in line with the built-in list (brands.data.ts) on start.
+model Brand {
+  id       String   @id @default(uuid(7)) @db.Uuid
+  /// As the brand writes itself: "Sütaş".
+  name     String   @unique
+  /// Normalised spellings found on receipts: ["sutas"].
+  keywords String[]
+
+  items ReceiptItem[]
+}
+
+// ───────────────────────────── Lists & home ─────────────────────────────
+
+model ShoppingList {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ShoppingListItem[]
+
+  @@index([userId])
+}
+
+model ShoppingListItem {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  listId         String    @db.Uuid
+  name           String
+  normalizedName String
+  doneAt         DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+
+  list ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@index([listId])
+}
+
+/// How an at-home product is counted.
+enum HomeUnit {
+  PIECE /// whole packs or pieces: 3 milks
+  KG /// by weight: 1.25 kg of bananas
+}
+
+/// A product the user keeps at home and counts.
+model HomeItem {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  userId             String    @db.Uuid
+  name               String
+  normalizedName     String
+  unit               HomeUnit  @default(PIECE)
+  /// Pieces, or kilograms for KG items.
+  count              Decimal   @default(0) @db.Decimal(10, 3)
+  /// Last receipt that raised the count, and by how much (in `unit`).
+  lastMatchAdded     Decimal?  @db.Decimal(10, 3)
+  lastMatchMarket    String?
+  lastMatchAt        DateTime? @db.Timestamptz(3)
+  lastMatchReceiptId String?   @db.Uuid
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changes HomeItemChange[]
+
+  @@unique([userId, normalizedName])
+}
+
+/// One receipt line raising one at-home count. Deleting the receipt takes
+/// exactly these amounts back off.
+model HomeItemChange {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  homeItemId    String   @db.Uuid
+  receiptId     String   @db.Uuid
+  receiptItemId String   @db.Uuid
+  /// In the home item's unit at the time (pieces or kg).
+  amount        Decimal  @db.Decimal(10, 3)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  homeItem    HomeItem    @relation(fields: [homeItemId], references: [id], onDelete: Cascade)
+  receipt     Receipt     @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptItem ReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
+
+  @@index([receiptId])
+  @@index([homeItemId])
+}
