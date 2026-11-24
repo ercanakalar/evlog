@@ -126,7 +126,7 @@ writes `build/raf.apk` (see [apps/raf-mobile/README.md](apps/raf-mobile/README.m
 docker compose ps                                     # what is running
 docker compose logs -f api raf-api receipt-reader     # follow the logs (Ctrl+C to stop)
 docker compose up -d --build api                      # rebuild after changing API code
-docker compose restart api                            # pick up a changed apps/api/.env
+docker compose up -d api                              # pick up a changed .env
 docker compose down                                   # stop everything (data is kept)
 ```
 
