@@ -63,6 +63,7 @@ services:
   # Raf API on port 3100 (PORT in apps/raf-api/.env).
   raf-api:
     build: ./apps/raf-api
+    restart: unless-stopped
     network_mode: host
     env_file: ./apps/raf-api/.env
     environment:
