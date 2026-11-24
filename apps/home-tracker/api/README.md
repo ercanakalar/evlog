@@ -20,10 +20,11 @@ To run it in Docker instead: `docker compose up -d --build api` from the repo ro
 | Module | Responsibility |
 | --- | --- |
 | `auth` | Register / login, argon2id hashes, 15-min JWT access tokens, rotating refresh tokens (only a hash is stored). |
+| `users` | `GET /me`: the signed-in user. |
 | `homes` | Homes and the `HomeAccessService` that decides owner vs. tenant rights (unknown ⇒ 404, wrong role ⇒ 403). |
 | `tenancies` | Owner invites with a one-time code; tenancy becomes **verified** after `RENT_RECEIPTS_TO_VERIFY` confirmed rent receipts in different months. |
 | `condition-records` | Photo sessions per room. Each photo: SHA-256, device time, server time. Locking writes a content hash over all photos; then both parties confirm. Not a contract — a verification. |
-| `receipts` | Upload → receipt reader (your YOLO service) → review → confirm. Duplicate images are rejected per user. |
+| `receipts` | Upload → receipt reader → review → confirm. Duplicate images are rejected per user. |
 | `ratings` | One rating per tenancy across 5 categories. Evidence is gathered server-side: condition record, rent receipts, utility / gas bills, renovation receipts. Categories without evidence are refused. |
 | `listings` | Links sahibinden.com listings, grants brokers token-based read-only access, "Send update" snapshots exactly what the owner chose to share. |
 | `kitchen` | Confirmed grocery receipts feed the pantry ("running low" learned from purchase gaps), price watch vs. last purchase, and anonymous market averages (hidden below 3 households). |
