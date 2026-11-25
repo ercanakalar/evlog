@@ -9,6 +9,12 @@ import { addDays } from '../common/utils/normalize';
 import { LoginDto, RegisterDto, TokenPairDto } from './dto/auth.dto';
 import { GoogleVerifier } from './google-verifier';
 
+/**
+ * How long a replaced refresh token keeps working: a phone that lost the
+ * connection before the answer arrived would otherwise be signed out.
+ */
+const ROTATION_GRACE_MS = 60_000;
+
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -98,12 +104,13 @@ export class AuthService {
     return this.issueTokens(user.id, user.email, userAgent);
   }
 
-  /** Rotates the refresh token: the old one stops working immediately. */
+  /** Rotates the refresh token: the old one stops working after a short grace period. */
   async refresh(refreshToken: string, userAgent?: string): Promise<TokenPairDto> {
     const session = await this.findActiveSession(refreshToken);
-    await this.prisma.authSession.update({
-      where: { id: session.id },
-      data: { revokedAt: new Date() },
+    // Keeps the time of the first use, so using it again does not extend the grace period.
+    await this.prisma.authSession.updateMany({
+      where: { id: session.id, rotatedAt: null },
+      data: { rotatedAt: new Date() },
     });
     return this.issueTokens(session.user.id, session.user.email, userAgent);
   }
@@ -130,6 +137,7 @@ export class AuthService {
     if (
       !session ||
       session.revokedAt ||
+      (session.rotatedAt && Date.now() - session.rotatedAt.getTime() > ROTATION_GRACE_MS) ||
       session.expiresAt < new Date() ||
       !safeEqual(session.refreshTokenHash, sha256(secret))
     ) {
@@ -144,6 +152,17 @@ export class AuthService {
     userAgent?: string,
   ): Promise<TokenPairDto> {
     const secret = randomToken(48);
+    // Sessions that can no longer be used are not kept.
+    await this.prisma.authSession.deleteMany({
+      where: {
+        userId,
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { revokedAt: { not: null } },
+          { rotatedAt: { lt: new Date(Date.now() - ROTATION_GRACE_MS) } },
+        ],
+      },
+    });
     const session = await this.prisma.authSession.create({
       data: {
         userId,

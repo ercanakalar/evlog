@@ -467,6 +467,7 @@ describe('Raf API (e2e)', () => {
       return api().post('/api/v1/auth/google').send({ idToken: 'x' });
     };
     afterAll(() => jest.restoreAllMocks());
+    const prisma = () => app.get(PrismaService);
 
     it('does not let someone who signed up with your address stay in your account', async () => {
       const { body: attacker } = await api()
@@ -479,6 +480,24 @@ describe('Raf API (e2e)', () => {
       // Signing in with Google again keeps working, and other devices with it.
       const { body: again } = await google('victim@example.com', 'google-victim').expect(200);
       await refresh(again.refreshToken).expect(200);
+    });
+
+    it('accepts a replaced refresh token for a moment, then no longer', async () => {
+      await register('lost@example.com');
+      const { body: first } = await login('lost@example.com', 'Sup3rSecret').expect(200);
+      await refresh(first.refreshToken).expect(200);
+      // The answer was lost on the way: the phone tries again with the old token.
+      const { body: second } = await refresh(first.refreshToken).expect(200);
+      await prisma().authSession.updateMany({
+        where: { id: first.refreshToken.split('.')[0] },
+        data: { rotatedAt: new Date(Date.now() - 120_000) },
+      });
+      await refresh(first.refreshToken).expect(401);
+      const { body: third } = await refresh(second.refreshToken).expect(200);
+      await api().post('/api/v1/auth/logout').send({ refreshToken: third.refreshToken }).expect(204);
+      await refresh(third.refreshToken).expect(401);
+      // The session past its grace period was cleaned up.
+      expect(await prisma().authSession.count({ where: { id: first.refreshToken.split('.')[0] } })).toBe(0);
     });
 
     it('limits sign-in attempts per email, not per address', async () => {
