@@ -13,6 +13,8 @@ RUN --mount=type=cache,target=/root/.npm NODE_ENV=development ONNXRUNTIME_NODE_I
 # The OCR models of the built-in receipt reader; only downloaded again when the script changes.
 FROM base AS models
 COPY scripts/download-models.mjs ./scripts/
+# A mirror of the models, for when their host cannot be reached.
+ARG OCR_MODELS_URL=
 RUN node scripts/download-models.mjs /models
 
 FROM deps AS build
