@@ -21,7 +21,8 @@ evlog/
 ├── services/
 │   └── receipt-reader/             OCR service that reads Evlog's receipts, port 8000
 ├── deploy/
-│   └── evlog/                      Evlog on a server: HTTPS, API, receipt reader, database
+│   ├── evlog/                      Evlog on a server: HTTPS, API, receipt reader, database
+│   └── raf/                        Raf on a server: HTTPS, API, database, backups
 ├── .github/workflows/ci.yml        lint, type checks and tests for each package
 └── docker-compose.yml              databases, APIs and receipt reader for local development
 ```

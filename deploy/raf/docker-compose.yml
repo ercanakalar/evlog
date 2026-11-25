@@ -1,0 +1,74 @@
+# Raf on one server: HTTPS proxy, API (its receipt reader is built in) and database.
+# See README.md in this folder.
+#
+# Only the proxy is reachable from the internet.
+name: raf-server
+
+services:
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in .env} --to api:3100
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy-data:/data
+    networks: [web]
+    depends_on: [api]
+
+  api:
+    build: ../../apps/shelf-tracker/raf-api
+    restart: unless-stopped
+    command: sh -c "npx prisma migrate deploy && exec node dist/main"
+    # Time to finish requests; receipts being read are taken up again at the next start.
+    stop_grace_period: 30s
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      PUBLIC_API_URL: https://${DOMAIN}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://raf:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:5432/raf?schema=public}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      UPLOAD_DIR: /app/uploads
+      SMTP_URL: ${SMTP_URL:?set SMTP_URL in .env}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      LEGAL_OPERATOR: ${LEGAL_OPERATOR:?set LEGAL_OPERATOR in .env}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:?set SUPPORT_EMAIL in .env}
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+      OCR_THREADS: ${OCR_THREADS:-}
+    volumes:
+      - uploads:/app/uploads
+    networks: [web, data]
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEMORY:-2500m}
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: raf
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: raf
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U raf']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  web:
+  data:
+    internal: true
+
+volumes:
+  caddy-data:
+  uploads:
+  pgdata:

@@ -79,6 +79,12 @@ Same reader and contract as Evlog ([`services/receipt-reader`](../../../services
 `kind=GROCERY`. Single-photo receipts may be answered later via the callback;
 long receipts need the reader to answer each part with `200`.
 
+## On a server
+
+[`deploy/raf`](../../../deploy/raf): HTTPS, database, backups. In production the API does not start
+with example secrets, or without email and legal settings. Request limits count per user, and
+per email and address when signing in, because mobile carriers put many phones behind one address.
+
 ## Tests
 
 ```bash
