@@ -10,3 +10,5 @@ process.env.OCR_CALLBACK_SECRET = 'test-ocr-callback-secret-0123456789abcd';
 process.env.OCR_TIMEOUT_MS = '5000';
 process.env.UPLOAD_DIR = './uploads-test';
 process.env.GOOGLE_CLIENT_IDS = '';
+process.env.SMTP_URL = '';
+process.env.MAIL_FROM = '';

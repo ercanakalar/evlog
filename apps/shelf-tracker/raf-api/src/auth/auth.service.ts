@@ -1,14 +1,26 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
+import { randomInt } from 'node:crypto';
 import type { Env } from '../config/env.validation';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomToken, safeEqual, sha256 } from '../common/utils/crypto';
 import { addDays } from '../common/utils/normalize';
-import { LoginDto, RegisterDto, TokenPairDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, ResetPasswordDto, TokenPairDto } from './dto/auth.dto';
 import { GoogleVerifier } from './google-verifier';
+import { resetCodeMail } from './reset-code-mail';
 
+const RESET_CODE_MINUTES = 15;
+const RESET_ATTEMPTS = 5;
+/** A new code is sent at most this often. */
+const RESET_INTERVAL_MS = 60_000;
 /**
  * How long a replaced refresh token keeps working: a phone that lost the
  * connection before the answer arrived would otherwise be signed out.
@@ -34,6 +46,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService<Env, true>,
     private readonly googleVerifier: GoogleVerifier,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto, userAgent?: string): Promise<TokenPairDto> {
@@ -100,6 +113,71 @@ export class AuthService {
         where: { id: existing.id },
         data: { googleSub: profile.sub, emailVerifiedAt: now, passwordHash: null },
       });
+    });
+    return this.issueTokens(user.id, user.email, userAgent);
+  }
+
+  /** Emails a code to reset the password with, if the account exists. */
+  async forgotPassword(email: string, lang: 'en' | 'tr' = 'en'): Promise<void> {
+    if (!this.mail.configured) {
+      throw new ServiceUnavailableException({
+        message: 'Password reset is not set up on this server',
+        code: 'RESET_UNAVAILABLE',
+      });
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, passwordReset: { select: { createdAt: true } } },
+    });
+    if (!user) return;
+    const last = user.passwordReset?.createdAt.getTime() ?? 0;
+    if (Date.now() - last < RESET_INTERVAL_MS) return;
+
+    const code = String(randomInt(100_000_000)).padStart(8, '0');
+    const reset = {
+      codeHash: sha256(`${user.id}:${code}`),
+      attempts: 0,
+      expiresAt: new Date(Date.now() + RESET_CODE_MINUTES * 60_000),
+      createdAt: new Date(),
+    };
+    await this.prisma.passwordReset.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, ...reset },
+      update: reset,
+    });
+    // Not awaited: how long sending takes would tell whether the account exists.
+    void this.mail.send({ to: email, ...resetCodeMail(code, RESET_CODE_MINUTES, lang) });
+  }
+
+  async resetPassword(dto: ResetPasswordDto, userAgent?: string): Promise<TokenPairDto> {
+    const wrong = new BadRequestException({
+      message: 'The code is wrong or has expired',
+      code: 'RESET_CODE_INVALID',
+    });
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true, email: true, passwordReset: true },
+    });
+    if (!user?.passwordReset) throw wrong;
+    // Counted before comparing, so parallel guesses cannot get extra attempts.
+    const { count } = await this.prisma.passwordReset.updateMany({
+      where: { userId: user.id, attempts: { lt: RESET_ATTEMPTS }, expiresAt: { gt: new Date() } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (count === 0) throw wrong;
+    const codeHash = sha256(`${user.id}:${dto.code}`);
+    if (!safeEqual(user.passwordReset.codeHash, codeHash)) throw wrong;
+
+    const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
+    await this.prisma.$transaction(async (tx) => {
+      // Only one request can use the code.
+      const used = await tx.passwordReset.deleteMany({ where: { userId: user.id, codeHash } });
+      if (used.count === 0) throw wrong;
+      await tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash, emailVerifiedAt: new Date() },
+      });
+      await tx.authSession.deleteMany({ where: { userId: user.id } });
     });
     return this.issueTokens(user.id, user.email, userAgent);
   }

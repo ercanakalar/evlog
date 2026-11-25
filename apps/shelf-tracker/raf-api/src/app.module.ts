@@ -13,6 +13,7 @@ import { HomeItemsModule } from './home-items/home-items.module';
 import { InsightsModule } from './insights/insights.module';
 import { ItemsModule } from './items/items.module';
 import { ListsModule } from './lists/lists.module';
+import { MailModule } from './mail/mail.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { ReceiptsModule } from './receipts/receipts.module';
@@ -37,6 +38,7 @@ import { UsersModule } from './users/users.module';
     }),
     PrismaModule,
     StorageModule,
+    MailModule,
     ProductsModule,
     HealthModule,
     AuthModule,

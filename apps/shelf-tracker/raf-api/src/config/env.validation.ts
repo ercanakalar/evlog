@@ -31,6 +31,10 @@ export const envSchema = z.object({
   OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).default(90000),
   /** OAuth client ids (web, iOS, Android) whose Google ID tokens are accepted. */
   GOOGLE_CLIENT_IDS: z.string().default(''),
+  /** Where emails are sent through, e.g. smtps://user:password@smtp.example.com:465. */
+  SMTP_URL: optional(z.url({ protocol: /^smtps?$/ })),
+  /** Sender of emails, e.g. Raf <no-reply@example.com>. */
+  MAIL_FROM: optional(z.string().min(3)),
 }).refine((env) => !env.OCR_SERVICE_URL || (env.OCR_SERVICE_TOKEN && env.OCR_CALLBACK_SECRET), {
   message: 'OCR_SERVICE_URL needs OCR_SERVICE_TOKEN and OCR_CALLBACK_SECRET',
   path: ['OCR_SERVICE_URL'],

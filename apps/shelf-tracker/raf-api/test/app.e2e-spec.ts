@@ -7,6 +7,7 @@ import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/setup-app';
 import { GoogleVerifier } from '../src/auth/google-verifier';
+import { MailService } from '../src/mail/mail.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { FakeOcr } from './fake-ocr';
 import cityGross from './fixtures/city-gross.json';
@@ -466,7 +467,24 @@ describe('Raf API (e2e)', () => {
       jest.spyOn(app.get(GoogleVerifier), 'verify').mockResolvedValue({ sub, email, name: 'Real Person' });
       return api().post('/api/v1/auth/google').send({ idToken: 'x' });
     };
+    const sent: { to: string; subject: string; text: string }[] = [];
+
+    beforeAll(() => {
+      const mail = app.get(MailService);
+      jest.spyOn(mail, 'configured', 'get').mockReturnValue(true);
+      jest.spyOn(mail, 'send').mockImplementation((m) => {
+        sent.push(m);
+        return Promise.resolve();
+      });
+    });
     afterAll(() => jest.restoreAllMocks());
+
+    const codeFor = async (email: string, lang = 'en') => {
+      await api().post('/api/v1/auth/password/forgot').send({ email, lang }).expect(202);
+      return /\d{4} \d{4}/.exec(sent.at(-1)!.text)![0];
+    };
+    const reset = (email: string, code: string, password = 'N3wPassword') =>
+      api().post('/api/v1/auth/password/reset').send({ email, code, password });
     const prisma = () => app.get(PrismaService);
 
     it('does not let someone who signed up with your address stay in your account', async () => {
@@ -480,6 +498,54 @@ describe('Raf API (e2e)', () => {
       // Signing in with Google again keeps working, and other devices with it.
       const { body: again } = await google('victim@example.com', 'google-victim').expect(200);
       await refresh(again.refreshToken).expect(200);
+    });
+
+    it('keeps the password when the address was verified before linking Google', async () => {
+      await register('both@example.com');
+      await reset('both@example.com', await codeFor('both@example.com')).expect(200);
+      await google('both@example.com', 'google-both').expect(200);
+      await login('both@example.com', 'N3wPassword').expect(200);
+    });
+
+    it('resets a password with the emailed code, once, and signs out other devices', async () => {
+      const { body: old } = await api()
+        .post('/api/v1/auth/register')
+        .send({ email: 'forgot@example.com', password: 'Sup3rSecret' })
+        .expect(201);
+      const code = await codeFor('forgot@example.com', 'tr');
+      expect(sent.at(-1)).toMatchObject({ to: 'forgot@example.com', subject: expect.stringContaining('şifre') });
+      expect((await reset('forgot@example.com', '00000000x').expect(400)).body.code).toBe('RESET_CODE_INVALID');
+      await reset('forgot@example.com', code, 'weak').expect(400);
+
+      const { body: tokens } = await reset('forgot@example.com', code).expect(200);
+      await api().get('/api/v1/me').set(auth(tokens.accessToken)).expect(200);
+      await login('forgot@example.com', 'Sup3rSecret').expect(401);
+      await login('forgot@example.com', 'N3wPassword').expect(200);
+      await refresh(old.refreshToken).expect(401);
+      await reset('forgot@example.com', code, 'An0therPass').expect(400);
+    });
+
+    it('answers the same for unknown addresses and sends at most one code a minute', async () => {
+      const before = sent.length;
+      await api().post('/api/v1/auth/password/forgot').send({ email: 'nobody@example.com' }).expect(202);
+      await register('again@example.com');
+      await codeFor('again@example.com');
+      await api().post('/api/v1/auth/password/forgot').send({ email: 'again@example.com' }).expect(202);
+      expect(sent.length).toBe(before + 1);
+      expect((await reset('nobody@example.com', '12345678').expect(400)).body.code).toBe('RESET_CODE_INVALID');
+    });
+
+    it('stops accepting a code after five wrong guesses, also parallel ones, or when it expires', async () => {
+      await register('guess@example.com');
+      const code = await codeFor('guess@example.com');
+      const wrong = code === '0000 0000' ? '1111 1111' : '0000 0000';
+      await Promise.all(Array.from({ length: 5 }, () => reset('guess@example.com', wrong).expect(400)));
+      await reset('guess@example.com', code).expect(400);
+
+      await register('late@example.com');
+      const late = await codeFor('late@example.com');
+      await prisma().passwordReset.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } });
+      await reset('late@example.com', late).expect(400);
     });
 
     it('accepts a replaced refresh token for a moment, then no longer', async () => {
