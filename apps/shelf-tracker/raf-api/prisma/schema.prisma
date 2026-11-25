@@ -15,15 +15,17 @@ datasource db {
 // ───────────────────────────── Identity ─────────────────────────────
 
 model User {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  email        String   @unique
+  id              String    @id @default(uuid(7)) @db.Uuid
+  email           String    @unique
   /// Null for accounts created with Google.
-  passwordHash String?
+  passwordHash    String?
   /// Google account id ("sub" claim), set once the user signs in with Google.
-  googleSub    String?  @unique
-  fullName     String
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  googleSub       String?   @unique
+  fullName        String
+  /// Set once the person proved the address is theirs (Google, or a password reset code).
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   // Settings
   currency          String  @default("TRY") @db.Char(3)
@@ -35,6 +37,7 @@ model User {
   countFromReceipts Boolean @default(true)
 
   sessions      AuthSession[]
+  passwordReset PasswordReset?
   receipts      Receipt[]
   shoppingLists ShoppingList[]
   homeItems     HomeItem[]
@@ -47,12 +50,25 @@ model AuthSession {
   refreshTokenHash String
   userAgent        String?
   expiresAt        DateTime  @db.Timestamptz(3)
+  /// Replaced by a newer token; still accepted for a moment, in case the phone never got that one.
+  rotatedAt        DateTime? @db.Timestamptz(3)
   revokedAt        DateTime? @db.Timestamptz(3)
   createdAt        DateTime  @default(now()) @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// The one password reset code a user can have. Only a hash is stored.
+model PasswordReset {
+  userId    String   @id @db.Uuid
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ───────────────────────────── Products ─────────────────────────────
@@ -109,6 +125,8 @@ model Receipt {
   /// A long receipt is photographed in parts, top to bottom.
   imageKeys          String[]
   mimeType           String
+  /// Language of the product names ("en" or "tr"): the app's, when the photo was sent.
+  language           String        @default("en") @db.VarChar(2)
   sha256             String
   merchantName       String?
   issuedAt           DateTime?     @db.Timestamptz(3)
