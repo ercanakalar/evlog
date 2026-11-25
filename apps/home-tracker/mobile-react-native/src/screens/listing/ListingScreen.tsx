@@ -58,13 +58,18 @@ function ListingSection({ listing }: { listing: Listing }) {
           <Text variant="label">{t('listing.perMonth', { price: f.money(listing.priceAmount, listing.currency) })}</Text>
         ) : null}
       </SpaceBetween>
+      {listing.hiddenAt ? (
+        <Card tone="warm">
+          <Text variant="label">{t('listing.hidden')}</Text>
+        </Card>
+      ) : null}
       <ListingSources listing={listing} />
       <SharingOptions listing={listing} onToggle={c.toggle} />
       <BrokerForm control={c.brokerControl} valid={c.brokerValid} loading={c.addingBroker} onSubmit={() => void c.inviteBroker()} />
       <Button
         title={t('listing.sendUpdate')}
         icon="arrow-right"
-        disabled={listing.brokers.length === 0}
+        disabled={listing.brokers.length === 0 || listing.hiddenAt !== null}
         loading={c.sending}
         onPress={() => void c.send()}
       />

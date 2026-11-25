@@ -115,6 +115,7 @@ const tr: Translation = {
     started: '{{date}} başladı',
     locked: '{{date}} kilitlendi',
     fingerprint: 'Parmak izi {{hash}}…',
+    hiddenPhoto: 'Bir moderatör gizledi',
   },
   rooms: {
     LIVING_ROOM: 'Salon', KITCHEN: 'Mutfak', BEDROOM: 'Yatak odası', BATHROOM: 'Banyo',
@@ -239,6 +240,7 @@ const tr: Translation = {
     sentBody_one: '{{count}} emlakçı en güncel kaydı görebilir.',
     sentBody_other: '{{count}} emlakçı en güncel kaydı görebilir.',
     sendFailed: 'Gönderilemedi',
+    hidden: 'Bir moderatör bu ilanı gizledi. Emlakçılar açamaz.',
   },
   receipts: {
     title: 'Fişlerim',
@@ -266,6 +268,24 @@ const tr: Translation = {
       RENOVATION: 'Tadilat', APPLIANCE: 'Cihaz alımı', SERVICE: 'Servis faturası', OTHER: 'Diğer',
     },
     loadMore: 'Daha fazla yükle',
+  },
+  report: {
+    title: 'Bildir',
+    open: 'Bildir',
+    intro: {
+      RATING: 'Bu puanı bir moderatör inceler. Yazan kişiye kimin bildirdiği söylenmez.',
+      CONDITION_PHOTO: 'Bu fotoğrafı bir moderatör inceler. Çeken kişiye kimin bildirdiği söylenmez.',
+    },
+    reasonTitle: 'Sorun nedir?',
+    reason: {
+      OFFENSIVE: 'Saldırgan veya taciz edici', PERSONAL_DATA: 'Kişisel veri', FALSE_INFORMATION: 'Yanlış bilgi',
+      SPAM: 'Reklam veya spam', ILLEGAL: 'Yasa dışı', OTHER: 'Başka bir şey',
+    },
+    details: 'Ayrıntılar (isteğe bağlı)',
+    send: 'Bildirimi gönder',
+    sent: 'Teşekkürler',
+    sentBody: 'İnceleyeceğiz; kullanım koşullarına aykırıysa gizleyeceğiz.',
+    failed: 'Bildirim gönderilemedi',
   },
   profile: {
     title: 'Profil',

@@ -14,7 +14,7 @@ import { useErrorAlert } from '../common/useErrorAlert';
 export function useConditionSession(sessionId: string) {
   const { t } = useTranslation();
   const showError = useErrorAlert();
-  const { home, role } = useCurrentHome();
+  const { home, role, me } = useCurrentHome();
   const session = useGetSessionQuery(sessionId);
   const [addPhoto, { isLoading: uploading }] = useAddPhotoMutation();
   const [runAction, { isLoading: acting }] = useSessionActionMutation();
@@ -52,6 +52,7 @@ export function useConditionSession(sessionId: string) {
 
   return {
     session: s,
+    userId: me?.id,
     isLoading: session.isLoading,
     isRefreshing: session.isFetching && !session.isLoading,
     error: session.error,

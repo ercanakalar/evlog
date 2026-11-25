@@ -113,6 +113,7 @@ const en = {
     started: 'Started {{date}}',
     locked: 'locked {{date}}',
     fingerprint: 'Fingerprint {{hash}}…',
+    hiddenPhoto: 'Hidden by a moderator',
   },
   rooms: {
     LIVING_ROOM: 'Living room', KITCHEN: 'Kitchen', BEDROOM: 'Bedroom', BATHROOM: 'Bathroom',
@@ -237,6 +238,7 @@ const en = {
     sentBody_one: '{{count}} broker can now see the latest record.',
     sentBody_other: '{{count}} brokers can now see the latest record.',
     sendFailed: 'Could not send',
+    hidden: 'A moderator hid this listing. Brokers cannot open it.',
   },
   receipts: {
     title: 'My receipts',
@@ -264,6 +266,24 @@ const en = {
       RENOVATION: 'Renovation', APPLIANCE: 'Appliance purchase', SERVICE: 'Service invoice', OTHER: 'Other',
     },
     loadMore: 'Load more',
+  },
+  report: {
+    title: 'Report',
+    open: 'Report',
+    intro: {
+      RATING: 'A moderator reviews this rating. The author is not told who reported it.',
+      CONDITION_PHOTO: 'A moderator reviews this photo. The person who took it is not told who reported it.',
+    },
+    reasonTitle: 'What is wrong?',
+    reason: {
+      OFFENSIVE: 'Offensive or abusive', PERSONAL_DATA: 'Personal data', FALSE_INFORMATION: 'False information',
+      SPAM: 'Advertising or spam', ILLEGAL: 'Illegal', OTHER: 'Something else',
+    },
+    details: 'Details (optional)',
+    send: 'Send report',
+    sent: 'Thank you',
+    sentBody: 'We will review it and hide it if it breaks the terms of use.',
+    failed: 'Could not send the report',
   },
   profile: {
     title: 'Profile',

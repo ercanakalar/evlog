@@ -98,6 +98,10 @@ export interface ConditionPhoto {
   capturedAt: string;
   receivedAt: string;
   sha256: string;
+  /** Empty once that person deleted their account. */
+  uploadedById: string | null;
+  /** Set when a moderator hid the photo. */
+  hiddenAt: string | null;
 }
 
 export type ConditionSessionDetail = ConditionSession & { photos: ConditionPhoto[] };
@@ -136,6 +140,7 @@ export interface PublishedRating {
   id: string;
   submittedAt: string;
   noteForNextTenant: string | null;
+  mine: boolean;
   scores: { category: RatingCategory; score: number; _count: { evidence: number } }[];
 }
 
@@ -194,8 +199,12 @@ export interface Listing {
   shareRatings: boolean;
   shareHeatingBills: boolean;
   coverPhotoId: string | null;
+  hiddenAt: string | null;
   brokers: Broker[];
   updates: { createdAt: string }[];
 }
+
+export type ReportTarget = 'RATING' | 'CONDITION_PHOTO';
+export type ReportReason = 'OFFENSIVE' | 'PERSONAL_DATA' | 'FALSE_INFORMATION' | 'SPAM' | 'ILLEGAL' | 'OTHER';
 
 export type ListingShareField = 'sharePhotos' | 'shareRatings' | 'shareHeatingBills';

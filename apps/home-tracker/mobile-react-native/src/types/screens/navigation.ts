@@ -1,6 +1,7 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { ReportTarget } from '@/types/api/models';
 
 export type HomeTabParamList = {
   Home: undefined;
@@ -24,6 +25,7 @@ export type RootStackParamList = {
   ReceiptReview: { receiptId: string };
   ReceiptList: undefined;
   Listing: undefined;
+  Report: { targetType: ReportTarget; targetId: string };
   // Always available
   Profile: undefined;
   Settings: undefined;

@@ -53,7 +53,7 @@ export function ConditionSessionScreen({ route }: RootScreenProps<'ConditionSess
       ) : null}
 
       <SectionHeader title={t('record.photosTitle', { count: s.photos.length })} />
-      <PhotoGrid photos={s.photos} />
+      <PhotoGrid photos={s.photos} userId={c.userId} />
       <ConfirmationStatus session={s} />
 
       {s.status === 'OPEN' ? (

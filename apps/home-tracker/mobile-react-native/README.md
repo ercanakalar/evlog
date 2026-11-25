@@ -23,14 +23,14 @@ mobile-react-native/
 └── src/
     ├── navigators/     → RootNavigator (auth / onboarding / app groups), HomeTabNavigator,
     │                     linking.ts (deep links), navigationRef
-    ├── screens/        → home, record, ratings, kitchen, upkeep, listing, receipts, onboarding,
+    ├── screens/        → home, record, ratings, kitchen, upkeep, listing, receipts, report, onboarding,
     │                     profile/{auth, settings, legal}
     ├── components/     → ui/ (generic parts) + one folder per feature
     ├── hooks/          → screen logic, one folder per feature (+ common/, app/)
     ├── store/
     │   ├── slices/        auth, session (selected home/role), settings, consent
     │   ├── services/      RTK Query: authenticationService, homeService, conditionRecordService,
-    │   │                  receiptService, ratingService, kitchenService, upkeepService, listingService
+    │   │                  receiptService, ratingService, kitchenService, upkeepService, listingService, reportService
     │   ├── bases/         baseQuery, baseQueryWithReauth, errorMapping, paging, responseTransform
     │   ├── middlewares/   auth, consent, persistence listeners + custom createApi (baseApi)
     │   ├── actions/       thunks: bootstrap, session (restore / sign out), receipt scanning

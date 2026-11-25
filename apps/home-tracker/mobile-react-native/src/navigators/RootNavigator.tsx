@@ -13,6 +13,7 @@ import { SettingsScreen } from '@/screens/profile/settings/SettingsScreen';
 import { ReceiptListScreen } from '@/screens/receipts/ReceiptListScreen';
 import { ReceiptReviewScreen } from '@/screens/receipts/ReceiptReviewScreen';
 import { ConditionSessionScreen } from '@/screens/record/ConditionSessionScreen';
+import { ReportScreen } from '@/screens/report/ReportScreen';
 import { useAppSelector } from '@/store/hooks';
 import { selectAuthStatus } from '@/store/slices/authSlice';
 import type { RootStackParamList } from '@/types/screens/navigation';
@@ -57,6 +58,7 @@ export function RootNavigator() {
           <Stack.Screen name="ReceiptReview" component={ReceiptReviewScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="ReceiptList" component={ReceiptListScreen} />
           <Stack.Screen name="Listing" component={ListingScreen} />
+          <Stack.Screen name="Report" component={ReportScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
         </Stack.Group>
       )}

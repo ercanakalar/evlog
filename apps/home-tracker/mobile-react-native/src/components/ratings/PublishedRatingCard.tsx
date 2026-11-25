@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { ReportLink } from '@/components/report/ReportLink';
 import { Card, SpaceBetween, Stars, Text } from '@/components/ui';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import type { PublishedRating } from '@/types/api/models';
@@ -18,6 +19,7 @@ export function PublishedRatingCard({ rating }: { rating: PublishedRating }) {
         </SpaceBetween>
       ))}
       {rating.noteForNextTenant ? <Text muted>“{rating.noteForNextTenant}”</Text> : null}
+      {rating.mine ? null : <ReportLink targetType="RATING" targetId={rating.id} />}
     </Card>
   );
 }

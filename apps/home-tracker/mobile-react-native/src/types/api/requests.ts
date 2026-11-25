@@ -1,4 +1,4 @@
-import type { ConditionSessionType, ListingShareField, RatingCategory, ReceiptKind, ReceiptStatus, Room } from './models';
+import type { ConditionSessionType, ListingShareField, RatingCategory, ReceiptKind, ReceiptStatus, ReportReason, ReportTarget, Room } from './models';
 
 /** A local file from the camera or library, sent as multipart. */
 export interface UploadFile {
@@ -44,3 +44,10 @@ export interface UpdateListingRequest {
   changes: Partial<Record<ListingShareField, boolean>>;
 }
 export interface AddBrokerRequest { id: string; homeId: string; agencyName: string; email: string }
+
+export interface ReportRequest {
+  targetType: ReportTarget;
+  targetId: string;
+  reason: ReportReason;
+  details?: string;
+}
