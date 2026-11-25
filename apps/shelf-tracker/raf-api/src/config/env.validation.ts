@@ -35,6 +35,9 @@ export const envSchema = z.object({
   SMTP_URL: optional(z.url({ protocol: /^smtps?$/ })),
   /** Sender of emails, e.g. Raf <no-reply@example.com>. */
   MAIL_FROM: optional(z.string().min(3)),
+  /** Who runs Raf (legal name and address) and where users reach them; shown on the legal pages. */
+  LEGAL_OPERATOR: optional(z.string().min(2)),
+  SUPPORT_EMAIL: optional(z.email()),
 }).refine((env) => !env.OCR_SERVICE_URL || (env.OCR_SERVICE_TOKEN && env.OCR_CALLBACK_SECRET), {
   message: 'OCR_SERVICE_URL needs OCR_SERVICE_TOKEN and OCR_CALLBACK_SECRET',
   path: ['OCR_SERVICE_URL'],

@@ -12,6 +12,7 @@ import { HealthModule } from './health/health.module';
 import { HomeItemsModule } from './home-items/home-items.module';
 import { InsightsModule } from './insights/insights.module';
 import { ItemsModule } from './items/items.module';
+import { LegalModule } from './legal/legal.module';
 import { ListsModule } from './lists/lists.module';
 import { MailModule } from './mail/mail.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -41,6 +42,7 @@ import { UsersModule } from './users/users.module';
     MailModule,
     ProductsModule,
     HealthModule,
+    LegalModule,
     AuthModule,
     UsersModule,
     ReceiptsModule,

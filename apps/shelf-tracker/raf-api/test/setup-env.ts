@@ -12,3 +12,5 @@ process.env.UPLOAD_DIR = './uploads-test';
 process.env.GOOGLE_CLIENT_IDS = '';
 process.env.SMTP_URL = '';
 process.env.MAIL_FROM = '';
+process.env.LEGAL_OPERATOR = 'Test <Ltd>';
+process.env.SUPPORT_EMAIL = 'help@example.com';

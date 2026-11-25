@@ -19,7 +19,9 @@ export function setupApp(app: INestApplication): void {
       .map((o) => o.trim())
       .filter(Boolean),
   });
-  app.setGlobalPrefix('api', { exclude: ['health', 'health/live'] });
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'health/live', 'privacy', 'terms', 'delete-account'],
+  });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.useGlobalPipes(
     new ValidationPipe({

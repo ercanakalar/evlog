@@ -643,6 +643,18 @@ describe('Raf API (e2e)', () => {
     });
   });
 
+  it('serves the legal pages in both languages, with the operator escaped', async () => {
+    const en = await api().get('/privacy').expect(200).expect('content-type', /text\/html/);
+    expect(en.text).toContain('Test &lt;Ltd&gt;');
+    expect(en.text).toContain('mailto:help@example.com');
+    expect(en.text).not.toContain('{{');
+    const tr = await api().get('/privacy').set('accept-language', 'tr-TR,tr;q=0.9').expect(200);
+    expect(tr.text).toContain('lang="tr"');
+    for (const path of ['/terms', '/delete-account']) {
+      expect((await api().get(`${path}?lang=tr`).expect(200)).text).not.toContain('{{');
+    }
+  });
+
   describe('at-home counts from the City Gross receipt (reader output of the real photo)', () => {
     let user: string;
     const homeAuth = () => ({ Authorization: `Bearer ${user}` });
