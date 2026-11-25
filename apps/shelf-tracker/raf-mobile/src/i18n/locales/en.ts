@@ -135,7 +135,7 @@ const en = {
     allowCamera: 'Allow camera',
     failed: 'Could not scan the receipt',
     cameraError: 'The camera could not take the photo. Try again.',
-    photosDenied: 'Allow photo access in Settings to pick a receipt from your gallery.',
+    photoUnreadable: 'The photo could not be opened. Try another one.',
   },
   review: {
     title: 'Review receipt',

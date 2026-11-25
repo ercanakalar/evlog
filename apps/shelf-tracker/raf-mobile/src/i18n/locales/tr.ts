@@ -137,7 +137,7 @@ const tr: Translation = {
     allowCamera: 'Kameraya izin ver',
     failed: 'Fiş taranamadı',
     cameraError: 'Kamera fotoğraf çekemedi. Tekrar dene.',
-    photosDenied: 'Galeriden fiş seçmek için Ayarlar’dan fotoğraf erişimine izin ver.',
+    photoUnreadable: 'Fotoğraf açılamadı. Başka bir tane dene.',
   },
   review: {
     title: 'Fişi kontrol et',

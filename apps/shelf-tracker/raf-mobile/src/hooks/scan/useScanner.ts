@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
 import { MAX_RECEIPT_PARTS } from '@/constants/domain';
 import { useCameraAccess } from '@/hooks/common/useCameraAccess';
-import { PhotoPermissionError, pickImages, prepareImage } from '@/services/media/imageCapture';
+import { pickImages, prepareImage } from '@/services/media/imageCapture';
 import { uploadReceipt } from '@/store/actions/receiptActions';
 import { describeError } from '@/store/bases/errorMapping';
 import { useAppDispatch } from '@/store/hooks';
@@ -67,8 +67,8 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       const files = await pickImages(MAX_RECEIPT_PARTS - parts.length);
       if (files.length === 0) return;
       void upload([...parts, ...files]);
-    } catch (error) {
-      if (error instanceof PhotoPermissionError) modal.alert(t('scan.failed'), t('scan.photosDenied'));
+    } catch {
+      modal.alert(t('scan.failed'), t('scan.photoUnreadable'));
     }
   };
 

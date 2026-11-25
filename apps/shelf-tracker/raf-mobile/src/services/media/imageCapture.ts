@@ -19,8 +19,6 @@ export function targetSize(width: number, height: number): { width: number; heig
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
 
-export class PhotoPermissionError extends Error {}
-
 /**
  * Re-encodes a photo as a JPEG: no larger than 2000px on its long edge, or
  * for a tall long-receipt photo no wider than 1200px (see targetSize).
@@ -41,11 +39,10 @@ export async function prepareImage(photo: { uri: string; width: number; height: 
 /**
  * Picks receipt photos from the library: one photo of a whole receipt, or
  * several parts of a long one in the order they are tapped. The same photo
- * picked twice is kept once. Resolves to [] when the user cancels.
+ * picked twice is kept once. Resolves to [] when the user cancels. The system
+ * picker only hands over the photos chosen, so no permission is needed.
  */
 export async function pickImages(limit: number): Promise<UploadFile[]> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) throw new PhotoPermissionError();
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 1,
