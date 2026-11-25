@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { UpdateSettingsDto } from './dto/settings.dto';
 
 const profileSelect = {
@@ -18,7 +19,10 @@ const profileSelect = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async me(userId: string) {
     const [user, categories, markets] = await Promise.all([
@@ -49,8 +53,15 @@ export class UsersService {
     return this.me(userId);
   }
 
-  /** Deletes the account and everything in it (receipts, lists, home items). */
+  /** Deletes the account and everything in it (receipts and their photos, lists, home items). */
   async remove(userId: string) {
-    await this.prisma.user.delete({ where: { id: userId } });
+    const imageKeys = await this.prisma.$transaction(async (tx) => {
+      // Holds back uploads in flight, so no photo is added after the keys are read.
+      await tx.$queryRaw`SELECT 1 FROM "User" WHERE "id" = ${userId}::uuid FOR UPDATE`;
+      const receipts = await tx.receipt.findMany({ where: { userId }, select: { imageKeys: true } });
+      await tx.user.delete({ where: { id: userId } });
+      return receipts.flatMap((r) => r.imageKeys);
+    });
+    await this.storage.remove(imageKeys);
   }
 }

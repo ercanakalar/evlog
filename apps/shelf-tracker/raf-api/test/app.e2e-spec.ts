@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomBytes } from 'node:crypto';
+import { existsSync, readdirSync } from 'node:fs';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
@@ -15,6 +16,12 @@ const jpeg = () =>
     Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]),
     randomBytes(256),
   ]);
+
+/** Photos on disk right now. */
+const storedFiles = () =>
+  existsSync('./uploads-test')
+    ? readdirSync('./uploads-test', { recursive: true, withFileTypes: true }).filter((f) => f.isFile()).length
+    : 0;
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
@@ -430,6 +437,24 @@ describe('Raf API (e2e)', () => {
     expect(updated.body.reminderLeadDays).toBe(3);
 
     await api().delete('/api/v1/me').set(auth(other)).expect(204);
+  });
+
+  it('deletes photos with their receipt and with the account', async () => {
+    const before = storedFiles();
+    const leaver = await register('leaver@example.com');
+    const first = await scan(2, leaver).expect(201);
+    await scan(1, leaver).expect(201);
+    expect(storedFiles()).toBe(before + 3);
+
+    await api().delete(`/api/v1/receipts/${first.body.id}`).set(auth(leaver)).expect(204);
+    expect(storedFiles()).toBe(before + 1);
+
+    await api().delete('/api/v1/me').set(auth(leaver)).expect(204);
+    expect(storedFiles()).toBe(before);
+
+    // The access token outlives the account; an upload with it must not leave a photo.
+    await scan(1, leaver).expect(409);
+    expect(storedFiles()).toBe(before);
   });
 
   describe('at-home counts from the City Gross receipt (reader output of the real photo)', () => {

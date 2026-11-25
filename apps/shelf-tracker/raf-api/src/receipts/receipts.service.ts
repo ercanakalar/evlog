@@ -72,12 +72,19 @@ export class ReceiptsService {
       });
     }
     const imageKeys: string[] = [];
-    for (const file of files) {
-      imageKeys.push(await this.storage.save('receipts', file.buffer, file.mimetype));
+    let receipt: { id: string };
+    try {
+      for (const file of files) {
+        imageKeys.push(await this.storage.save('receipts', file.buffer, file.mimetype));
+      }
+      receipt = await this.prisma.receipt.create({
+        data: { userId, imageKeys, mimeType: files[0].mimetype, sha256: hash },
+      });
+    } catch (error) {
+      // e.g. the account was deleted meanwhile: leave no photo behind.
+      await this.storage.remove(imageKeys);
+      throw error;
     }
-    const receipt = await this.prisma.receipt.create({
-      data: { userId, imageKeys, mimeType: files[0].mimetype, sha256: hash },
-    });
     return this.scan(receipt.id, files.map((f) => f.buffer));
   }
 
@@ -204,13 +211,14 @@ export class ReceiptsService {
     return this.get(receiptId, userId);
   }
 
-  /** Deletes a receipt and takes back what it added to the at-home counts. */
+  /** Deletes a receipt with its photos and takes back what it added to the at-home counts. */
   async remove(receiptId: string, userId: string) {
     const receipt = await this.own(receiptId, userId);
     await this.prisma.$transaction(async (tx) => {
       await this.homeItems.uncountReceipt(tx, userId, receipt.id);
       await tx.receipt.delete({ where: { id: receipt.id } });
     });
+    await this.storage.remove(receipt.imageKeys);
   }
 
   /** The original photo; `part` picks one part of a long receipt. */
