@@ -18,6 +18,7 @@ interface TokenInfo {
   exp?: string;
 }
 
+const FAILED = { message: 'Google sign-in failed', code: 'GOOGLE_FAILED' };
 const ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
 
 /**
@@ -37,7 +38,10 @@ export class GoogleVerifier {
       .map((id) => id.trim())
       .filter(Boolean);
     if (clientIds.length === 0) {
-      throw new ServiceUnavailableException('Google sign-in is not set up on this server');
+      throw new ServiceUnavailableException({
+        message: 'Google sign-in is not set up on this server',
+        code: 'GOOGLE_UNAVAILABLE',
+      });
     }
 
     let info: TokenInfo;
@@ -45,12 +49,15 @@ export class GoogleVerifier {
       const url = new URL('https://oauth2.googleapis.com/tokeninfo');
       url.searchParams.set('id_token', idToken);
       const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-      if (!response.ok) throw new UnauthorizedException('Google sign-in failed');
+      if (!response.ok) throw new UnauthorizedException(FAILED);
       info = (await response.json()) as TokenInfo;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       this.logger.warn(`Google tokeninfo unreachable: ${String(error)}`);
-      throw new ServiceUnavailableException('Could not reach Google, try again');
+      throw new ServiceUnavailableException({
+        message: 'Could not reach Google, try again',
+        code: 'GOOGLE_UNAVAILABLE',
+      });
     }
 
     const verified = info.email_verified === true || info.email_verified === 'true';
@@ -64,7 +71,7 @@ export class GoogleVerifier {
       !ISSUERS.has(info.iss) ||
       Number(info.exp ?? 0) * 1000 < Date.now()
     ) {
-      throw new UnauthorizedException('Google sign-in failed');
+      throw new UnauthorizedException(FAILED);
     }
     return {
       sub: info.sub,

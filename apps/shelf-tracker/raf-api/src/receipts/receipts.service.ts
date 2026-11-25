@@ -192,13 +192,22 @@ export class ReceiptsService {
     const receipt = await this.own(receiptId, userId);
     if (receipt.status === 'CONFIRMED') return this.get(receiptId, userId);
     if (receipt.status !== 'PARSED') {
-      throw new ConflictException('Wait for the scan, or fill the fields in manually');
+      throw new ConflictException({
+        message: 'Wait for the scan, or fill the fields in manually',
+        code: 'RECEIPT_NOT_READ',
+      });
     }
     if (!receipt.issuedAt || receipt.totalAmount === null) {
-      throw new BadRequestException('Date and total are required before saving');
+      throw new BadRequestException({
+        message: 'Date and total are required before saving',
+        code: 'RECEIPT_INCOMPLETE',
+      });
     }
     if (receipt.issuedAt > new Date()) {
-      throw new BadRequestException('Receipt date is in the future');
+      throw new BadRequestException({
+        message: 'Receipt date is in the future',
+        code: 'RECEIPT_IN_FUTURE',
+      });
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.receipt.update({
@@ -255,7 +264,7 @@ export class ReceiptsService {
     if (failed) return failed;
     if (outcomes.some((o) => o.kind === 'accepted')) {
       // Callbacks arrive one per receipt, so parts cannot be joined later.
-      return { kind: 'failed', error: 'The reader must answer long receipts straight away' };
+      return { kind: 'failed', error: 'READER_UNAVAILABLE' };
     }
     const parts = outcomes.flatMap((o) => (o.kind === 'parsed' ? [o.result] : []));
     return { kind: 'parsed', result: mergeReceiptParts(parts) };

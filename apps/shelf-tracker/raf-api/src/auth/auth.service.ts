@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -9,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { randomInt } from 'node:crypto';
 import type { Env } from '../config/env.validation';
+import { Prisma } from '../generated/prisma/client';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomToken, safeEqual, sha256 } from '../common/utils/crypto';
@@ -53,14 +55,20 @@ export class AuthService {
     const passwordHash = await argon2.hash(dto.password, {
       type: argon2.argon2id,
     });
-    // A duplicate email surfaces as P2002 -> 409 via PrismaExceptionFilter.
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        fullName: dto.fullName ?? dto.email.split('@')[0],
-      },
-    });
+    const user = await this.prisma.user
+      .create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          fullName: dto.fullName ?? dto.email.split('@')[0],
+        },
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException({ message: 'This email already has an account', code: 'EMAIL_TAKEN' });
+        }
+        throw error;
+      });
     return this.issueTokens(user.id, user.email, userAgent);
   }
 
@@ -73,7 +81,10 @@ export class AuthService {
       .verify(user?.passwordHash ?? DUMMY_HASH, dto.password)
       .catch(() => false);
     if (!user || !valid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException({
+        message: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS',
+      });
     }
     return this.issueTokens(user.id, user.email, userAgent);
   }

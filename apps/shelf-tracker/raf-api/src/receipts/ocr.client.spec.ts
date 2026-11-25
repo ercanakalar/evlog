@@ -16,14 +16,14 @@ describe('OcrClient.parse', () => {
 
   it('rejects negative prices and missing names', async () => {
     const result = await client.parse({ items: [{ name: '', totalPrice: -3 }] });
-    expect(result).toEqual({ kind: 'failed', error: expect.stringContaining('items') });
+    expect(result).toEqual({ kind: 'failed', error: 'UNREADABLE' });
   });
 
-  it('passes through a reader error', async () => {
-    expect(await client.parse({ error: 'Image too blurry' })).toEqual({
-      kind: 'failed',
-      error: 'Image too blurry',
-    });
+  it('turns what the reader says into a code the app can translate', async () => {
+    const codeFor = async (error: string) => ((await client.parse({ error })) as { error: string }).error;
+    expect(await codeFor('Image too blurry')).toBe('UNREADABLE');
+    expect(await codeFor('No text found in the photo')).toBe('NO_TEXT');
+    expect(await codeFor('Could not find any items. Take a closer, straight photo of the receipt.')).toBe('NO_ITEMS');
   });
 
   it('treats an empty body as an empty receipt', async () => {

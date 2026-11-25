@@ -364,7 +364,10 @@ export class HomeItemsService {
 
   private checkCount(unit: HomeUnit, count: number) {
     if (unit === 'PIECE' && !Number.isInteger(count)) {
-      throw new BadRequestException('Pieces are counted in whole numbers');
+      throw new BadRequestException({
+        message: 'Pieces are counted in whole numbers',
+        code: 'WHOLE_PIECES',
+      });
     }
   }
 

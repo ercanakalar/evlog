@@ -167,7 +167,7 @@ describe('Raf API (e2e)', () => {
   it('matches lines typed in by hand when the reader fails', async () => {
     ocr.respond = () => ({ status: 200, body: { error: 'Too blurry' } });
     const failed = await scan().expect(201);
-    expect(failed.body).toMatchObject({ status: 'FAILED', ocrError: 'Too blurry' });
+    expect(failed.body).toMatchObject({ status: 'FAILED', ocrError: 'UNREADABLE' });
     const typed = await api()
       .patch(`/api/v1/receipts/${failed.body.id}`)
       .set(auth())
@@ -487,6 +487,15 @@ describe('Raf API (e2e)', () => {
       api().post('/api/v1/auth/password/reset').send({ email, code, password });
     const prisma = () => app.get(PrismaService);
 
+    it('says when an email is taken or a password is wrong, in codes', async () => {
+      const taken = await api()
+        .post('/api/v1/auth/register')
+        .send({ email: 'deniz@example.com', password: 'Sup3rSecret' })
+        .expect(409);
+      expect(taken.body.code).toBe('EMAIL_TAKEN');
+      expect((await login('deniz@example.com', 'Wrong1234').expect(401)).body.code).toBe('INVALID_CREDENTIALS');
+    });
+
     it('does not let someone who signed up with your address stay in your account', async () => {
       const { body: attacker } = await api()
         .post('/api/v1/auth/register')
@@ -674,7 +683,7 @@ describe('Raf API (e2e)', () => {
         .set(homeAuth())
         .attach('file', jpeg(), { filename: 'pack.jpg', contentType: 'image/jpeg' })
         .expect(200);
-      expect(none.body.label).toMatchObject({ expiresOn: null, error: 'No expiry date found', text: 'P1NAR LA8NE' });
+      expect(none.body.label).toMatchObject({ expiresOn: null, error: 'NO_DATE', text: 'P1NAR LA8NE' });
       expect(none.body.item.packDate).toBe(false);
       await api().delete(`/api/v1/receipts/${scanned.body.id}`).set(homeAuth()).expect(204);
     });

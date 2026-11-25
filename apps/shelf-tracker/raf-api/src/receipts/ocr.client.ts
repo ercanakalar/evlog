@@ -5,11 +5,12 @@ import { validate } from 'class-validator';
 import type { Env } from '../config/env.validation';
 import { ReaderService } from '../reader/reader.service';
 import { LabelResultDto, OcrResultDto } from './dto/ocr-result.dto';
+import { readError, type ReadError } from './read-error';
 
 export type OcrDispatchResult =
   | { kind: 'parsed'; result: OcrResultDto }
   | { kind: 'accepted' }
-  | { kind: 'failed'; error: string };
+  | { kind: 'failed'; error: ReadError };
 
 /**
  * Reads photos with the reader built into this API or, when OCR_SERVICE_URL
@@ -64,13 +65,14 @@ export class OcrClient {
       });
       if (response.status === 202) return { kind: 'accepted' };
       if (!response.ok) {
-        return { kind: 'failed', error: `Receipt reader answered ${response.status}` };
+        this.logger.warn(`Receipt reader answered ${response.status} for ${input.receiptId}`);
+        return { kind: 'failed', error: 'READER_UNAVAILABLE' };
       }
       return this.parse(await response.json());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Receipt reader unreachable for ${input.receiptId}: ${message}`);
-      return { kind: 'failed', error: 'Receipt reader is unreachable, try again later' };
+      return { kind: 'failed', error: 'READER_UNAVAILABLE' };
     }
   }
 
@@ -90,12 +92,12 @@ export class OcrClient {
         headers: { Authorization: `Bearer ${this.config.get('OCR_SERVICE_TOKEN', { infer: true })}` },
         signal: AbortSignal.timeout(this.config.get('OCR_TIMEOUT_MS', { infer: true })),
       });
-      if (!response.ok) return { error: `Receipt reader answered ${response.status}` };
+      if (!response.ok) return { error: 'READER_UNAVAILABLE' };
       return await this.parseLabel(await response.json());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Receipt reader unreachable for a pack label: ${message}`);
-      return { error: 'Receipt reader is unreachable, try again later' };
+      return { error: 'READER_UNAVAILABLE' };
     }
   }
 
@@ -104,7 +106,7 @@ export class OcrClient {
       return await this.parse(await this.reader.readReceipt(image));
     } catch (error) {
       this.logger.error(`Could not read receipt ${receiptId}: ${String(error)}`);
-      return { kind: 'failed', error: 'Could not read this receipt, try again later' };
+      return { kind: 'failed', error: 'UNREADABLE' };
     }
   }
 
@@ -113,14 +115,16 @@ export class OcrClient {
       return await this.parseLabel(await this.reader.readLabel(image));
     } catch (error) {
       this.logger.error(`Could not read a pack label: ${String(error)}`);
-      return { error: 'Could not read this photo, try again later' };
+      return { error: 'UNREADABLE' };
     }
   }
 
   private async parseLabel(body: unknown): Promise<LabelResultDto> {
     const result = plainToInstance(LabelResultDto, body ?? {});
     const errors = await validate(result, { whitelist: true });
-    return errors.length > 0 ? { error: 'Reader returned an invalid label result' } : result;
+    if (errors.length > 0) return { error: 'UNREADABLE' };
+    if (result.error) result.error = readError(result.error);
+    return result;
   }
 
   /** Validates an untrusted reader payload. */
@@ -129,9 +133,10 @@ export class OcrClient {
     const errors = await validate(result, { whitelist: true });
     if (errors.length > 0) {
       const detail = errors.map((e) => e.property).join(', ');
-      return { kind: 'failed', error: `Reader returned invalid fields: ${detail}` };
+      this.logger.warn(`Reader returned invalid fields: ${detail}`);
+      return { kind: 'failed', error: 'UNREADABLE' };
     }
-    if (result.error) return { kind: 'failed', error: result.error };
+    if (result.error) return { kind: 'failed', error: readError(result.error) };
     return { kind: 'parsed', result };
   }
 }
