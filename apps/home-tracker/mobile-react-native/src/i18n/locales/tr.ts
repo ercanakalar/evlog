@@ -284,6 +284,12 @@ const tr: Translation = {
     privacy: 'Gizlilik',
     usageReporting: 'Anonim kullanım verisi paylaş',
     usageReportingHint: 'Hangi özelliklerin kullanıldığı; fotoğraf, fiş veya puanlarınız asla.',
+    account: 'Hesap',
+    deleteAccount: 'Hesabı sil',
+    deleteTitle: 'Hesabınız silinsin mi?',
+    deleteBody: 'Fişleriniz, puanlarınız, ilanlarınız ve sahibi olduğunuz evler hemen silinir. Bu geri alınamaz. Sahibi olduğunuz bir evde kiracı yaşıyorsa ev kaydı kiracıda kalır. Kalan bir evde çektiğiniz durum fotoğrafları, adınız olmadan diğer taraf için saklanır.',
+    deleteConfirm: 'Kalıcı olarak sil',
+    deleteFailed: 'Hesabınız silinemedi',
   },
   legal: {
     privacy: 'Gizlilik',

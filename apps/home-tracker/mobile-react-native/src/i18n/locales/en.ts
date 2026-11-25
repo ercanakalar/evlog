@@ -282,6 +282,12 @@ const en = {
     privacy: 'Privacy',
     usageReporting: 'Share anonymous usage data',
     usageReportingHint: 'Which features are used, never your photos, receipts or ratings.',
+    account: 'Account',
+    deleteAccount: 'Delete account',
+    deleteTitle: 'Delete your account?',
+    deleteBody: 'Your receipts, ratings, listings and the homes you own are deleted at once. This cannot be undone. If a tenant lives in a home you own, they keep its record. Condition photos you took in a home that stays are kept for the other party, without your name.',
+    deleteConfirm: 'Delete for good',
+    deleteFailed: 'Could not delete your account',
   },
   legal: {
     privacy: 'Privacy',

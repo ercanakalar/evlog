@@ -12,6 +12,10 @@ export const homeService = baseApi.injectEndpoints({
       query: (homeId) => `/homes/${homeId}`,
       providesTags: (_r, _e, homeId) => [{ type: 'Dashboard', id: homeId }],
     }),
+    /** The caller signs out afterwards, which clears every cached response. */
+    deleteAccount: build.mutation<void, void>({
+      query: () => ({ url: '/me', method: 'DELETE' }),
+    }),
     createHome: build.mutation<{ id: string }, CreateHomeRequest>({
       query: (body) => ({ url: '/homes', method: 'POST', body }),
       invalidatesTags: ['Me'],
@@ -33,6 +37,7 @@ export const homeService = baseApi.injectEndpoints({
 export const {
   useGetMeQuery,
   useGetDashboardQuery,
+  useDeleteAccountMutation,
   useCreateHomeMutation,
   useJoinHomeMutation,
   useInviteTenantMutation,

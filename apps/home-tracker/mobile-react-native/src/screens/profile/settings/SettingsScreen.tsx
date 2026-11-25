@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
-import { Card, Chip, Row, Screen, ScreenHeader, SectionHeader, Text } from '@/components/ui';
+import { Button, Card, Chip, Row, Screen, ScreenHeader, SectionHeader, Text } from '@/components/ui';
 import { useSettings } from '@/hooks/profile/useSettings';
 import { useTheme } from '@/theme';
 import type { LanguagePreference, ThemePreference } from '@/types/store/state';
@@ -44,6 +44,12 @@ export function SettingsScreen() {
           />
         </Row>
       </Card>
+      {s.signedIn ? (
+        <>
+          <SectionHeader title={t('settings.account')} />
+          <Button title={t('settings.deleteAccount')} variant="outline" loading={s.deleting} onPress={s.deleteAccount} />
+        </>
+      ) : null}
     </Screen>
   );
 }
