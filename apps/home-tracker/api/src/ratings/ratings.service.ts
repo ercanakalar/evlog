@@ -9,6 +9,7 @@ import { RatingCategory, ReceiptKind } from '../generated/prisma/enums';
 import { HomeAccessService } from '../homes/home-access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmitRatingDto } from './dto/rating.dto';
+import { averageScores } from './home-score';
 
 /** Which receipts prove the tenant can judge each category. */
 const RECEIPT_EVIDENCE: Partial<Record<RatingCategory, ReceiptKind[]>> = {
@@ -136,35 +137,13 @@ export class RatingsService {
     });
   }
 
-  /** Average of every rating's mean score, plus per-category averages. */
   async homeScore(homeId: string) {
-    const ratings = await this.prisma.rating.findMany({
-      where: { homeId },
-      select: { scores: { select: { category: true, score: true } } },
-    });
-    if (ratings.length === 0) {
-      return { score: null, ratingCount: 0, categories: {} };
-    }
-    const perRating = ratings.map(
-      (r) => r.scores.reduce((s, x) => s + x.score, 0) / r.scores.length,
+    return averageScores(
+      await this.prisma.rating.findMany({
+        where: { homeId },
+        select: { scores: { select: { category: true, score: true } } },
+      }),
     );
-    const byCategory: Partial<Record<RatingCategory, number[]>> = {};
-    for (const { scores } of ratings) {
-      for (const { category, score } of scores) {
-        (byCategory[category] ??= []).push(score);
-      }
-    }
-    const round1 = (n: number) => Math.round(n * 10) / 10;
-    return {
-      score: round1(perRating.reduce((a, b) => a + b, 0) / perRating.length),
-      ratingCount: ratings.length,
-      categories: Object.fromEntries(
-        Object.entries(byCategory).map(([k, v]) => [
-          k,
-          round1(v.reduce((a, b) => a + b, 0) / v.length),
-        ]),
-      ),
-    };
   }
 
   private async evidence(tenancy: Tenancy): Promise<CategoryEvidence[]> {
