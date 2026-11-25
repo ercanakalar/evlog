@@ -26,8 +26,9 @@ function refreshOnce(api: Api, extraOptions: object): Promise<boolean> {
       api.dispatch(credentialsReceived({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }));
       return true;
     }
-    // Only a definitive rejection signs the user out; offline keeps the session.
-    if (result.error && typeof result.error.status === 'number') api.dispatch(signedOut());
+    // Only a rejected token signs the user out. Being offline, a busy server (429)
+    // or one that is restarting (5xx) says nothing about the session.
+    if (result.error?.status === 401 || result.error?.status === 400) api.dispatch(signedOut());
     return false;
   })().finally(() => {
     refreshing = null;
