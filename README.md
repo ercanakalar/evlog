@@ -20,6 +20,8 @@ evlog/
 │       └── raf-mobile/             Expo phone app
 ├── services/
 │   └── receipt-reader/             OCR service that reads Evlog's receipts, port 8000
+├── deploy/
+│   └── evlog/                      Evlog on a server: HTTPS, API, receipt reader, database
 ├── .github/workflows/ci.yml        lint, type checks and tests for each package
 └── docker-compose.yml              databases, APIs and receipt reader for local development
 ```

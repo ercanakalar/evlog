@@ -1,4 +1,4 @@
-# Receipt reader (runs on your computer)
+# Receipt reader
 
 The [Evlog API](../../apps/home-tracker/api) sends receipt photos here and stores whatever comes back. ([Raf's API](../../apps/shelf-tracker/raf-api)
 has a TypeScript port of this reader built in, and uses this one only when its
@@ -32,8 +32,11 @@ The port is only open to this computer, and `docker-compose.yml` sets `ALLOW_DEV
 so the example token works. Anywhere else the reader only starts with an
 `OCR_SERVICE_TOKEN` of at least 16 characters.
 
-If an API runs elsewhere (in the cloud), expose the reader through a tunnel (Cloudflare
-Tunnel, Tailscale) rather than opening the port.
+## On a server
+
+[`deploy/evlog`](../../deploy/evlog) runs the reader next to the API on an internal network,
+and explains how to put it on a server of its own. Never publish its port to the internet.
+It reads one receipt at a time, so receipts that arrive together wait for each other.
 
 ## How it reads
 

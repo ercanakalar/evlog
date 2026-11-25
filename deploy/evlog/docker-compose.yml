@@ -1,0 +1,86 @@
+# Evlog on one server: HTTPS proxy, API, receipt reader and database.
+# See README.md in this folder.
+#
+# Only the proxy is reachable from the internet. The reader and the database
+# are on internal networks, so their ports are never published.
+# Not "evlog": that is the development project in the repository root.
+name: evlog-server
+
+services:
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in .env} --to api:3000
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy-data:/data
+    networks: [web]
+    depends_on: [api]
+
+  api:
+    build: ../../apps/home-tracker/api
+    restart: unless-stopped
+    command: sh -c "npx prisma migrate deploy && node dist/main"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PUBLIC_API_URL: https://${DOMAIN}
+      DATABASE_URL: postgresql://evlog:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:5432/evlog?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      UPLOAD_DIR: /app/uploads
+      OCR_SERVICE_URL: http://receipt-reader:8000
+      OCR_SERVICE_TOKEN: ${OCR_SERVICE_TOKEN:?set OCR_SERVICE_TOKEN in .env}
+      OCR_CALLBACK_SECRET: ${OCR_CALLBACK_SECRET:?set OCR_CALLBACK_SECRET in .env}
+      OCR_TIMEOUT_MS: ${OCR_TIMEOUT_MS:-90000}
+      SAHIBINDEN_API_URL: ${SAHIBINDEN_API_URL:-}
+      SAHIBINDEN_API_KEY: ${SAHIBINDEN_API_KEY:-}
+    volumes:
+      - uploads:/app/uploads
+    networks: [web, data, reader]
+    depends_on:
+      db:
+        condition: service_healthy
+      receipt-reader:
+        condition: service_healthy
+
+  # Can be moved to its own server: see README.md.
+  receipt-reader:
+    build: ../../services/receipt-reader
+    restart: unless-stopped
+    environment:
+      OCR_SERVICE_TOKEN: ${OCR_SERVICE_TOKEN}
+    networks: [reader]
+    deploy:
+      resources:
+        limits:
+          memory: ${READER_MEMORY:-3g}
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evlog
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: evlog
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U evlog']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  web:
+  data:
+    internal: true
+  reader:
+    internal: true
+
+volumes:
+  caddy-data:
+  uploads:
+  pgdata:

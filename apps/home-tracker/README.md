@@ -42,3 +42,7 @@ cd apps/home-tracker/mobile-react-native
 cp .env.example .env                  # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000
 npm install && npm start
 ```
+
+## Run it on a server
+
+See [`deploy/evlog`](../../deploy/evlog): HTTPS, API, receipt reader, database, backups and moderation.
