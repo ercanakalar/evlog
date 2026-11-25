@@ -5,6 +5,11 @@ const httpUrl = z.url({ protocol: /^https?$/ });
 const optional = <T extends z.ZodType>(type: T) =>
   z.preprocess((v) => (v === '' ? undefined : v), type.optional());
 
+/** The example values are public, so a production API must not start with them. */
+const SECRETS = ['JWT_ACCESS_SECRET', 'OCR_SERVICE_TOKEN', 'OCR_CALLBACK_SECRET'] as const;
+/** Without these a published app has no password reset and no valid legal pages. */
+const NEEDED_IN_PRODUCTION = ['SMTP_URL', 'MAIL_FROM', 'LEGAL_OPERATOR', 'SUPPORT_EMAIL'] as const;
+
 /** Every environment variable the API reads. The app refuses to start if one is invalid. */
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -41,6 +46,17 @@ export const envSchema = z.object({
 }).refine((env) => !env.OCR_SERVICE_URL || (env.OCR_SERVICE_TOKEN && env.OCR_CALLBACK_SECRET), {
   message: 'OCR_SERVICE_URL needs OCR_SERVICE_TOKEN and OCR_CALLBACK_SECRET',
   path: ['OCR_SERVICE_URL'],
+}).superRefine((env, ctx) => {
+  if (env.NODE_ENV !== 'production') return;
+  const issue = (name: string, message: string) => ctx.addIssue({ code: 'custom', path: [name], message });
+  for (const name of SECRETS) {
+    // The reader's secrets only matter with a separate reader.
+    if (name !== 'JWT_ACCESS_SECRET' && !env.OCR_SERVICE_URL) continue;
+    if (env[name]?.startsWith('change-me')) issue(name, 'Set a secret of your own in production');
+  }
+  for (const name of NEEDED_IN_PRODUCTION) {
+    if (!env[name]) issue(name, 'Required in production');
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
