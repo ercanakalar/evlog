@@ -66,6 +66,7 @@ const en = {
     password: 'Password',
     passwordPlaceholder: 'At least 8 characters',
     forgot: 'Forgot your password?',
+    agree: 'By creating an account you accept the terms of use. The privacy notice explains how your data is used.',
   },
   reset: {
     title: 'Reset password',
@@ -77,6 +78,7 @@ const en = {
     save: 'Save and log in',
     again: 'Send a new code',
   },
+  legal: { privacy: 'Privacy notice', terms: 'Terms of use' },
   errors: {
     EMAIL_TAKEN: 'This email already has an account. Log in, or reset your password.',
     INVALID_CREDENTIALS: 'Wrong email or password.',
@@ -344,12 +346,15 @@ const en = {
     palettes: { lime: 'Lime', mint: 'Mint', sky: 'Sky', lilac: 'Lilac', rose: 'Rose', lemon: 'Lemon', aqua: 'Aqua', orchid: 'Orchid' },
     font: 'Font style',
     fonts: { receipt: 'Receipt', editorial: 'Editorial', rounded: 'Rounded', legible: 'Easy to read' },
+    about: 'About Raf',
+    help: 'Help',
+    version: 'Raf {{version}}',
     usage: 'Share anonymous usage',
     saveFailed: 'Could not save the setting',
     logOut: 'Log out',
     deleteAccount: 'Delete account',
     deleteTitle: 'Delete your account?',
-    deleteBody: 'Your receipts, lists and counts are deleted for good.',
+    deleteBody: 'Your receipts with their photos, lists and counts are deleted at once and for good.',
   },
   packs: {
     title: 'Scan pack dates',

@@ -13,6 +13,8 @@ npm start                 # i / a, or scan the QR code
 `EXPO_PUBLIC_API_URL` must be reachable from the phone: `http://10.0.2.2:3100` on the
 Android emulator, your computer's LAN IP on a real device.
 
+`EXPO_PUBLIC_SUPPORT_EMAIL` is shown under Settings → Help.
+
 The live scanner (`expo-camera`), reminders (`expo-notifications`) and Google
 sign-in need a development build (`npx expo run:ios|android`); Expo Go lacks some
 of these modules.
@@ -54,8 +56,10 @@ so the address of the HTTPS API is stored on Expo. Once:
 npx eas-cli@latest login
 npx eas-cli@latest init        # links the app to your Expo account; if it cannot write the
                                # project id itself, add it to app.json as extra.eas.projectId
-npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value https://<api> --environment preview --visibility plaintext
-npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value https://<api> --environment production --visibility plaintext
+for env in preview production; do
+  npx eas-cli@latest env:set --environment $env --visibility plaintext --name EXPO_PUBLIC_API_URL --value https://<api>
+  npx eas-cli@latest env:set --environment $env --visibility plaintext --name EXPO_PUBLIC_SUPPORT_EMAIL --value <email>
+done
 ```
 
 Then, for each release:
@@ -91,7 +95,7 @@ where Apple then requires Sign in with Apple.
 | Trips | Saved receipts by month with totals, filtered by market. |
 | Receipt detail | The trip as a receipt, grouped by category, with days left per product and the original photo. |
 | Spending | Six months of totals; a month by category or by market. |
-| Settings | Expiry reminders and lead time, at-home tracking, currency, language, appearance (theme, colour palette, font style), log out, delete account. |
+| Settings | Expiry reminders and lead time, at-home tracking, currency, language, appearance (theme, colour palette, font style), help and legal pages, log out, delete account. |
 
 ## Structure
 

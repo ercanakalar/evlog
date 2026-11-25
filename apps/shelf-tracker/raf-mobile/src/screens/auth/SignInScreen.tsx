@@ -7,6 +7,7 @@ import { ReceiptHero } from '@/components/brand/ReceiptHero';
 import { Button, FormField, Segmented, Text, TextLink } from '@/components/ui';
 import { space } from '@/constants/layout';
 import { useAuthForm, type AuthMode } from '@/hooks/auth/useAuthForms';
+import { useLegalLinks } from '@/hooks/common/useLegalLinks';
 import { useTheme } from '@/theme';
 import type { RootScreenProps } from '@/types/screens/navigation';
 
@@ -17,6 +18,7 @@ export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const auth = useAuthForm();
+  const legal = useLegalLinks();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -94,7 +96,15 @@ export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
               <View style={{ alignItems: 'center' }}>
                 <TextLink label={t('auth.forgot')} onPress={() => navigation.navigate('ForgotPassword', { email: auth.email() })} />
               </View>
-            ) : null}
+            ) : (
+              <Text variant="small" muted style={{ textAlign: 'center' }}>
+                {t('auth.agree')}
+              </Text>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.lg }}>
+              <TextLink label={t('legal.terms')} onPress={legal.openTerms} />
+              <TextLink label={t('legal.privacy')} onPress={legal.openPrivacy} />
+            </View>
           </SafeAreaView>
         </ScrollView>
       </KeyboardAvoidingView>

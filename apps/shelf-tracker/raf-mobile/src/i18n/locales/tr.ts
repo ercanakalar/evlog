@@ -68,6 +68,7 @@ const tr: Translation = {
     password: 'Şifre',
     passwordPlaceholder: 'En az 8 karakter',
     forgot: 'Şifreni mi unuttun?',
+    agree: 'Hesap oluşturarak kullanım koşullarını kabul edersin. Gizlilik metni verilerinin nasıl kullanıldığını açıklar.',
   },
   reset: {
     title: 'Şifre sıfırla',
@@ -79,6 +80,7 @@ const tr: Translation = {
     save: 'Kaydet ve giriş yap',
     again: 'Yeni kod gönder',
   },
+  legal: { privacy: 'Gizlilik metni', terms: 'Kullanım koşulları' },
   errors: {
     EMAIL_TAKEN: 'Bu e-postanın zaten hesabı var. Giriş yap ya da şifreni sıfırla.',
     INVALID_CREDENTIALS: 'E-posta veya şifre yanlış.',
@@ -346,12 +348,15 @@ const tr: Translation = {
     palettes: { lime: 'Fıstık yeşili', mint: 'Nane', sky: 'Gök mavisi', lilac: 'Lila', rose: 'Pembe', lemon: 'Limon', aqua: 'Turkuaz', orchid: 'Orkide' },
     font: 'Yazı tipi',
     fonts: { receipt: 'Fiş', editorial: 'Dergi', rounded: 'Yuvarlak', legible: 'Kolay okunur' },
+    about: 'Raf hakkında',
+    help: 'Yardım',
+    version: 'Raf {{version}}',
     usage: 'Anonim kullanım verisi paylaş',
     saveFailed: 'Ayar kaydedilemedi',
     logOut: 'Çıkış yap',
     deleteAccount: 'Hesabı sil',
     deleteTitle: 'Hesabın silinsin mi?',
-    deleteBody: 'Fişlerin, listelerin ve sayıların kalıcı olarak silinir.',
+    deleteBody: 'Fişlerin, fotoğrafları, listelerin ve sayıların hemen ve kalıcı olarak silinir.',
   },
   packs: {
     title: 'Paket tarihlerini tara',

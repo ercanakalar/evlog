@@ -61,7 +61,7 @@ export function ValueRow({
       {divider ? <Rule /> : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}, ${value}`}
+        accessibilityLabel={value ? `${label}, ${value}` : label}
         onPress={onPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
         <SpaceBetween style={{ minHeight: 52 }}>

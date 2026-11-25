@@ -1,6 +1,10 @@
+import Constants from 'expo-constants';
 import { useTranslation } from 'react-i18next';
+import { Linking } from 'react-native';
 import { useModal } from '@/components/ui';
+import { env } from '@/config/env';
 import { useErrorAlert } from '@/hooks/common/useErrorAlert';
+import { useLegalLinks } from '@/hooks/common/useLegalLinks';
 import { signOut } from '@/store/actions/sessionActions';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useDeleteAccountMutation, useGetMeQuery, useUpdateSettingsMutation } from '@/store/services/meService';
@@ -19,6 +23,8 @@ import { signedOut } from '@/store/slices/authSlice';
 import type { UpdateSettingsRequest } from '@/types/api/requests';
 import type { FontPreference, LanguagePreference, PalettePreference, ThemePreference } from '@/types/store/state';
 
+const appVersion = Constants.expoConfig?.version ?? '';
+
 const CURRENCIES = ['TRY', 'EUR', 'USD', 'GBP'] as const;
 
 /** Account, countdown and at-home settings (server) plus app preferences (device). */
@@ -35,6 +41,7 @@ export function useSettings() {
   const palette = useAppSelector(selectPalettePreference);
   const font = useAppSelector(selectFontPreference);
   const usage = useAppSelector(selectUsageReportingConsent);
+  const legal = useLegalLinks();
 
   const set = (changes: UpdateSettingsRequest) =>
     void update(changes).unwrap().catch((error: unknown) => showError(t('settings.saveFailed'), error));
@@ -65,6 +72,10 @@ export function useSettings() {
     setFont: (f: FontPreference) => dispatch(fontChanged(f)),
     usageReporting: usage === 'granted',
     setUsageReporting: (on: boolean) => dispatch(usageReportingDecided(on ? 'granted' : 'denied')),
+    ...legal,
+    supportEmail: env.supportEmail,
+    contactSupport: () => void Linking.openURL(`mailto:${env.supportEmail}?subject=Raf%20${appVersion}`).catch(() => undefined),
+    version: appVersion,
     pickCurrency: () =>
       pick(t('settings.currency'), CURRENCIES, me.data?.currency as (typeof CURRENCIES)[number] | undefined, (c) => t(`currencies.${c}`), (currency) => set({ currency })),
     pickLanguage: () =>

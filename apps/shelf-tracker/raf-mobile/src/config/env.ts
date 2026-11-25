@@ -9,6 +9,9 @@ const optional = (value: string | undefined) => (value ? value : undefined);
 export const env = {
   /** Base URL of the versioned API, e.g. http://localhost:3100/api/v1 */
   apiUrl: `${raw.replace(/\/+$/, '')}/api/v1`,
+  /** Legal pages served by the API (also linked from the store listing). */
+  legalUrl: (page: 'privacy' | 'terms', lang: string) => `${raw.replace(/\/+$/, '')}/${page}?lang=${lang}`,
+  supportEmail: optional(process.env.EXPO_PUBLIC_SUPPORT_EMAIL),
   /** Google OAuth client ids; the Google button is hidden when none is set. */
   google: {
     webClientId: optional(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),

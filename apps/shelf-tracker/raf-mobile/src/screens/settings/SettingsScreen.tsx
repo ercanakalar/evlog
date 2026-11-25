@@ -100,9 +100,18 @@ export function SettingsScreen() {
         <SwitchRow divider label={t('settings.usage')} value={s.usageReporting} onChange={s.setUsageReporting} />
       </SettingGroup>
 
+      <SettingGroup title={t('settings.about')}>
+        {s.supportEmail ? <ValueRow label={t('settings.help')} value={s.supportEmail} onPress={s.contactSupport} /> : null}
+        <ValueRow divider={Boolean(s.supportEmail)} label={t('legal.privacy')} value="" onPress={s.openPrivacy} />
+        <ValueRow divider label={t('legal.terms')} value="" onPress={s.openTerms} />
+      </SettingGroup>
+
       <View style={{ gap: 8 }}>
         <Button title={t('settings.logOut')} variant="outline" onPress={s.logOut} style={{ minHeight: 50, borderRadius: 10, backgroundColor: 'transparent' }} />
         <Button title={t('settings.deleteAccount')} variant="danger" loading={s.deleting} onPress={s.deleteAccount} compact />
+        <Text variant="caption" muted style={{ textAlign: 'center' }}>
+          {t('settings.version', { version: s.version })}
+        </Text>
       </View>
     </Screen>
   );
