@@ -457,6 +457,18 @@ describe('Raf API (e2e)', () => {
     expect(storedFiles()).toBe(before);
   });
 
+  describe('sign-in security', () => {
+    const login = (email: string, password: string) =>
+      api().post('/api/v1/auth/login').send({ email, password });
+
+    it('limits sign-in attempts per email, not per address', async () => {
+      for (let i = 0; i < 10; i++) await login('target@example.com', 'Wrong1234').expect(401);
+      await login('target@example.com', 'Wrong1234').expect(429);
+      // Someone else behind the same address is not affected.
+      await login('deniz@example.com', 'Sup3rSecret').expect(200);
+    });
+  });
+
   describe('at-home counts from the City Gross receipt (reader output of the real photo)', () => {
     let user: string;
     const homeAuth = () => ({ Authorization: `Bearer ${user}` });

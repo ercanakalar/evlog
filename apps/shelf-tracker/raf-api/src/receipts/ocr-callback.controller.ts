@@ -23,7 +23,7 @@ import { ReceiptsService } from './receipts.service';
  */
 @ApiExcludeController()
 @Public()
-@SkipThrottle()
+@SkipThrottle({ default: true, address: true })
 @Controller('ocr/receipts')
 export class OcrCallbackController {
   constructor(

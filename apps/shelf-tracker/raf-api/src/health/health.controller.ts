@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('health')
 @Public()
-@SkipThrottle()
+@SkipThrottle({ default: true, address: true })
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
