@@ -36,6 +36,11 @@ export class OcrClient {
     private readonly reader: ReaderService,
   ) {}
 
+  /** True while the API shuts down; reading is then taken up again at the next start. */
+  get stopping(): boolean {
+    return this.reader.stopping;
+  }
+
   async dispatch(input: {
     receiptId: string;
     kind: string;

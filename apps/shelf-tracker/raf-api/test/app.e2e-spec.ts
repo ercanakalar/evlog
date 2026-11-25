@@ -9,6 +9,7 @@ import { setupApp } from '../src/setup-app';
 import { GoogleVerifier } from '../src/auth/google-verifier';
 import { MailService } from '../src/mail/mail.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ReceiptsService } from '../src/receipts/receipts.service';
 import { FakeOcr } from './fake-ocr';
 import cityGross from './fixtures/city-gross.json';
 
@@ -49,6 +50,18 @@ describe('Raf API (e2e)', () => {
       void req.attach('files', jpeg(), { filename: `r${i}.jpg`, contentType: 'image/jpeg' });
     }
     return req;
+  };
+
+  /** Uploads are read in the background: sends the request and waits until that is done. */
+  const read = async (upload: request.Test, t = token) => {
+    const { body } = await upload.expect(201);
+    expect(body.status).toBe('PROCESSING');
+    for (let i = 0; i < 200; i++) {
+      const res = await api().get(`/api/v1/receipts/${body.id}`).set(auth(t)).expect(200);
+      if (!['PENDING', 'PROCESSING'].includes(res.body.status)) return res;
+      await new Promise((done) => setTimeout(done, 20));
+    }
+    throw new Error('The receipt was not read');
   };
 
   beforeAll(async () => {
@@ -107,7 +120,7 @@ describe('Raf API (e2e)', () => {
         ],
       },
     });
-    const scanned = await scan().expect(201);
+    const scanned = await read(scan());
     expect(scanned.body.status).toBe('PARSED');
     expect(scanned.body.items.map((i: { name: string }) => i.name)).toEqual([
       'Whole milk 1 L', 'Pasta 500 g', 'Bananas 1.12 kg', 'Dish soap 750 ml', 'Xq Urun',
@@ -166,7 +179,7 @@ describe('Raf API (e2e)', () => {
 
   it('matches lines typed in by hand when the reader fails', async () => {
     ocr.respond = () => ({ status: 200, body: { error: 'Too blurry' } });
-    const failed = await scan().expect(201);
+    const failed = await read(scan());
     expect(failed.body).toMatchObject({ status: 'FAILED', ocrError: 'UNREADABLE' });
     const typed = await api()
       .patch(`/api/v1/receipts/${failed.body.id}`)
@@ -198,7 +211,7 @@ describe('Raf API (e2e)', () => {
             { name: 'EKMEK', totalPrice: 20 }, { name: 'DOMATES', totalPrice: 40 },
           ] } };
     };
-    const res = await scan(2).expect(201);
+    const res = await read(scan(2));
     expect(res.body.merchantName).toBe('Migros');
     expect(res.body.totalAmount).toBe('199.5');
     expect(res.body.items.map((i: { name: string }) => i.name)).toEqual(['Eggs 15 pack', 'Bread', 'Tomatoes']);
@@ -305,7 +318,7 @@ describe('Raf API (e2e)', () => {
       status: 200,
       body: { merchantName: 'A101', issuedAt: daysAgo(1), total: 56, items: [{ name: 'TAM YAGLI SUT 1L', totalPrice: 56 }] },
     });
-    const scanned = await scan(1, token).expect(201);
+    const scanned = await read(scan(1, token), token);
     const confirmed = await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(token)).expect(200);
     const milk = confirmed.body.items[0];
 
@@ -362,7 +375,7 @@ describe('Raf API (e2e)', () => {
         ],
       },
     });
-    const scanned = await scan(1, token).expect(201);
+    const scanned = await read(scan(1, token), token);
     expect(scanned.body.items[0]).toMatchObject({ name: 'Ayran 1000 ml', brand: { name: 'Sütaş' }, packAmount: '1000', packUnit: 'ml' });
     const confirmed = await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(token)).expect(200);
 
@@ -402,7 +415,7 @@ describe('Raf API (e2e)', () => {
         ],
       },
     });
-    const scanned = await scan(1, token).expect(201);
+    const scanned = await read(scan(1, token), token);
     const lines = scanned.body.items.map((i: Record<string, unknown>) => ({
       name: i.name, rawName: i.rawName, quantity: Number(i.quantity), totalPrice: Number(i.totalPrice), checked: true,
     }));
@@ -444,8 +457,8 @@ describe('Raf API (e2e)', () => {
   it('deletes photos with their receipt and with the account', async () => {
     const before = storedFiles();
     const leaver = await register('leaver@example.com');
-    const first = await scan(2, leaver).expect(201);
-    await scan(1, leaver).expect(201);
+    const first = await read(scan(2, leaver), leaver);
+    await read(scan(1, leaver), leaver);
     expect(storedFiles()).toBe(before + 3);
 
     await api().delete(`/api/v1/receipts/${first.body.id}`).set(auth(leaver)).expect(204);
@@ -457,6 +470,44 @@ describe('Raf API (e2e)', () => {
     // The access token outlives the account; an upload with it must not leave a photo.
     await scan(1, leaver).expect(409);
     expect(storedFiles()).toBe(before);
+  });
+
+  describe('reading in the background', () => {
+    let user: string;
+    beforeAll(async () => {
+      user = await register('reader@example.com');
+    });
+
+    it('lists receipts that are not saved yet, and limits how many wait', async () => {
+      // Answered later through the callback, so they stay in the queue.
+      ocr.respond = () => ({ status: 202 });
+      const sent: string[] = [];
+      for (let i = 0; i < 3; i++) sent.push((await scan(1, user).expect(201)).body.id);
+      const refused = await scan(1, user).expect(429);
+      expect(refused.body.code).toBe('TOO_MANY_READING');
+      const unsaved = await api().get('/api/v1/receipts?unsaved=true').set(auth(user)).expect(200);
+      expect(unsaved.body.map((r: { id: string }) => r.id).sort()).toEqual([...sent].sort());
+      for (const id of sent) await api().delete(`/api/v1/receipts/${id}`).set(auth(user)).expect(204);
+    });
+
+    it('takes up receipts that were being read when the API stopped', async () => {
+      ocr.respond = () => ({ status: 202 });
+      const { body } = await scan(1, user).expect(201);
+      ocr.respond = () => ({
+        status: 200,
+        body: { merchantName: 'Şok', issuedAt: daysAgo(1), items: [{ name: 'EKMEK', totalPrice: 20 }] },
+      });
+      await app.get(ReceiptsService).resume();
+      for (let i = 0; i < 100; i++) {
+        const res = await api().get(`/api/v1/receipts/${body.id}`).set(auth(user)).expect(200);
+        if (res.body.status === 'PARSED') {
+          expect(res.body.merchantName).toBe('Şok');
+          return;
+        }
+        await new Promise((done) => setTimeout(done, 20));
+      }
+      throw new Error('The receipt was not read');
+    });
   });
 
   describe('sign-in security', () => {
@@ -597,11 +648,13 @@ describe('Raf API (e2e)', () => {
     };
     const saveReceipt = async () => {
       ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(10) } });
-      const scanned = await api()
-        .post('/api/v1/receipts')
-        .set(homeAuth())
-        .attach('files', jpeg(), { filename: 'r.jpg', contentType: 'image/jpeg' })
-        .expect(201);
+      const scanned = await read(
+        api()
+          .post('/api/v1/receipts')
+          .set(homeAuth())
+          .attach('files', jpeg(), { filename: 'r.jpg', contentType: 'image/jpeg' }),
+        user,
+      );
       await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(homeAuth()).expect(200);
       return scanned.body.id as string;
     };
@@ -634,12 +687,14 @@ describe('Raf API (e2e)', () => {
       const calls = ocr.calls.length;
       ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(12) } });
       const photo = jpeg();
-      const scanned = await api()
-        .post('/api/v1/receipts')
-        .set(homeAuth())
-        .attach('files', photo, { filename: 'a.jpg', contentType: 'image/jpeg' })
-        .attach('files', photo, { filename: 'b.jpg', contentType: 'image/jpeg' })
-        .expect(201);
+      const scanned = await read(
+        api()
+          .post('/api/v1/receipts')
+          .set(homeAuth())
+          .attach('files', photo, { filename: 'a.jpg', contentType: 'image/jpeg' })
+          .attach('files', photo, { filename: 'b.jpg', contentType: 'image/jpeg' }),
+        user,
+      );
       expect(ocr.calls.length - calls).toBe(1);
       expect(scanned.body.items).toHaveLength(cityGross.items.length);
       await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(homeAuth()).expect(200);
@@ -653,27 +708,29 @@ describe('Raf API (e2e)', () => {
         call.path === '/v1/labels/parse'
           ? { status: 200, body: { expiresOn: '2027-03-15', barcode: '8690565007679', dates: [] } }
           : { status: 200, body: { ...cityGross, issuedAt: daysAgo(3) } };
-      const scanned = await api()
-        .post('/api/v1/receipts')
-        .set(homeAuth())
-        .attach('files', jpeg(), { filename: 'r.jpg', contentType: 'image/jpeg' })
-        .expect(201);
+      const scanned = await read(
+        api()
+          .post('/api/v1/receipts')
+          .set(homeAuth())
+          .attach('files', jpeg(), { filename: 'r.jpg', contentType: 'image/jpeg' }),
+        user,
+      );
       await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(homeAuth()).expect(200);
 
       const shelf = await api().get('/api/v1/items').set(homeAuth()).expect(200);
       const labneh = shelf.body.find((i: { barcode: string | null }) => i.barcode === '8690565007679');
       expect(labneh).toMatchObject({ name: 'Labneh 400 g', packDate: false });
 
-      const read = await api()
+      const labelled = await api()
         .post(`/api/v1/items/${labneh.id}/label`)
         .set(homeAuth())
         .attach('file', jpeg(), { filename: 'pack.jpg', contentType: 'image/jpeg' })
         .expect(200);
-      expect(read.body.label).toEqual({
+      expect(labelled.body.label).toEqual({
         expiresOn: '2027-03-15', barcode: '8690565007679', barcodeMatches: true, error: null, text: null,
       });
-      expect(read.body.item).toMatchObject({ packDate: true });
-      expect(read.body.item.expiresAt.slice(0, 10)).toBe('2027-03-15');
+      expect(labelled.body.item).toMatchObject({ packDate: true });
+      expect(labelled.body.item.expiresAt.slice(0, 10)).toBe('2027-03-15');
 
       // No date on the photo: nothing changes and the app is told why.
       ocr.respond = () => ({ status: 200, body: { expiresOn: null, error: 'No expiry date found', text: 'P1NAR LA8NE' } });

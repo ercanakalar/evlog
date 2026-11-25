@@ -1,8 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { HomeItemsService } from '../home-items/home-items.service';
@@ -31,10 +35,17 @@ const withItems = {
   },
 } satisfies Prisma.ReceiptInclude;
 
+/** Photos are read one at a time, so nobody may fill the queue. */
+const MAX_READING = 3;
+/** Receipts left unread longer than this are not read again at start. */
+const RESUME_WITHIN_MS = 24 * 60 * 60_000;
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 @Injectable()
-export class ReceiptsService {
+export class ReceiptsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(ReceiptsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -44,9 +55,28 @@ export class ReceiptsService {
     private readonly homeItems: HomeItemsService,
   ) {}
 
+  onApplicationBootstrap() {
+    this.resume().catch((error: Error) => this.logger.error(`Could not resume reading: ${error.message}`));
+  }
+
+  /** Reads receipts that were waiting or being read when the API stopped. */
+  async resume(): Promise<void> {
+    const left = await this.prisma.receipt.findMany({
+      where: {
+        status: { in: ['PENDING', 'PROCESSING'] },
+        createdAt: { gt: new Date(Date.now() - RESUME_WITHIN_MS) },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    for (const { id } of left) void this.read(id);
+    if (left.length > 0) this.logger.log(`Reading ${left.length} receipts left from before`);
+  }
+
   /**
-   * Stores the photo(s), sends them to the reader and returns the receipt.
-   * A long receipt arrives as several photos, top to bottom.
+   * Stores the photo(s) and returns the receipt straight away; it is read in
+   * the background and the app polls until its status changes. A long receipt
+   * arrives as several photos, top to bottom.
    */
   async upload(userId: string, uploaded: Express.Multer.File[]) {
     if (uploaded.length === 0) throw new BadRequestException('Add a photo of the receipt');
@@ -71,6 +101,7 @@ export class ReceiptsService {
         receiptId: existing.id,
       });
     }
+    await this.checkQueue(userId);
     const imageKeys: string[] = [];
     let receipt: { id: string };
     try {
@@ -85,7 +116,7 @@ export class ReceiptsService {
       await this.storage.remove(imageKeys);
       throw error;
     }
-    return this.scan(receipt.id, files.map((f) => f.buffer));
+    return this.startReading(receipt.id);
   }
 
   /** Sends the stored photos to the reader again (after a failure). */
@@ -94,13 +125,9 @@ export class ReceiptsService {
     if (receipt.status === 'CONFIRMED') {
       throw new ConflictException('Saved receipts cannot be rescanned');
     }
-    const images: Buffer[] = [];
-    for (const key of receipt.imageKeys) {
-      const chunks: Buffer[] = [];
-      for await (const chunk of await this.storage.open(key)) chunks.push(chunk as Buffer);
-      images.push(Buffer.concat(chunks));
-    }
-    return this.scan(receiptId, images);
+    if (receipt.status !== 'FAILED' && receipt.status !== 'PARSED') return this.get(receiptId, userId);
+    await this.checkQueue(userId);
+    return this.startReading(receiptId);
   }
 
   /** Called by the reader's callback (single-photo receipts only). */
@@ -119,7 +146,7 @@ export class ReceiptsService {
     return this.prisma.receipt.findMany({
       where: {
         userId,
-        status: query.status,
+        status: query.unsaved ? { not: 'CONFIRMED' } : query.status,
         merchantName: query.market,
         ...(query.from || query.to
           ? {
@@ -238,24 +265,74 @@ export class ReceiptsService {
     return { stream: await this.storage.open(key), mimeType: receipt.mimeType };
   }
 
-  private async scan(receiptId: string, images: Buffer[]) {
-    await this.prisma.receipt.update({
+  private async checkQueue(userId: string): Promise<void> {
+    const reading = await this.prisma.receipt.count({
+      where: {
+        userId,
+        status: { in: ['PENDING', 'PROCESSING'] },
+        createdAt: { gt: new Date(Date.now() - RESUME_WITHIN_MS) },
+      },
+    });
+    if (reading < MAX_READING) return;
+    throw new HttpException(
+      { message: 'Wait until the receipts you sent are read', code: 'TOO_MANY_READING' },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
+  private async startReading(receiptId: string) {
+    const receipt = await this.prisma.receipt.update({
       where: { id: receiptId },
       data: { status: 'PROCESSING', ocrError: null },
-    });
-    const receipt = await this.prisma.receipt.findUniqueOrThrow({ where: { id: receiptId } });
-    const outcomes: OcrDispatchResult[] = [];
-    for (const image of images) {
-      outcomes.push(
-        await this.ocr.dispatch({ receiptId, kind: 'GROCERY', image, mimeType: receipt.mimeType }),
-      );
-    }
-    await this.apply(receiptId, this.combine(outcomes));
-    return this.prisma.receipt.findUniqueOrThrow({
-      where: { id: receiptId },
       include: withItems,
       omit: { imageKeys: true },
     });
+    void this.read(receiptId);
+    return receipt;
+  }
+
+  /** Reads the stored photos and saves what was found. Never throws. */
+  private async read(receiptId: string): Promise<void> {
+    try {
+      const receipt = await this.prisma.receipt.findUnique({ where: { id: receiptId } });
+      if (!receipt) return;
+      const outcomes: OcrDispatchResult[] = [];
+      for (const key of receipt.imageKeys) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of await this.storage.open(key)) chunks.push(chunk as Buffer);
+        outcomes.push(
+          await this.ocr.dispatch({
+            receiptId,
+            kind: 'GROCERY',
+            image: Buffer.concat(chunks),
+            mimeType: receipt.mimeType,
+          }),
+        );
+        // Interrupted, not unreadable: it is read again at the next start.
+        if (this.ocr.stopping) return;
+        // Deleted, or filled in by hand, while it was being read.
+        if (!(await this.isWaiting(receiptId))) return;
+      }
+      await this.apply(receiptId, this.combine(outcomes));
+    } catch (error) {
+      if (this.ocr.stopping) return;
+      // Deleted while its result was being saved.
+      if (!(await this.isWaiting(receiptId).catch(() => true))) return;
+      this.logger.error(`Could not read receipt ${receiptId}: ${String(error)}`);
+      await this.prisma.receipt
+        .updateMany({
+          where: { id: receiptId, status: { in: ['PENDING', 'PROCESSING'] } },
+          data: { status: 'FAILED', ocrError: 'UNREADABLE' },
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  private async isWaiting(receiptId: string): Promise<boolean> {
+    const count = await this.prisma.receipt.count({
+      where: { id: receiptId, status: { in: ['PENDING', 'PROCESSING'] } },
+    });
+    return count > 0;
   }
 
   private combine(outcomes: OcrDispatchResult[]): OcrDispatchResult {

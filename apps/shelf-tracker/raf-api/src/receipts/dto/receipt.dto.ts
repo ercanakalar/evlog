@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -88,6 +88,10 @@ export class UpdateReceiptDto {
 export class ListReceiptsQueryDto {
   @IsOptional() @IsEnum(ReceiptStatus)
   status?: ReceiptStatus;
+
+  /** Only receipts not saved yet: being read, waiting for review, or unreadable. */
+  @IsOptional() @Transform(({ value }: { value: unknown }) => value === 'true' || value === true) @IsBoolean()
+  unsaved?: boolean;
 
   /** Exact market name, as returned in `merchantName`. */
   @IsOptional() @IsString() @MaxLength(200)

@@ -58,6 +58,20 @@ describe('ReaderService', () => {
     expect(started).toHaveLength(1);
   });
 
+  it('reads a pack label before receipts that are waiting', async () => {
+    void service.readReceipt(Buffer.from('a'));
+    void service.readReceipt(Buffer.from('b'));
+    void service.readLabel(Buffer.from('c'));
+    void service.readLabel(Buffer.from('d'));
+    const reader = await running();
+    for (let i = 0; i < 4; i++) {
+      reader.emit('message', { result: {} });
+      await tick();
+    }
+    const read = (reader.jobs as { file: Buffer }[]).map((j) => j.file.toString());
+    expect(read).toEqual(['a', 'c', 'd', 'b']);
+  });
+
   it('does not pass the API secrets to the process, and turns telemetry off', async () => {
     const result = service.readReceipt(Buffer.from('a'));
     (await running()).emit('message', { result: {} });

@@ -5,15 +5,25 @@ import { join, resolve } from 'node:path';
 import type { Env } from '../config/env.validation';
 import type { Job, Reply } from './reader.process';
 
+interface Waiting {
+  job: Job;
+  resolve: (result: unknown) => void;
+  reject: (error: Error) => void;
+}
+
 /**
  * The built-in receipt reader. Photos are read one at a time, in a separate
- * process, because the OCR models already use every CPU core.
+ * process, because the OCR models already use every CPU core. A pack label
+ * goes before waiting receipts: its user is looking at the screen.
  */
 @Injectable()
 export class ReaderService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(ReaderService.name);
   private reader?: Promise<ChildProcess>;
-  private queue: Promise<unknown> = Promise.resolve();
+  private readonly waiting: Waiting[] = [];
+  private busy = false;
+  /** Set when the API shuts down: photos that fail from then on were interrupted, not unreadable. */
+  stopping = false;
 
   constructor(private readonly config: ConfigService<Env, true>) {}
 
@@ -25,6 +35,7 @@ export class ReaderService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    this.stopping = true;
     const reader = await this.reader?.catch(() => undefined);
     reader?.kill('SIGKILL');
   }
@@ -38,9 +49,27 @@ export class ReaderService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private enqueue(job: Job): Promise<unknown> {
-    const result = this.queue.then(() => this.run(job));
-    this.queue = result.catch(() => undefined);
-    return result;
+    return new Promise((resolve, reject) => {
+      const firstReceipt = this.waiting.findIndex((w) => w.job.kind === 'receipt');
+      const at = job.kind === 'label' && firstReceipt >= 0 ? firstReceipt : this.waiting.length;
+      this.waiting.splice(at, 0, { job, resolve, reject });
+      void this.readNext();
+    });
+  }
+
+  private async readNext(): Promise<void> {
+    if (this.busy) return;
+    const next = this.waiting.shift();
+    if (!next) return;
+    this.busy = true;
+    try {
+      next.resolve(await this.run(next.job));
+    } catch (error) {
+      next.reject(error as Error);
+    } finally {
+      this.busy = false;
+    }
+    void this.readNext();
   }
 
   private async run(job: Job): Promise<unknown> {
