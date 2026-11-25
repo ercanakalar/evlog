@@ -36,12 +36,14 @@ ENV CI=1 NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm NODE_ENV=development npm ci
 COPY . .
-RUN npx expo prebuild --platform android --no-install
+# Overrides EXPO_PUBLIC_API_URL from .env when given. Needed by prebuild too:
+# app.config.ts allows plain http only when the API's address is http://.
+ARG API_URL
+RUN if [ -n "$API_URL" ]; then export EXPO_PUBLIC_API_URL="$API_URL"; fi \
+  && npx expo prebuild --platform android --no-install
 # arm64-v8a covers phones from the last ten years; pass
 # --build-arg ABIS=arm64-v8a,armeabi-v7a,x86_64 for older phones or emulators.
 ARG ABIS=arm64-v8a
-# Overrides EXPO_PUBLIC_API_URL from .env when given.
-ARG API_URL
 RUN --mount=type=cache,target=/root/.gradle \
   if [ -n "$API_URL" ]; then export EXPO_PUBLIC_API_URL="$API_URL"; fi \
   && cd android \
