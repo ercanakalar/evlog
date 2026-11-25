@@ -490,6 +490,15 @@ describe('Raf API (e2e)', () => {
       for (const id of sent) await api().delete(`/api/v1/receipts/${id}`).set(auth(user)).expect(204);
     });
 
+    it('names products in the language of the app', async () => {
+      ocr.respond = () => ({
+        status: 200,
+        body: { merchantName: 'BİM', issuedAt: daysAgo(1), items: [{ name: 'TAM YAGLI SUT 1L', totalPrice: 50 }] },
+      });
+      const { body } = await read(scan(1, user).set('accept-language', 'tr'), user);
+      expect(body.items[0]).toMatchObject({ name: 'Tam yağlı süt 1 L', rawName: 'TAM YAGLI SUT 1L' });
+    });
+
     it('takes up receipts that were being read when the API stopped', async () => {
       ocr.respond = () => ({ status: 202 });
       const { body } = await scan(1, user).expect(201);

@@ -3,15 +3,21 @@
  * a demo account with a month of trips that matches the design mockups.
  * Safe to run more than once.
  *
- *   demo: demo@raf.app / Demo1234
+ *   demo: demo@raf.app / Demo1234      (DEMO_LANGUAGE=tr: product names in Turkish)
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { normalizeProductName } from '../src/common/utils/normalize';
-import { matchProduct, type ShelfLifeEntry } from '../src/products/product-matcher';
+import { matchProduct, type ProductLanguage, type ShelfLifeEntry } from '../src/products/product-matcher';
 import { SHELF_LIFE, SHELF_LIFE_SOURCE } from '../src/products/shelf-life.data';
+import { TURKISH_NAMES } from '../src/products/turkish-names.data';
+
+const LANGUAGE: ProductLanguage = process.env.DEMO_LANGUAGE === 'tr' ? 'tr' : 'en';
+/** A product or list name of the demo account in its language. */
+const local = (name: string) =>
+  LANGUAGE === 'tr' ? ({ 'Weekend shop': 'Hafta sonu', 'Monthly stock': 'Aylık stok' }[name] ?? TURKISH_NAMES[name] ?? name) : name;
 
 const DAY = 86_400_000;
 const ago = (days: number, hour = 18) => {
@@ -80,7 +86,7 @@ async function main() {
   for (const [index, trip] of TRIPS.entries()) {
     const issuedAt = ago(trip.daysAgo, trip.hour);
     const items = trip.lines.map(([raw, total, quantity = 1, unit], position) => {
-      const match = matchProduct(raw, catalog, quantity, unit);
+      const match = matchProduct(raw, catalog, quantity, unit, LANGUAGE);
       return {
         position,
         name: match.name,
@@ -104,6 +110,7 @@ async function main() {
         homeCountsRecorded: true,
         imageKeys: [],
         mimeType: 'image/jpeg',
+        language: LANGUAGE,
         sha256: `demo-${index}`,
         merchantName: trip.market,
         issuedAt,
@@ -122,8 +129,8 @@ async function main() {
   await prisma.homeItem.createMany({
     data: home.map(([name, count, unit = 'PIECE']) => ({
       userId: user.id,
-      name,
-      normalizedName: normalizeProductName(name),
+      name: local(name),
+      normalizedName: normalizeProductName(local(name)),
       unit,
       count,
     })),
@@ -132,9 +139,9 @@ async function main() {
   await prisma.shoppingList.create({
     data: {
       userId: user.id,
-      name: 'Weekend shop',
+      name: local('Weekend shop'),
       items: {
-        create: ['Whole milk', 'Eggs', 'Tomatoes', 'Sourdough bread', 'Pasta'].map((name) => ({
+        create: ['Whole milk', 'Eggs', 'Tomatoes', 'Sourdough bread', 'Pasta'].map(local).map((name) => ({
           name,
           normalizedName: normalizeProductName(name),
         })),
@@ -144,8 +151,8 @@ async function main() {
   await prisma.shoppingList.create({
     data: {
       userId: user.id,
-      name: 'Monthly stock',
-      items: { create: ['Rice', 'Toilet paper'].map((name) => ({ name, normalizedName: normalizeProductName(name) })) },
+      name: local('Monthly stock'),
+      items: { create: ['Rice', 'Toilet paper'].map(local).map((name) => ({ name, normalizedName: normalizeProductName(name) })) },
     },
   });
 

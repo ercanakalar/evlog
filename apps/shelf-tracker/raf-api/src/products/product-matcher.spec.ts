@@ -1,6 +1,16 @@
 import { BRANDS } from './brands.data';
 import { SHELF_LIFE } from './shelf-life.data';
-import { findBrand, homeName, matchProduct, namesMatch, packOf, packSize, type ShelfLifeEntry } from './product-matcher';
+import {
+  findBrand,
+  homeName,
+  matchProduct,
+  namesMatch,
+  packOf,
+  packSize,
+  productLanguage,
+  type ShelfLifeEntry,
+} from './product-matcher';
+import { TURKISH_NAMES } from './turkish-names.data';
 
 const catalog: ShelfLifeEntry[] = SHELF_LIFE.map(
   ([keyword, displayName, category, storage, shelfLifeDays, openedShelfLifeDays]) => ({
@@ -150,5 +160,24 @@ describe('homeName', () => {
     ['Bread', 'Bread'],
   ])('%s -> %s', (name, expected) => {
     expect(homeName(name)).toBe(expected);
+  });
+});
+
+describe('Turkish product names', () => {
+  it('has one for every product', () => {
+    const missing = SHELF_LIFE.map(([, name]) => name).filter((name) => !TURKISH_NAMES[name]);
+    expect(missing).toEqual([]);
+  });
+
+  it('names products in the language of the app', () => {
+    const name = (raw: string) => matchProduct(raw, catalog, undefined, undefined, 'tr').name;
+    expect(name('TAM YAGLI SUT 1L')).toBe('Tam yağlı süt 1 L');
+    expect(name('YUMURTA 15LI')).toBe('Yumurta 15 adet');
+    expect(matchProduct('MUZ KG', catalog, 1.12, 'kg', 'tr').name).toBe('Muz 1,12 kg');
+    expect(homeName('Muz 1,12 kg')).toBe('Muz');
+    expect(homeName(name('YUMURTA 15LI'))).toBe('Yumurta');
+    expect(productLanguage('tr')).toBe('tr');
+    expect(productLanguage('tr-TR,tr;q=0.9')).toBe('tr');
+    expect(productLanguage(undefined)).toBe('en');
   });
 });

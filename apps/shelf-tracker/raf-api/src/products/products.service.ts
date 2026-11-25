@@ -1,7 +1,15 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BRANDS } from './brands.data';
-import { findBrand, matchProduct, packOf, type BrandEntry, type ProductMatch, type ShelfLifeEntry } from './product-matcher';
+import {
+  findBrand,
+  matchProduct,
+  packOf,
+  type BrandEntry,
+  type ProductLanguage,
+  type ProductMatch,
+  type ShelfLifeEntry,
+} from './product-matcher';
 import { SHELF_LIFE, SHELF_LIFE_SOURCE } from './shelf-life.data';
 
 /** A matched line plus its brand and printed pack size, as stored on a receipt line. */
@@ -120,17 +128,20 @@ export class ProductsService implements OnApplicationBootstrap {
     if (updated > 0) this.logger.log(`Brands: ${updated} saved lines filled in`);
   }
 
-  async match(rawName: string, quantity?: number, unit?: string | null): Promise<ProductMatch> {
-    return matchProduct(rawName, (await this.entries()).catalog, quantity, unit);
+  async match(rawName: string, language: ProductLanguage): Promise<ProductMatch> {
+    return matchProduct(rawName, (await this.entries()).catalog, undefined, undefined, language);
   }
 
   /** Each line's product, brand and printed pack size. */
-  async matchMany(lines: { name: string; quantity?: number; unit?: string | null }[]): Promise<LineMatch[]> {
+  async matchMany(
+    lines: { name: string; quantity?: number; unit?: string | null }[],
+    language: ProductLanguage,
+  ): Promise<LineMatch[]> {
     const { catalog, brands } = await this.entries();
     return lines.map((line) => {
       const pack = packOf(line.name);
       return {
-        ...matchProduct(line.name, catalog, line.quantity, line.unit),
+        ...matchProduct(line.name, catalog, line.quantity, line.unit, language),
         brandId: findBrand(line.name, brands)?.id ?? null,
         packAmount: pack?.amount ?? null,
         packUnit: pack?.unit ?? null,

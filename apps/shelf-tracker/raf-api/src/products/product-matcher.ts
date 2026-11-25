@@ -1,5 +1,13 @@
 import type { Category, Storage } from '../generated/prisma/enums';
 import { normalizeProductName } from '../common/utils/normalize';
+import { TURKISH_NAMES } from './turkish-names.data';
+
+/** Language of the product names shown to the user. */
+export type ProductLanguage = 'en' | 'tr';
+
+/** From an Accept-Language header; the app sends just its own language. */
+export const productLanguage = (header: string | undefined): ProductLanguage =>
+  /^\s*tr\b/i.test(header ?? '') ? 'tr' : 'en';
 
 export interface ShelfLifeEntry {
   keyword: string;
@@ -74,7 +82,7 @@ export const findBrand = <B extends BrandEntry>(rawName: string, brands: readonl
 
 /** An at-home name from a clean product name: "Ayran 1000 ml" -> "Ayran", "Eggs 15 pack" -> "Eggs". */
 export const homeName = (name: string): string =>
-  name.replace(/\s+\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|pack)$/i, '').trim() || name.trim();
+  name.replace(/\s+\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|pack|adet)$/i, '').trim() || name.trim();
 
 /** Weight printed in a product name, in kg: "MAKARNA 500G" -> 0.5, "PIRINC 1KG" -> 1. */
 export const weightKg = (raw: string): number | null => {
@@ -117,6 +125,7 @@ export function matchProduct(
   catalog: readonly ShelfLifeEntry[],
   quantity?: number,
   unit?: string | null,
+  language: ProductLanguage = 'en',
 ): ProductMatch {
   const normalized = normalizeProductName(rawName);
   let best: ShelfLifeEntry | undefined;
@@ -129,6 +138,7 @@ export function matchProduct(
   // Loose produce: "MUZ KG" with quantity 1.12 -> "1.12 kg". A count of
   // pieces is not part of the name (the receipt line shows "× 6" already).
   if (!size && unit && unit !== 'pcs' && quantity && quantity !== 1) size = `${quantity} ${unit}`;
+  if (language === 'tr') size = size?.replace(/ pack$/, ' adet').replace('.', ',') ?? null;
 
   if (!best) {
     return {
@@ -140,8 +150,9 @@ export function matchProduct(
       needsReview: true,
     };
   }
+  const name = language === 'tr' ? (TURKISH_NAMES[best.displayName] ?? best.displayName) : best.displayName;
   return {
-    name: size ? `${best.displayName} ${size}` : best.displayName,
+    name: size ? `${name} ${size}` : name,
     category: best.category,
     storage: best.storage,
     shelfLifeDays: best.shelfLifeDays,

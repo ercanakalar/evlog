@@ -12,6 +12,7 @@ import { Prisma } from '../generated/prisma/client';
 import { HomeItemsService } from '../home-items/home-items.service';
 import { ItemsService } from '../items/items.service';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ProductLanguage } from '../products/product-matcher';
 import { ProductsService } from '../products/products.service';
 import { StorageService } from '../storage/storage.service';
 import { sha256 } from '../common/utils/crypto';
@@ -78,7 +79,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
    * the background and the app polls until its status changes. A long receipt
    * arrives as several photos, top to bottom.
    */
-  async upload(userId: string, uploaded: Express.Multer.File[]) {
+  async upload(userId: string, uploaded: Express.Multer.File[], language: ProductLanguage) {
     if (uploaded.length === 0) throw new BadRequestException('Add a photo of the receipt');
     // The same photo sent twice as two parts would read every line twice.
     const seen = new Set<string>();
@@ -109,7 +110,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
         imageKeys.push(await this.storage.save('receipts', file.buffer, file.mimetype));
       }
       receipt = await this.prisma.receipt.create({
-        data: { userId, imageKeys, mimeType: files[0].mimetype, sha256: hash },
+        data: { userId, imageKeys, mimeType: files[0].mimetype, sha256: hash, language },
       });
     } catch (error) {
       // e.g. the account was deleted meanwhile: leave no photo behind.
@@ -137,7 +138,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
     if (receipt.status !== 'PROCESSING' && receipt.status !== 'PENDING') {
       throw new ConflictException('Receipt is not waiting for a result');
     }
-    await this.apply(receiptId, await this.ocr.parse(body));
+    await this.apply(receipt, await this.ocr.parse(body));
     return { ok: true };
   }
 
@@ -191,7 +192,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
       throw new ConflictException('Saved receipts cannot be edited');
     }
     const { items, issuedAt, ...fields } = dto;
-    const lines = items ? await this.linesFromUser(items) : undefined;
+    const lines = items ? await this.linesFromUser(items, receipt.language as ProductLanguage) : undefined;
     return this.prisma.$transaction(async (tx) => {
       if (lines) {
         await tx.receiptItem.deleteMany({ where: { receiptId } });
@@ -313,7 +314,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
         // Deleted, or filled in by hand, while it was being read.
         if (!(await this.isWaiting(receiptId))) return;
       }
-      await this.apply(receiptId, this.combine(outcomes));
+      await this.apply(receipt, this.combine(outcomes));
     } catch (error) {
       if (this.ocr.stopping) return;
       // Deleted while its result was being saved.
@@ -347,7 +348,10 @@ export class ReceiptsService implements OnApplicationBootstrap {
     return { kind: 'parsed', result: mergeReceiptParts(parts) };
   }
 
-  private async apply(receiptId: string, outcome: OcrDispatchResult) {
+  private async apply(
+    { id: receiptId, language }: { id: string; language: string },
+    outcome: OcrDispatchResult,
+  ) {
     if (outcome.kind === 'accepted') return;
     if (outcome.kind === 'failed') {
       await this.prisma.receipt.update({
@@ -358,7 +362,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
     }
     const result: OcrResultDto = outcome.result;
     const total = result.total ?? result.items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const lines = await this.linesFromReader(result.items);
+    const lines = await this.linesFromReader(result.items, language as ProductLanguage);
     await this.prisma.$transaction([
       this.prisma.receiptItem.deleteMany({ where: { receiptId } }),
       this.prisma.receiptItem.createMany({ data: lines.map((line) => ({ ...line, receiptId })) }),
@@ -378,9 +382,10 @@ export class ReceiptsService implements OnApplicationBootstrap {
   }
 
   /** Reader lines -> stored lines, each matched with the shelf-life table. */
-  private async linesFromReader(items: OcrItemDto[]) {
+  private async linesFromReader(items: OcrItemDto[], language: ProductLanguage) {
     const matches = await this.products.matchMany(
       items.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
+      language,
     );
     return items.map((item, position) => {
       const match = matches[position];
@@ -413,9 +418,10 @@ export class ReceiptsService implements OnApplicationBootstrap {
    * category win over the table. A line without one was typed in from the
    * paper receipt, so it is matched like a line from the reader.
    */
-  private async linesFromUser(items: ReceiptLineDto[]) {
+  private async linesFromUser(items: ReceiptLineDto[], language: ProductLanguage) {
     const matches = await this.products.matchMany(
       items.map((i) => ({ name: i.rawName ?? i.name, quantity: i.quantity, unit: i.unit })),
+      language,
     );
     return items.map((item, position) => {
       const match = matches[position];

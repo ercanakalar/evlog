@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -18,6 +19,7 @@ import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { type AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { ImageFilesPipe } from '../common/pipes/image-file.pipe';
+import { productLanguage } from '../products/product-matcher';
 import { ImagePartQueryDto } from './dto/image-part.dto';
 import { ListReceiptsQueryDto, UpdateReceiptDto } from './dto/receipt.dto';
 import { ReceiptsService } from './receipts.service';
@@ -42,8 +44,9 @@ export class ReceiptsController {
   upload(
     @CurrentUser() user: AuthUser,
     @UploadedFiles(ImageFilesPipe) files: Express.Multer.File[],
+    @Headers('accept-language') language?: string,
   ) {
-    return this.receipts.upload(user.id, files);
+    return this.receipts.upload(user.id, files, productLanguage(language));
   }
 
   /** Trips, newest first; filter by market or date range. */
