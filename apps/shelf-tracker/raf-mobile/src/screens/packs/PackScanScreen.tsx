@@ -147,7 +147,7 @@ export function PackScanScreen({ route }: RootScreenProps<'PackScan'>) {
                 </View>
               ) : (
                 <TypeDate
-                  message={s.result.label.error ?? t('packs.noDate')}
+                  message={t(s.result.label.error && s.result.label.error !== 'NO_DATE' ? 'packs.notRead' : 'packs.noDate')}
                   read={s.result.label.text}
                   saving={s.saving}
                   onSave={(day) => void s.saveTyped(day)}

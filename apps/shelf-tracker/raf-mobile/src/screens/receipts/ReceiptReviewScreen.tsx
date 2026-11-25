@@ -10,6 +10,10 @@ import { useReceiptReview } from '@/hooks/receipts/useReceiptReview';
 import { useTheme } from '@/theme';
 import type { RootScreenProps } from '@/types/screens/navigation';
 
+const READ_ERRORS = ['NO_TEXT', 'NO_ITEMS', 'READER_UNAVAILABLE'] as const;
+/** Why the photo could not be read; receipts read before these codes existed have a sentence instead. */
+const readErrorKey = (code: string | null) => READ_ERRORS.find((c) => c === code) ?? 'UNREADABLE';
+
 export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -83,7 +87,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
       {failed ? (
         <Card style={{ gap: 12 }}>
           <Text variant="bodyStrong">{t('review.failedTitle')}</Text>
-          <Text variant="small" muted>{receipt.ocrError ?? t('common.somethingWrong')}</Text>
+          <Text variant="small" muted>{t(`review.readError.${readErrorKey(receipt.ocrError)}`)}</Text>
           <Button title={t('common.retry')} compact loading={r.rescanning} onPress={r.rescan} />
         </Card>
       ) : null}

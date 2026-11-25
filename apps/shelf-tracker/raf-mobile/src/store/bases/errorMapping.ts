@@ -42,13 +42,35 @@ export function asAppError(error: unknown): AppError {
   return { status: 0, message: serialized?.message ?? 'somethingWrong', messages: [] };
 }
 
-/**
- * Human-readable text for an error. Network/unknown failures use the
- * translated generic strings; API validation messages are shown as sent.
- */
-export function describeError(error: AppError | undefined, t: (key: 'common.offline' | 'common.somethingWrong') => string) {
+/** Codes the API sends with an error; each has a text under `errors`. */
+const CODES = [
+  'EMAIL_TAKEN',
+  'INVALID_CREDENTIALS',
+  'GOOGLE_FAILED',
+  'GOOGLE_UNAVAILABLE',
+  'RESET_CODE_INVALID',
+  'RESET_UNAVAILABLE',
+  'RECEIPT_INCOMPLETE',
+  'RECEIPT_IN_FUTURE',
+  'RECEIPT_NOT_READ',
+  'TOO_MANY_READING',
+  'WHOLE_PIECES',
+] as const;
+
+type ErrorKey =
+  | 'common.offline'
+  | 'common.somethingWrong'
+  | `errors.${(typeof CODES)[number] | 'tooMany' | 'photo' | 'notFound' | 'server'}`;
+
+/** Text for an error in the app's language. The API's own messages are English and not shown. */
+export function describeError(error: AppError | undefined, t: (key: ErrorKey) => string): string {
   if (!error) return '';
   if (error.message === 'offline') return t('common.offline');
-  if (error.message === 'somethingWrong') return t('common.somethingWrong');
-  return error.messages.length > 1 ? error.messages.join('\n') : error.message;
+  const code = CODES.find((c) => c === (error.body as { code?: unknown } | null | undefined)?.code);
+  if (code) return t(`errors.${code}`);
+  if (error.status === 429) return t('errors.tooMany');
+  if (error.status === 413 || error.status === 422) return t('errors.photo');
+  if (error.status === 404) return t('errors.notFound');
+  if (error.status >= 500) return t('errors.server');
+  return t('common.somethingWrong');
 }
