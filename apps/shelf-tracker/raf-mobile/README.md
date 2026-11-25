@@ -44,6 +44,30 @@ The first build downloads the Android SDK, NDK and Gradle (several GB); later
 builds reuse them. The APK is signed with the debug key, which is fine for
 installing it yourself but not for the Play Store (use EAS for that).
 
+## Store builds with EAS
+
+[`eas.json`](eas.json) has two profiles: `preview` (an APK to install directly) and
+`production` (a signed AAB / IPA; EAS raises the build number). `.env` is not uploaded,
+so the address of the HTTPS API is stored on Expo. Once:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init        # links the app to your Expo account; if it cannot write the
+                               # project id itself, add it to app.json as extra.eas.projectId
+npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value https://<api> --environment preview --visibility plaintext
+npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value https://<api> --environment production --visibility plaintext
+```
+
+Then, for each release:
+
+```bash
+npx eas-cli@latest build --platform android --profile production
+npx eas-cli@latest submit --platform android --profile production    # to Play's internal test track
+```
+
+Google Play needs the first AAB of a new app to be uploaded by hand in the Play Console,
+and a Google service account key for `submit` after that.
+
 ## Google sign-in
 
 Create OAuth client ids in Google Cloud Console (web, iOS, Android), put them in
