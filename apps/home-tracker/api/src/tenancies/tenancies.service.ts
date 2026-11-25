@@ -8,7 +8,9 @@ import { ConfigService } from '@nestjs/config';
 import { randomInt } from 'node:crypto';
 import type { Env } from '../config/env.validation';
 import { HomeAccessService } from '../homes/home-access.service';
+import { HomeRemovalService } from '../homes/home-removal.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 // No 0/O/1/I so codes survive being read aloud or typed.
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -20,6 +22,8 @@ export class TenanciesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: HomeAccessService,
+    private readonly homes: HomeRemovalService,
+    private readonly storage: StorageService,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
@@ -55,10 +59,23 @@ export class TenanciesService {
   async end(homeId: string, userId: string, endDate?: string) {
     const { activeTenancy } = await this.access.get(homeId, userId);
     if (!activeTenancy) throw new NotFoundException('No active tenancy');
-    return this.prisma.tenancy.update({
-      where: { id: activeTenancy.id },
-      data: { status: 'ENDED', endDate: endDate ? new Date(endDate) : new Date() },
+    const { ended, files } = await this.prisma.$transaction(async (tx) => {
+      // The owner may be deleting their account right now.
+      await tx.$queryRaw`SELECT 1 FROM "Home" WHERE "id" = ${homeId}::uuid FOR UPDATE`;
+      const tenancy = await tx.tenancy.update({
+        where: { id: activeTenancy.id },
+        data: { status: 'ENDED', endDate: endDate ? new Date(endDate) : new Date() },
+        include: { home: { select: { ownerId: true } } },
+      });
+      const { home, ...rest } = tenancy;
+      // Nobody can open an ownerless home once its tenant has left.
+      return {
+        ended: rest,
+        files: home.ownerId === null ? await this.homes.remove(tx, homeId) : [],
+      };
     });
+    await this.storage.remove(files);
+    return ended;
   }
 
   list(homeId: string, userId: string) {

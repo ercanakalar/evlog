@@ -1,9 +1,11 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomBytes } from 'node:crypto';
+import { existsSync, readdirSync } from 'node:fs';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { setupApp } from '../src/setup-app';
 import { FakeOcr } from './fake-ocr';
 
@@ -13,6 +15,12 @@ const jpeg = () =>
     Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]),
     randomBytes(256),
   ]);
+
+/** Photos on disk right now. */
+const storedFiles = () =>
+  existsSync('./uploads-test')
+    ? readdirSync('./uploads-test', { recursive: true, withFileTypes: true }).filter((f) => f.isFile()).length
+    : 0;
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
@@ -485,6 +493,181 @@ describe('Evlog API (e2e)', () => {
         .set(auth(owner))
         .expect(204);
       await api().get(`/api/v1/shared/listings/${shareToken}`).expect(404);
+    });
+  });
+
+  describe('account deletion', () => {
+    let landlord: string;
+
+    const remove = (token: string) => api().delete('/api/v1/me').set(auth(token)).expect(204);
+    const prisma = () => app.get(PrismaService);
+    const homesOf = async (token: string) =>
+      (await api().get('/api/v1/me').set(auth(token)).expect(200)).body.homes as { home: { id: string } }[];
+
+    it('needs a signed-in user', () => api().delete('/api/v1/me').expect(401));
+
+    it('deletes a home nobody else lives in, with its photos', async () => {
+      const before = storedFiles();
+      const leaver = await register('leaver@example.com');
+      const home = await api()
+        .post('/api/v1/homes')
+        .set(auth(leaver))
+        .send({ city: 'İzmir', district: 'Konak', addressLine: 'Kordon 5', roomLayout: '1+1' })
+        .expect(201);
+      const session = await api()
+        .post(`/api/v1/homes/${home.body.id}/condition-sessions`)
+        .set(auth(leaver))
+        .send({ type: 'PERIODIC' })
+        .expect(201);
+      await api()
+        .post(`/api/v1/condition-sessions/${session.body.id}/photos`)
+        .set(auth(leaver))
+        .field('room', 'KITCHEN')
+        .field('capturedAt', new Date().toISOString())
+        .attach('file', jpeg(), { filename: 'p.jpg', contentType: 'image/jpeg' })
+        .expect(201);
+      const receipt = await scan(leaver, 'OTHER').expect(201);
+      await scan(leaver, 'OTHER').expect(201);
+      expect(storedFiles()).toBe(before + 3);
+      await api().delete(`/api/v1/receipts/${receipt.body.id}`).set(auth(leaver)).expect(204);
+      expect(storedFiles()).toBe(before + 2);
+
+      await remove(leaver);
+      expect(storedFiles()).toBe(before);
+      expect(await prisma().home.count({ where: { id: home.body.id } })).toBe(0);
+      await api()
+        .post('/api/v1/auth/login')
+        .send({ email: 'leaver@example.com', password: 'Sup3rSecret' })
+        .expect(401);
+
+      // The access token outlives the account; an upload with it must not leave a photo.
+      await scan(leaver, 'OTHER').expect(409);
+      expect(storedFiles()).toBe(before);
+    });
+
+    it('lets an owner go while their tenant keeps the home', async () => {
+      const before = storedFiles();
+      const ownReceipts = await prisma().receipt.count({ where: { user: { email: 'owner@example.com' } } });
+      expect(ownReceipts).toBeGreaterThan(0);
+      await prisma().conditionPhoto.updateMany({ data: { latitude: 39.9, longitude: 32.8 } });
+
+      await remove(owner);
+      expect(storedFiles()).toBe(before - ownReceipts);
+      expect((await homesOf(tenant)).map((h) => h.home.id)).toEqual([homeId]);
+
+      const records = await api().get(`/api/v1/homes/${homeId}/condition-sessions`).set(auth(tenant)).expect(200);
+      const detail = await api()
+        .get(`/api/v1/condition-sessions/${records.body[0].id}`)
+        .set(auth(tenant))
+        .expect(200);
+      expect(detail.body).toEqual(expect.objectContaining({ status: 'CONFIRMED', createdById: null }));
+      expect(detail.body.photos).toHaveLength(3);
+      expect(detail.body.photos[0]).toEqual(
+        expect.objectContaining({ uploadedById: null, latitude: null, longitude: null }),
+      );
+      // Sharing with brokers was the owner's choice, so it ends.
+      expect(await prisma().listing.count({ where: { homeId } })).toBe(0);
+      expect(await prisma().rating.count({ where: { homeId } })).toBe(1);
+    });
+
+    it('deletes the home when the last person in it leaves', async () => {
+      await remove(tenant);
+      expect(await prisma().home.count({ where: { id: homeId } })).toBe(0);
+      expect(await prisma().conditionPhoto.count()).toBe(0);
+      expect(await prisma().rating.count()).toBe(0);
+      expect(storedFiles()).toBe(0);
+    });
+
+    it('lets a tenant go: their rating leaves the home and what was sent to brokers', async () => {
+      landlord = await register('landlord@example.com');
+      const renter = await register('renter@example.com');
+      const { body: home } = await api()
+        .post('/api/v1/homes')
+        .set(auth(landlord))
+        .send({ city: 'Ankara', district: 'Çankaya', addressLine: 'Tunalı 9', roomLayout: '3+1' })
+        .expect(201);
+      const invite = () =>
+        api()
+          .post(`/api/v1/homes/${home.id}/tenancies/invite`)
+          .set(auth(landlord))
+          .send({ startDate: daysAgo(90).slice(0, 10) });
+      const { body: tenancy } = await invite().expect(201);
+      await api()
+        .post('/api/v1/tenancies/accept')
+        .set(auth(renter))
+        .send({ code: tenancy.inviteCode })
+        .expect(200);
+      let month = 0;
+      ocr.respond = () => {
+        month += 1;
+        return { status: 200, body: { merchantName: 'Bank', issuedAt: daysAgo(month * 28), total: 777, items: [] } };
+      };
+      for (const kind of ['RENT', 'RENT', 'UTILITY_GAS']) {
+        const { body } = await scan(renter, kind, { homeId: home.id }).expect(201);
+        await api().post(`/api/v1/receipts/${body.id}/confirm`).set(auth(renter)).expect(200);
+      }
+      await api()
+        .post(`/api/v1/homes/${home.id}/ratings`)
+        .set(auth(renter))
+        .send({ scores: [{ category: 'NEIGHBORHOOD', score: 5 }], noteForNextTenant: 'Call me, Renter' })
+        .expect(201);
+      const { body: listing } = await api()
+        .post(`/api/v1/homes/${home.id}/listings`)
+        .set(auth(landlord))
+        .send({ reference: '9876543210' })
+        .expect(201);
+      const { body: broker } = await api()
+        .post(`/api/v1/listings/${listing.id}/brokers`)
+        .set(auth(landlord))
+        .send({ agencyName: 'Emlak', email: 'e@example.com' })
+        .expect(201);
+      await api()
+        .patch(`/api/v1/listings/${listing.id}`)
+        .set(auth(landlord))
+        .send({ shareHeatingBills: true })
+        .expect(200);
+      const sent = await api().post(`/api/v1/listings/${listing.id}/send-update`).set(auth(landlord)).expect(200);
+      expect(JSON.stringify(sent.body)).toContain('777');
+
+      await remove(renter);
+      const stored = await prisma().listingUpdate.findMany();
+      expect(JSON.stringify(stored)).not.toContain('Call me, Renter');
+      expect(JSON.stringify(stored)).not.toContain('777');
+      const view = await api().get(`/api/v1/shared/listings/${broker.shareToken}`).expect(200);
+      expect(view.body).toEqual(expect.objectContaining({ ratings: [], score: expect.objectContaining({ score: null }) }));
+      const history = await api().get(`/api/v1/homes/${home.id}/tenancies`).set(auth(landlord)).expect(200);
+      expect(history.body[0]).toEqual(expect.objectContaining({ status: 'ENDED', tenant: null }));
+      // The home is free for the next tenant.
+      await invite().expect(201);
+    });
+
+    it('never leaves an ownerless home behind when owner and tenant leave together', async () => {
+      const [a, b] = await Promise.all([register('pair.a@example.com'), register('pair.b@example.com')]);
+      const { body: home } = await api()
+        .post('/api/v1/homes')
+        .set(auth(a))
+        .send({ city: 'Bursa', district: 'Nilüfer', addressLine: 'FSM 1', roomLayout: '2+1' })
+        .expect(201);
+      const { body: tenancy } = await api()
+        .post(`/api/v1/homes/${home.id}/tenancies/invite`)
+        .set(auth(a))
+        .send({ startDate: daysAgo(5).slice(0, 10) })
+        .expect(201);
+      await api().post('/api/v1/tenancies/accept').set(auth(b)).send({ code: tenancy.inviteCode }).expect(200);
+      await Promise.all([remove(a), remove(b)]);
+      expect(await prisma().home.count({ where: { id: home.id } })).toBe(0);
+    });
+
+    it('deletes an ownerless home when its tenancy ends', async () => {
+      const home = await prisma().home.create({
+        data: { city: 'Ankara', district: 'X', addressLine: 'Y', roomLayout: '1+1' },
+      });
+      const { body: me } = await api().get('/api/v1/me').set(auth(landlord)).expect(200);
+      await prisma().tenancy.create({
+        data: { homeId: home.id, tenantId: me.id, status: 'ACTIVE', startDate: new Date() },
+      });
+      await api().post(`/api/v1/homes/${home.id}/tenancies/end`).set(auth(landlord)).send({}).expect(200);
+      expect(await prisma().home.count({ where: { id: home.id } })).toBe(0);
     });
   });
 });

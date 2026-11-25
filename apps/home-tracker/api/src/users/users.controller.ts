@@ -1,13 +1,17 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { type AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { AccountDeletionService } from './account-deletion.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('me')
 export class UsersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accounts: AccountDeletionService,
+  ) {}
 
   /** The signed-in user with the homes they own or rent. */
   @Get()
@@ -33,5 +37,11 @@ export class UsersController {
         ...rented.map((t) => ({ role: 'TENANT' as const, home: t.home, tenancyId: t.id })),
       ],
     };
+  }
+  /** Deletes the account; see AccountDeletionService for what stays with others. */
+  @Delete()
+  @HttpCode(204)
+  remove(@CurrentUser() user: AuthUser) {
+    return this.accounts.remove(user.id);
   }
 }

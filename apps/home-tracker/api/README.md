@@ -22,7 +22,7 @@ To run it in Docker instead: `docker compose up -d --build api` from the repo ro
 | Module | Responsibility |
 | --- | --- |
 | `auth` | Register / login, argon2id hashes, 15-min JWT access tokens, rotating refresh tokens (only a hash is stored). |
-| `users` | `GET /me`: the signed-in user. |
+| `users` | `GET /me`: the signed-in user. `DELETE /me`: deletes the account, its files, and the homes nobody else lives in; a home with a tenant stays with the tenant, and condition photos in a home that stays are kept without a link to the person. |
 | `homes` | Homes and the `HomeAccessService` that decides owner vs. tenant rights (unknown ⇒ 404, wrong role ⇒ 403). |
 | `tenancies` | Owner invites with a one-time code; tenancy becomes **verified** after `RENT_RECEIPTS_TO_VERIFY` confirmed rent receipts in different months. |
 | `condition-records` | Photo sessions per room. Each photo: SHA-256, device time, server time. Locking writes a content hash over all photos; then both parties confirm. Not a contract — a verification. |
@@ -36,7 +36,7 @@ To run it in Docker instead: `docker compose up -d --build api` from the repo ro
 
 * Global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`) with class-validator DTOs on every body, query and param (`ParseUUIDPipe`).
 * Environment validated with Zod at boot; the app refuses to start on bad config.
-* Uploads: size limit + **magic-number** type check (`file-type`), stored write-once under random keys; files are only served after an access check.
+* Uploads: size limit + **magic-number** type check (`file-type`), stored write-once under random keys; files are only served after an access check and are deleted with their receipt, home or account.
 * Reader (OCR) responses are untrusted and validated with the same DTO rules. The callback endpoint uses a shared secret compared in constant time.
 * Helmet, CORS allow-list, rate limiting (tighter on auth and uploads), Prisma errors mapped to 404/409.
 

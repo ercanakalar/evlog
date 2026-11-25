@@ -51,7 +51,8 @@ model AuthSession {
 
 model Home {
   id           String   @id @default(uuid(7)) @db.Uuid
-  ownerId      String   @db.Uuid
+  /// Empty once the owner deleted their account while a tenant lives here.
+  ownerId      String?  @db.Uuid
   city         String
   district     String
   neighborhood String?
@@ -61,7 +62,7 @@ model Home {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
-  owner             User               @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner             User?              @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   tenancies         Tenancy[]
   conditionSessions ConditionSession[]
   receipts          Receipt[]
@@ -132,7 +133,8 @@ model ConditionSession {
   id                String                 @id @default(uuid(7)) @db.Uuid
   homeId            String                 @db.Uuid
   tenancyId         String?                @db.Uuid
-  createdById       String                 @db.Uuid
+  /// Empty once that person deleted their account; the other party keeps the record.
+  createdById       String?                @db.Uuid
   type              ConditionSessionType
   status            ConditionSessionStatus @default(OPEN)
   startedAt         DateTime               @default(now()) @db.Timestamptz(3)
@@ -144,7 +146,7 @@ model ConditionSession {
 
   home      Home             @relation(fields: [homeId], references: [id], onDelete: Cascade)
   tenancy   Tenancy?         @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
-  createdBy User             @relation("ConditionSessionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy User?            @relation("ConditionSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   photos    ConditionPhoto[]
 
   @@index([homeId, startedAt(sort: Desc)])
@@ -153,7 +155,7 @@ model ConditionSession {
 model ConditionPhoto {
   id           String   @id @default(uuid(7)) @db.Uuid
   sessionId    String   @db.Uuid
-  uploadedById String   @db.Uuid
+  uploadedById String?  @db.Uuid
   room         Room
   storageKey   String   @unique
   mimeType     String
@@ -168,7 +170,7 @@ model ConditionPhoto {
   note         String?
 
   session    ConditionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  uploadedBy User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  uploadedBy User?            @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, sha256])
   @@index([sessionId, room])
@@ -266,7 +268,7 @@ model Rating {
 
   home    Home          @relation(fields: [homeId], references: [id], onDelete: Cascade)
   tenancy Tenancy       @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
-  author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
   scores  RatingScore[]
 
   @@index([homeId])
@@ -471,13 +473,13 @@ model MaintenanceTask {
 model MaintenanceLog {
   id        String   @id @default(uuid(7)) @db.Uuid
   taskId    String   @db.Uuid
-  doneById  String   @db.Uuid
+  doneById  String?  @db.Uuid
   doneAt    DateTime @db.Timestamptz(3)
   note      String?
   receiptId String?  @db.Uuid
 
   task    MaintenanceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  doneBy  User            @relation(fields: [doneById], references: [id], onDelete: Restrict)
+  doneBy  User?           @relation(fields: [doneById], references: [id], onDelete: SetNull)
   receipt Receipt?        @relation(fields: [receiptId], references: [id], onDelete: SetNull)
 
   @@index([taskId, doneAt(sort: Desc)])
