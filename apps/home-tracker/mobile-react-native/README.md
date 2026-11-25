@@ -17,6 +17,28 @@ Checks: `npm run typecheck`, `npm run lint`.
 `EXPO_PUBLIC_LEGAL_OPERATOR` and `EXPO_PUBLIC_SUPPORT_EMAIL` fill in the legal texts
 (`src/i18n/locales/legal.en.ts`, `legal.tr.ts`).
 
+## Store builds with EAS
+
+[`eas.json`](eas.json) has two profiles: `preview` (an APK to install directly) and
+`production` (a signed AAB / IPA; EAS raises the build number). `.env` is not uploaded, so
+the settings are stored on Expo. `app.config.ts` stops a production build that has no HTTPS
+API address, operator or support email. Once:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init        # links the app to your Expo account; if it cannot write the
+                               # project id itself, add it to app.json as extra.eas.projectId
+for env in preview production; do
+  npx eas-cli@latest env:set --environment $env --visibility plaintext --name EXPO_PUBLIC_API_URL --value https://<api>
+  npx eas-cli@latest env:set --environment $env --visibility plaintext --name EXPO_PUBLIC_LEGAL_OPERATOR --value "<name, address>"
+  npx eas-cli@latest env:set --environment $env --visibility plaintext --name EXPO_PUBLIC_SUPPORT_EMAIL --value <email>
+done
+```
+
+Then, for each release, `npx eas-cli@latest build --platform android --profile production` and
+`npx eas-cli@latest submit --platform android --profile production` (Play's internal test track;
+the first AAB of a new app is uploaded by hand in the Play Console).
+
 ## Structure
 
 ```
