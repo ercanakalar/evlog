@@ -6,6 +6,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/setup-app';
+import { GoogleVerifier } from '../src/auth/google-verifier';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { FakeOcr } from './fake-ocr';
 import cityGross from './fixtures/city-gross.json';
@@ -460,6 +461,25 @@ describe('Raf API (e2e)', () => {
   describe('sign-in security', () => {
     const login = (email: string, password: string) =>
       api().post('/api/v1/auth/login').send({ email, password });
+    const refresh = (refreshToken: string) => api().post('/api/v1/auth/refresh').send({ refreshToken });
+    const google = (email: string, sub: string) => {
+      jest.spyOn(app.get(GoogleVerifier), 'verify').mockResolvedValue({ sub, email, name: 'Real Person' });
+      return api().post('/api/v1/auth/google').send({ idToken: 'x' });
+    };
+    afterAll(() => jest.restoreAllMocks());
+
+    it('does not let someone who signed up with your address stay in your account', async () => {
+      const { body: attacker } = await api()
+        .post('/api/v1/auth/register')
+        .send({ email: 'victim@example.com', password: 'Attack3rPass' })
+        .expect(201);
+      await google('victim@example.com', 'google-victim').expect(200);
+      await login('victim@example.com', 'Attack3rPass').expect(401);
+      await refresh(attacker.refreshToken).expect(401);
+      // Signing in with Google again keeps working, and other devices with it.
+      const { body: again } = await google('victim@example.com', 'google-victim').expect(200);
+      await refresh(again.refreshToken).expect(200);
+    });
 
     it('limits sign-in attempts per email, not per address', async () => {
       for (let i = 0; i < 10; i++) await login('target@example.com', 'Wrong1234').expect(401);

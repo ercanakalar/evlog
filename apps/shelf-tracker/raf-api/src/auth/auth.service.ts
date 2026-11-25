@@ -61,17 +61,40 @@ export class AuthService {
 
   /**
    * Signs in with a Google ID token. Creates the account on first use, or
-   * links Google to an existing email account (Google has verified the email).
+   * links Google to the account that has this email.
+   *
+   * Nobody proves an address is theirs when they sign up with a password. So
+   * that someone who signed up with another person's address cannot stay in
+   * the account, linking takes away a password set before the address was
+   * verified and signs out its devices.
    */
   async google(idToken: string, userAgent?: string): Promise<TokenPairDto> {
     const profile = await this.googleVerifier.verify(idToken);
-    const user =
-      (await this.prisma.user.findUnique({ where: { googleSub: profile.sub } })) ??
-      (await this.prisma.user.upsert({
-        where: { email: profile.email },
-        update: { googleSub: profile.sub },
-        create: { email: profile.email, googleSub: profile.sub, fullName: profile.name },
-      }));
+    const linked = await this.prisma.user.findUnique({ where: { googleSub: profile.sub } });
+    if (linked) return this.issueTokens(linked.id, linked.email, userAgent);
+
+    const now = new Date();
+    const user = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.user.findUnique({ where: { email: profile.email } });
+      if (!existing) {
+        return tx.user.create({
+          data: {
+            email: profile.email,
+            googleSub: profile.sub,
+            fullName: profile.name,
+            emailVerifiedAt: now,
+          },
+        });
+      }
+      if (existing.emailVerifiedAt) {
+        return tx.user.update({ where: { id: existing.id }, data: { googleSub: profile.sub } });
+      }
+      await tx.authSession.deleteMany({ where: { userId: existing.id } });
+      return tx.user.update({
+        where: { id: existing.id },
+        data: { googleSub: profile.sub, emailVerifiedAt: now, passwordHash: null },
+      });
+    });
     return this.issueTokens(user.id, user.email, userAgent);
   }
 
