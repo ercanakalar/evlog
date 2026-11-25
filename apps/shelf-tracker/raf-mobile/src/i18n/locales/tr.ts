@@ -13,6 +13,7 @@ const tr: Translation = {
     ok: 'Tamam',
     all: 'Tümü',
     somethingWrong: 'Bir şeyler ters gitti. Tekrar dene.',
+    crashed: 'Uygulamada bir şeyler ters gitti. Kayıtlı fişlerin güvende.',
     offline: 'Sunucuya ulaşılamadı. Bağlantını kontrol et.',
   },
   validation: {

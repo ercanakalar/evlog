@@ -11,6 +11,7 @@ const en = {
     ok: 'OK',
     all: 'All',
     somethingWrong: 'Something went wrong. Try again.',
+    crashed: 'Something went wrong in the app. Your saved receipts are safe.',
     offline: 'Could not reach the server. Check your connection.',
   },
   validation: {
