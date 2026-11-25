@@ -79,7 +79,7 @@ sign-in is not set up yet.
 
 | Tab / screen | What it does |
 | --- | --- |
-| Sign in | Continue with Google, or sign up / log in with email. |
+| Sign in | Continue with Google, or sign up / log in with email; reset a forgotten password with an emailed code. |
 | Home | This month's spend vs. last month, the three products to use soonest, the last trip. |
 | Shelf · Countdown | Every product with its days left, filtered by category. |
 | Shelf · At home | Products you keep at home with counts; saved receipts raise matching counts. |

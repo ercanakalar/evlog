@@ -13,6 +13,9 @@ export interface SignInRequest { email: string; password: string }
 /** `fullName` defaults to the part of the email before the "@". */
 export interface SignUpRequest { email: string; password: string; fullName?: string }
 
+export interface ForgotPasswordRequest { email: string; lang: 'en' | 'tr' }
+export interface ResetPasswordRequest { email: string; code: string; password: string }
+
 /** Parts of one receipt, top to bottom (one part for a normal receipt). */
 export interface UploadReceiptRequest { files: UploadFile[] }
 

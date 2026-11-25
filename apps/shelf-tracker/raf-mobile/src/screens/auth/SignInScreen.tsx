@@ -4,15 +4,16 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleButton } from '@/components/auth/GoogleButton';
 import { ReceiptHero } from '@/components/brand/ReceiptHero';
-import { Button, FormField, Segmented, Text } from '@/components/ui';
+import { Button, FormField, Segmented, Text, TextLink } from '@/components/ui';
 import { space } from '@/constants/layout';
 import { useAuthForm, type AuthMode } from '@/hooks/auth/useAuthForms';
 import { useTheme } from '@/theme';
+import type { RootScreenProps } from '@/types/screens/navigation';
 
 // Closes the Google pop-up on web once it redirects back.
 WebBrowser.maybeCompleteAuthSession();
 
-export function SignInScreen() {
+export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const auth = useAuthForm();
@@ -89,6 +90,12 @@ export function SignInScreen() {
               onPress={() => void auth.submit()}
               loading={auth.isLoading}
             />
+
+            {auth.mode === 'login' ? (
+              <View style={{ alignItems: 'center' }}>
+                <TextLink label={t('auth.forgot')} onPress={() => navigation.navigate('ForgotPassword', { email: auth.email() })} />
+              </View>
+            ) : null}
           </SafeAreaView>
         </ScrollView>
       </KeyboardAvoidingView>

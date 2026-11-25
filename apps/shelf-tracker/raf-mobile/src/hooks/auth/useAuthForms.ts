@@ -59,5 +59,6 @@ export function useAuthForm() {
     signInWithGoogle,
     setServerError,
     serverError,
+    email: () => form.getValues('email').trim(),
   };
 }

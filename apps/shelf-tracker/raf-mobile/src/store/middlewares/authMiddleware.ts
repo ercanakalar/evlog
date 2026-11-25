@@ -1,3 +1,4 @@
+import { isAnyOf } from '@reduxjs/toolkit';
 import { secureStorage } from '@/services/storage/secureStorage';
 import { authenticationService } from '../services/authenticationService';
 import { credentialsReceived, signedOut } from '../slices/authSlice';
@@ -6,20 +7,22 @@ import { startAppListening } from './listener';
 
 /**
  * Auth side effects:
- *  - login/register/Google responses become credentials in the store
+ *  - login/register/Google/password reset responses become credentials in the store
  *  - credentials are mirrored to SecureStore (Keychain / Keystore)
  *  - signing out wipes stored tokens and every cached API response
  */
 export function registerAuthListeners() {
-  const { login, register, google } = authenticationService.endpoints;
-  const signedIn = (action: unknown) =>
-    login.matchFulfilled(action) || register.matchFulfilled(action) || google.matchFulfilled(action);
+  const { login, register, google, resetPassword } = authenticationService.endpoints;
+  const signedIn = isAnyOf(
+    login.matchFulfilled,
+    register.matchFulfilled,
+    google.matchFulfilled,
+    resetPassword.matchFulfilled,
+  );
   startAppListening({
-    predicate: signedIn,
+    predicate: (action) => signedIn(action),
     effect: (action, { dispatch }) => {
-      if (!login.matchFulfilled(action) && !register.matchFulfilled(action) && !google.matchFulfilled(action)) {
-        return;
-      }
+      if (!signedIn(action)) return;
       const { accessToken, refreshToken } = action.payload;
       dispatch(credentialsReceived({ accessToken, refreshToken }));
     },

@@ -9,15 +9,22 @@ export const signInSchema = z.object({
   password: z.string().min(1, 'validation.required'),
 });
 
-export const signUpSchema = z.object({
-  email: z.email('validation.email'),
-  password: z
-    .string()
-    .min(8, 'validation.passwordLength')
-    .regex(/[a-z]/, 'validation.passwordLower')
-    .regex(/[A-Z]/, 'validation.passwordUpper')
-    .regex(/\d/, 'validation.passwordDigit')
-    .max(128),
+const newPassword = z
+  .string()
+  .min(8, 'validation.passwordLength')
+  .regex(/[a-z]/, 'validation.passwordLower')
+  .regex(/[A-Z]/, 'validation.passwordUpper')
+  .regex(/\d/, 'validation.passwordDigit')
+  .max(128);
+
+export const signUpSchema = z.object({ email: z.email('validation.email'), password: newPassword });
+
+export const forgotPasswordSchema = z.object({ email: z.email('validation.email') });
+
+export const resetPasswordSchema = z.object({
+  /** 8 digits, as printed in the email ("1234 5678"). */
+  code: z.string().regex(/^\s*(\d\s*){8}$/, 'validation.code'),
+  password: newPassword,
 });
 
 /** Receipt header on the review screen. */
@@ -38,3 +45,5 @@ export const packDateSchema = z
 
 export type SignInValues = z.infer<typeof signInSchema>;
 export type ReceiptHeaderValues = z.infer<typeof receiptHeaderSchema>;
+export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;

@@ -13,6 +13,7 @@ export type TabParamList = {
 export type RootStackParamList = {
   // Signed out
   SignIn: undefined;
+  ForgotPassword: { email?: string } | undefined;
   // Signed in
   Tabs: NavigatorScreenParams<TabParamList> | undefined;
   Scan: undefined;

@@ -15,6 +15,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: {
       SignIn: 'sign-in',
+      ForgotPassword: 'forgot-password',
       Tabs: {
         screens: {
           Home: '',

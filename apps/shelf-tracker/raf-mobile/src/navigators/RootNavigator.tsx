@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { useExpiryReminders } from '@/hooks/app/useExpiryReminders';
+import { ForgotPasswordScreen } from '@/screens/auth/ForgotPasswordScreen';
 import { SignInScreen } from '@/screens/auth/SignInScreen';
 import { PackScanScreen } from '@/screens/packs/PackScanScreen';
 import { HomeItemScreen } from '@/screens/shelf/HomeItemScreen';
@@ -34,7 +35,10 @@ export function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!signedIn ? (
-        <Stack.Screen name="SignIn" component={SignInScreen} options={{ animationTypeForReplace: 'pop' }} />
+        <Stack.Group>
+          <Stack.Screen name="SignIn" component={SignInScreen} options={{ animationTypeForReplace: 'pop' }} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        </Stack.Group>
       ) : (
         <Stack.Group>
           <Stack.Screen name="Tabs" component={TabNavigator} />
