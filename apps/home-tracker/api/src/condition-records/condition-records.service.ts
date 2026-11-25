@@ -87,22 +87,27 @@ export class ConditionRecordsService {
     if (duplicate) throw new ConflictException('This photo was already added');
 
     const storageKey = await this.storage.save('condition', file.buffer, file.mimetype);
-    return this.prisma.conditionPhoto.create({
-      data: {
-        sessionId,
-        uploadedById: userId,
-        room: dto.room,
-        storageKey,
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
-        sha256: hash,
-        capturedAt,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        note: dto.note,
-      },
-      omit: { storageKey: true },
-    });
+    return this.prisma.conditionPhoto
+      .create({
+        data: {
+          sessionId,
+          uploadedById: userId,
+          room: dto.room,
+          storageKey,
+          mimeType: file.mimetype,
+          sizeBytes: file.size,
+          sha256: hash,
+          capturedAt,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          note: dto.note,
+        },
+        omit: { storageKey: true },
+      })
+      .catch(async (error: unknown) => {
+        await this.storage.remove([storageKey]);
+        throw error;
+      });
   }
 
   /**

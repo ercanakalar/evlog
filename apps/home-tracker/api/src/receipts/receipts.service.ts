@@ -67,16 +67,22 @@ export class ReceiptsService {
       });
     }
     const imageKey = await this.storage.save('receipts', file.buffer, file.mimetype);
-    const receipt = await this.prisma.receipt.create({
-      data: {
-        userId,
-        homeId: dto.homeId,
-        kind: dto.kind,
-        imageKey,
-        mimeType: file.mimetype,
-        sha256: hash,
-      },
-    });
+    const receipt = await this.prisma.receipt
+      .create({
+        data: {
+          userId,
+          homeId: dto.homeId,
+          kind: dto.kind,
+          imageKey,
+          mimeType: file.mimetype,
+          sha256: hash,
+        },
+      })
+      .catch(async (error: unknown) => {
+        // e.g. the account was deleted meanwhile: leave no photo behind.
+        await this.storage.remove([imageKey]);
+        throw error;
+      });
     return this.scan(receipt.id, file.buffer);
   }
 
@@ -198,6 +204,7 @@ export class ReceiptsService {
       throw new ConflictException('This receipt backs a submitted rating');
     }
     await this.prisma.receipt.delete({ where: { id: receipt.id } });
+    await this.storage.remove([receipt.imageKey]);
   }
 
   async image(receiptId: string, userId: string) {
