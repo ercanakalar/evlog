@@ -8,7 +8,7 @@
 #   docker compose down
 #
 # The APIs use the host's network, so they read DATABASE_URL and
-# OCR_SERVICE_URL from apps/*/.env exactly like running them with npm does
+# OCR_SERVICE_URL from apps/*/*/.env exactly like running them with npm does
 # (localhost works) and phones reach them on this computer's LAN IP.
 services:
   # Postgres in Docker, for when you don't run your own. Only started when
@@ -48,24 +48,24 @@ services:
       timeout: 3s
       retries: 10
 
-  # Evlog API on port 3000 (PORT in apps/api/.env).
+  # Evlog API on port 3000 (PORT in apps/home-tracker/api/.env).
   api:
-    build: ./apps/api
+    build: ./apps/home-tracker/api
     network_mode: host
     depends_on: [receipt-reader]
-    env_file: ./apps/api/.env
+    env_file: ./apps/home-tracker/api/.env
     environment:
       UPLOAD_DIR: /app/uploads
     command: sh -c "npx prisma migrate deploy && node dist/main"
     volumes:
       - uploads:/app/uploads
 
-  # Raf API on port 3100 (PORT in apps/raf-api/.env).
+  # Raf API on port 3100 (PORT in apps/shelf-tracker/raf-api/.env).
   raf-api:
-    build: ./apps/raf-api
+    build: ./apps/shelf-tracker/raf-api
     restart: unless-stopped
     network_mode: host
-    env_file: ./apps/raf-api/.env
+    env_file: ./apps/shelf-tracker/raf-api/.env
     environment:
       UPLOAD_DIR: /app/uploads
     command: sh -c "npx prisma migrate deploy && node dist/main"
