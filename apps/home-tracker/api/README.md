@@ -36,7 +36,7 @@ To run it in Docker instead: `docker compose up -d --build api` from the repo ro
 ## Validation & safety
 
 * Global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`) with class-validator DTOs on every body, query and param (`ParseUUIDPipe`).
-* Environment validated with Zod at boot; the app refuses to start on bad config.
+* Environment validated with Zod at boot; the app refuses to start on bad config, and in production on the example secrets.
 * Uploads: size limit + **magic-number** type check (`file-type`), stored write-once under random keys; files are only served after an access check and are deleted with their receipt, home or account.
 * Reader (OCR) responses are untrusted and validated with the same DTO rules. The callback endpoint uses a shared secret compared in constant time.
 * Helmet, CORS allow-list, rate limiting (tighter on auth and uploads), Prisma errors mapped to 404/409.

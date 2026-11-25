@@ -6,6 +6,9 @@ const optionalString = z
   .optional()
   .transform((v) => (v ? v : undefined));
 
+/** The example values are public, so a production API must not start with them. */
+const SECRETS = ['JWT_ACCESS_SECRET', 'OCR_SERVICE_TOKEN', 'OCR_CALLBACK_SECRET'] as const;
+
 /** Every environment variable the API reads. The app refuses to start if one is invalid. */
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -28,6 +31,13 @@ export const envSchema = z.object({
   RENT_RECEIPTS_TO_VERIFY: z.coerce.number().int().min(1).max(12).default(2),
   SAHIBINDEN_API_URL: optionalString.pipe(httpUrl.optional()),
   SAHIBINDEN_API_KEY: optionalString,
+}).superRefine((env, ctx) => {
+  if (env.NODE_ENV !== 'production') return;
+  for (const name of SECRETS) {
+    if (env[name].startsWith('change-me')) {
+      ctx.addIssue({ code: 'custom', path: [name], message: 'Set a secret of your own in production' });
+    }
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
