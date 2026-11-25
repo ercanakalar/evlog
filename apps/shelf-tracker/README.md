@@ -26,6 +26,11 @@ instead when `OCR_SERVICE_URL` is set.
 * Market lists with last prices, and "at home" counts that go up when a receipt
   has a matching product.
 
+## Publish
+
+[`store`](store) has the checklist, listing texts, Play Console answers and graphics;
+[`deploy/raf`](../../deploy/raf) runs the API on a server.
+
 ## Run only Raf
 
 With the [databases and settings](../../README.md#run-with-docker) in place, from the repository root:
