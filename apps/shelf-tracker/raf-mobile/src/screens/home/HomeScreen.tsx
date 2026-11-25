@@ -78,8 +78,8 @@ export function HomeScreen() {
         </Text>
         <Rule style={{ marginTop: 8 }} />
         <SpaceBetween style={{ paddingTop: 4 }}>
-          <Text variant="mono">{t('home.trips', { count: insights.trips }).toLocaleUpperCase()}</Text>
-          <Text variant="mono">{t('home.items', { count: insights.items }).toLocaleUpperCase()}</Text>
+          <Text variant="mono">{f.upper(t('home.trips', { count: insights.trips }))}</Text>
+          <Text variant="mono">{f.upper(t('home.items', { count: insights.items }))}</Text>
         </SpaceBetween>
       </ReceiptPaper>
 

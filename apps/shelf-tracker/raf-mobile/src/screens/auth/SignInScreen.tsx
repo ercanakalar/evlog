@@ -7,6 +7,7 @@ import { ReceiptHero } from '@/components/brand/ReceiptHero';
 import { Button, FormField, Segmented, Text, TextLink } from '@/components/ui';
 import { space } from '@/constants/layout';
 import { useAuthForm, type AuthMode } from '@/hooks/auth/useAuthForms';
+import { useFormatters } from '@/hooks/common/useFormatters';
 import { useLegalLinks } from '@/hooks/common/useLegalLinks';
 import { useTheme } from '@/theme';
 import type { RootScreenProps } from '@/types/screens/navigation';
@@ -17,6 +18,7 @@ WebBrowser.maybeCompleteAuthSession();
 export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const f = useFormatters();
   const auth = useAuthForm();
   const legal = useLegalLinks();
 
@@ -27,9 +29,9 @@ export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
           <ReceiptHero
             lines={[
-              [t('auth.hero.chicken'), t('countdown.today').toLocaleUpperCase()],
-              [t('auth.hero.spinach'), t('countdown.days', { count: 2 }).toLocaleUpperCase()],
-              [t('auth.hero.milk'), t('countdown.days', { count: 5 }).toLocaleUpperCase()],
+              [t('auth.hero.chicken'), f.upper(t('countdown.today'))],
+              [t('auth.hero.spinach'), f.upper(t('countdown.days', { count: 2 }))],
+              [t('auth.hero.milk'), f.upper(t('countdown.days', { count: 5 }))],
             ]}
           />
           <SafeAreaView edges={['bottom']} style={{ flex: 1, padding: 24, paddingTop: 22, gap: 13 }}>

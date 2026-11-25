@@ -9,6 +9,7 @@ import {
   formatMonth,
   formatShortDate,
   formatTime,
+  upper,
 } from '@/utils/format';
 
 /** Locale-aware formatters bound to the current language. */
@@ -23,6 +24,8 @@ export function useFormatters() {
       longDate: (iso: string | null | undefined) => formatLongDate(iso, lang),
       time: (iso: string | null | undefined) => formatTime(iso, lang),
       month: (month: string, style?: 'long' | 'short') => formatMonth(month, lang, style),
+      /** Upper case, as printed on receipts. */
+      upper: (text: string) => upper(text, lang),
       category: (category: Category) => t(`categories.${category}`),
       /** At-home amount: "3" for pieces, "1.25 kg" by weight. */
       homeAmount: (count: number, unit: HomeUnit) =>

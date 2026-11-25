@@ -40,7 +40,7 @@ export function ProductScreen({ route }: RootScreenProps<'Product'>) {
   const { item } = p;
   const opened = item.openedAt !== null;
   const tone = countdownColors(item.daysLeft, colors);
-  const expires = item.expiresAt ? f.day(item.expiresAt).toLocaleUpperCase() : null;
+  const expires = item.expiresAt ? f.upper(f.day(item.expiresAt)) : null;
   // "Dairy & eggs · Sütaş · 1000 ml"
   const about = [f.category(item.category), item.brand?.name, f.pack(item.packAmount, item.packUnit)].filter(Boolean).join(' · ');
 

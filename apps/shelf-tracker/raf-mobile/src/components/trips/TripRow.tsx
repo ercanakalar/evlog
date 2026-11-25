@@ -29,7 +29,7 @@ export function TripRow({ trip, last, onPress }: { trip: Receipt; last: boolean;
             {date ? date.getDate() : '–'}
           </Text>
           <Text variant="monoSmall" muted style={{ fontSize: 11 }}>
-            {date ? date.toLocaleDateString(toLocale(i18n.language), { weekday: 'short' }).toLocaleUpperCase() : ''}
+            {date ? f.upper(date.toLocaleDateString(toLocale(i18n.language), { weekday: 'short' })) : ''}
           </Text>
         </View>
         <View style={{ flex: 1, gap: 2 }}>

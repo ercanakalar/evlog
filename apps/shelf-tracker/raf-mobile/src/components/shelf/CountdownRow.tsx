@@ -18,7 +18,7 @@ export function CountdownRow({ item, meta, onPress }: { item: ShelfItem; meta?: 
           {item.name}
         </Text>
         <Text variant="monoBold" color={tone.text}>
-          {left.toLocaleUpperCase()}
+          {f.upper(left)}
         </Text>
       </SpaceBetween>
       {meta ? (

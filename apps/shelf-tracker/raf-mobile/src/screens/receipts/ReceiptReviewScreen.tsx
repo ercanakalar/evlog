@@ -111,7 +111,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
                   {receipt.merchantName ?? t('trips.unknownMarket')}
                 </Text>
                 <Text variant="mono" color={colors.onInkMuted}>
-                  {`${f.longDate(receipt.issuedAt)} · ${f.time(receipt.issuedAt)}`.toLocaleUpperCase()}
+                  {f.upper(`${f.longDate(receipt.issuedAt)} · ${f.time(receipt.issuedAt)}`)}
                 </Text>
               </View>
               {editable ? (

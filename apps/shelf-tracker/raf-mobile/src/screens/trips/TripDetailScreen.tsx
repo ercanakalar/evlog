@@ -41,10 +41,10 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
       gap={10}>
       <ReceiptPaper style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 14, gap: 0 }}>
         <Text variant="title" accessibilityRole="header" style={{ textAlign: 'center', letterSpacing: 1 }}>
-          {(receipt.merchantName ?? t('trips.unknownMarket')).toLocaleUpperCase()}
+          {f.upper(receipt.merchantName ?? t('trips.unknownMarket'))}
         </Text>
         <SpaceBetween style={{ marginTop: 8, paddingBottom: 10 }}>
-          <Text variant="mono">{f.longDate(receipt.issuedAt).toLocaleUpperCase()}</Text>
+          <Text variant="mono">{f.upper(f.longDate(receipt.issuedAt))}</Text>
           <Text variant="mono">{f.time(receipt.issuedAt)}</Text>
         </SpaceBetween>
         <Rule strong />
@@ -52,7 +52,7 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
         {trip.groups.map((group) => (
           <View key={group.category} style={{ paddingTop: 10 }}>
             <Text variant="monoSmall" muted style={{ fontFamily: fonts.monoBold, marginBottom: 2 }} accessibilityRole="header">
-              {f.category(group.category).toLocaleUpperCase()}
+              {f.upper(f.category(group.category))}
             </Text>
             {group.items.map((item) => {
               const days = daysUntil(item.expiresAt);
@@ -76,7 +76,7 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
                       {name}
                     </Text>
                     <Text variant="monoSmall" color={tone}>
-                      {left.toLocaleUpperCase()}
+                      {f.upper(left)}
                     </Text>
                     {atHome ? (
                       <View style={{ marginTop: 3 }}>
@@ -96,7 +96,7 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
         <Rule strong style={{ marginTop: 10 }} />
         <SpaceBetween style={{ paddingTop: 10, alignItems: 'baseline' }}>
           <Text variant="monoBold" style={{ fontSize: 14 }}>
-            {t('trip.total', { count }).toLocaleUpperCase()}
+            {f.upper(t('trip.total', { count }))}
           </Text>
           <Text variant="amount" style={{ fontSize: 20, letterSpacing: -0.4 }}>
             {f.money(receipt.totalAmount, receipt.currency)}

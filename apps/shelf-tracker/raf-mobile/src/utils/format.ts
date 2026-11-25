@@ -72,5 +72,12 @@ export const initials = (name: string) =>
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase() ?? '')
+    .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
+
+/**
+ * Upper case in the app's language, not the phone's: Turkish has "i → İ", and
+ * English on a Turkish phone must not.
+ */
+export const upper = (text: string, lang: string) =>
+  (lang === 'tr' ? text.replace(/i/g, 'İ').replace(/ı/g, 'I') : text).toUpperCase();
