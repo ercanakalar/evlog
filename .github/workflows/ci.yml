@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/api
+        working-directory: apps/home-tracker/api
     services:
       postgres:
         image: postgres:18-alpine
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: apps/api/package-lock.json
+          cache-dependency-path: apps/home-tracker/api/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/mobile-react-native
+        working-directory: apps/home-tracker/mobile-react-native
     env:
       EXPO_PUBLIC_API_URL: http://localhost:3000
     steps:
@@ -54,7 +54,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: apps/mobile-react-native/package-lock.json
+          cache-dependency-path: apps/home-tracker/mobile-react-native/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/raf-api
+        working-directory: apps/shelf-tracker/raf-api
     services:
       postgres:
         image: postgres:18-alpine
@@ -83,7 +83,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: apps/raf-api/package-lock.json
+          cache-dependency-path: apps/shelf-tracker/raf-api/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/raf-mobile
+        working-directory: apps/shelf-tracker/raf-mobile
     env:
       EXPO_PUBLIC_API_URL: http://localhost:3100
     steps:
@@ -104,7 +104,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: apps/raf-mobile/package-lock.json
+          cache-dependency-path: apps/shelf-tracker/raf-mobile/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
