@@ -1,7 +1,13 @@
 import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cancelReminders, onReminderTapped, remindersAllowed, scheduleExpiryReminders } from '@/services/reminders';
+import {
+  cancelReminders,
+  onReminderTapped,
+  prepareReminders,
+  remindersAllowed,
+  scheduleExpiryReminders,
+} from '@/services/reminders';
 import { useListShelfQuery } from '@/store/services/itemService';
 import { useGetMeQuery } from '@/store/services/meService';
 
@@ -25,11 +31,18 @@ export function useExpiryReminders(signedIn: boolean) {
     }
     if (!shelf.data) return;
     const items = shelf.data.flatMap((i) => (i.expiresAt ? [{ id: i.id, name: i.name, expiresAt: i.expiresAt }] : []));
-    void remindersAllowed(true)
+    // Asked once there is something to remind about, not right after signing in.
+    if (items.length === 0) {
+      void cancelReminders().catch(() => undefined);
+      return;
+    }
+    void prepareReminders(t('settings.reminders'))
+      .then(() => remindersAllowed(true))
       .then((allowed) =>
         allowed
           ? scheduleExpiryReminders(items, leadDays, {
-              title: (count, days) => t('reminders.title', { count, days }),
+              title: (count, days) =>
+                t('reminders.title', { count, when: t('reminders.when', { count: days }) }),
               body: (names) => names.slice(0, 4).join(', ') + (names.length > 4 ? '…' : ''),
             })
           : undefined,

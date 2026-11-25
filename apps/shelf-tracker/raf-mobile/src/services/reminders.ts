@@ -1,5 +1,11 @@
 import * as Notifications from 'expo-notifications';
+import { AndroidImportance } from 'expo-notifications';
+import { Platform } from 'react-native';
 import { REMINDER_HOUR } from '@/constants/domain';
+
+const CHANNEL = 'expiry';
+/** iOS keeps at most 64 scheduled notifications. */
+const MAX_SCHEDULED = 60;
 
 export interface ReminderItem {
   id: string;
@@ -22,6 +28,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Android 13 and later only ask for permission once the app has a channel. */
+export async function prepareReminders(channelName: string): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(CHANNEL, {
+    name: channelName,
+    importance: AndroidImportance.DEFAULT,
+  });
+}
+
 export async function remindersAllowed(ask: boolean): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   if (current.granted || !ask || !current.canAskAgain) return current.granted;
@@ -42,7 +57,8 @@ export async function scheduleExpiryReminders(items: ReminderItem[], leadDays: n
     if (at.getTime() <= Date.now()) continue;
     byDay.set(at.getTime(), [...(byDay.get(at.getTime()) ?? []), item]);
   }
-  for (const [at, group] of byDay) {
+  const soonest = [...byDay].sort(([a], [b]) => a - b).slice(0, MAX_SCHEDULED);
+  for (const [at, group] of soonest) {
     const first = group[0];
     if (!first) continue;
     await Notifications.scheduleNotificationAsync({
@@ -51,7 +67,7 @@ export async function scheduleExpiryReminders(items: ReminderItem[], leadDays: n
         body: text.body(group.map((i) => i.name)),
         data: { url: group.length === 1 ? `raf://product/${first.id}` : 'raf://shelf' },
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: CHANNEL },
     });
   }
 }

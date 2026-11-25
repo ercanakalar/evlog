@@ -389,8 +389,10 @@ const en = {
     failed: 'Could not read the pack',
   },
   reminders: {
-    title_one: '{{count}} product expires in {{days}} days',
-    title_other: '{{count}} products expire in {{days}} days',
+    title_one: '{{count}} product expires {{when}}',
+    title_other: '{{count}} products expire {{when}}',
+    when_one: 'tomorrow',
+    when_other: 'in {{count}} days',
   },
 };
 

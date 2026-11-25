@@ -391,8 +391,10 @@ const tr: Translation = {
     failed: 'Paket okunamadı',
   },
   reminders: {
-    title_one: '{{count}} ürünün {{days}} gün içinde süresi doluyor',
-    title_other: '{{count}} ürünün {{days}} gün içinde süresi doluyor',
+    title_one: '{{count}} ürünün süresi {{when}} doluyor',
+    title_other: '{{count}} ürünün süresi {{when}} doluyor',
+    when_one: 'yarın',
+    when_other: '{{count}} gün sonra',
   },
 };
 
