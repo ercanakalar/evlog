@@ -14,6 +14,9 @@ Android emulator, your computer's LAN IP on a real device.
 
 Checks: `npm run typecheck`, `npm run lint`.
 
+`EXPO_PUBLIC_LEGAL_OPERATOR` and `EXPO_PUBLIC_SUPPORT_EMAIL` fill in the legal texts
+(`src/i18n/locales/legal.en.ts`, `legal.tr.ts`).
+
 ## Structure
 
 ```

@@ -1,4 +1,5 @@
 import type { Translation } from './en';
+import legal from './legal.tr';
 
 const tr: Translation = {
   common: {
@@ -47,6 +48,7 @@ const tr: Translation = {
     password: 'Şifre',
     noAccount: 'Yeni misiniz? Hesap oluşturun',
     haveAccount: 'Hesabınız var mı? Giriş yapın',
+    agree: 'Hesap oluşturarak kullanım koşullarını kabul edersiniz. Gizlilik metni verilerinizin nasıl kullanıldığını açıklar.',
   },
   onboarding: {
     title: 'Evinizi ekleyin',
@@ -315,11 +317,7 @@ const tr: Translation = {
     privacy: 'Gizlilik',
     terms: 'Kullanım koşulları',
     verification: 'Durum kayıtları hakkında',
-    body: {
-      privacy: 'Fotoğraflar ve fişler Evlog sunucusunda saklanır ve yalnızca evin sahibi ile mevcut kiracısı tarafından görülebilir. Emlakçılar yalnızca ev sahibinin paylaşmayı seçtiklerini görür. Fotoğraflar yüklenmeden önce telefonunuzda yeniden kodlanır; bu, konum bilgisini kaldırır.',
-      terms: 'Evlog, ev sahibi ve kiracıların bir ev hakkında ortak kayıt tutmasına yardımcı olur. Yüklediğiniz içerikten siz sorumlusunuz. Puanlar kendi kiracılığınızı yansıtmalı ve kendi makbuzlarınızla desteklenmelidir.',
-      verification: 'Durum kaydı bir sözleşme değil, bir doğrulamadır. Fotoğraflar sunucuya ulaştığında parmak izi ve zaman damgası alır; kilitlendikten sonra parmak izi değişmeden fotoğraf seti değiştirilemez. Ev sahibi ve kiracı kaydı ayrı ayrı onaylar.',
-    },
+    body: legal,
   },
 };
 

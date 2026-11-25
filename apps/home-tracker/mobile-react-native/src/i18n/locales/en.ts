@@ -1,3 +1,5 @@
+import legal from './legal.en';
+
 const en = {
   common: {
     appName: 'Evlog',
@@ -45,6 +47,7 @@ const en = {
     password: 'Password',
     noAccount: 'New here? Create an account',
     haveAccount: 'Already have an account? Sign in',
+    agree: 'By creating an account you accept the terms of use. The privacy notice explains how your data is used.',
   },
   onboarding: {
     title: 'Set up your home',
@@ -313,11 +316,7 @@ const en = {
     privacy: 'Privacy',
     terms: 'Terms of use',
     verification: 'About condition records',
-    body: {
-      privacy: 'Photos and receipts are stored on the Evlog server and are only visible to the owner and the current tenant of the home. Brokers only see what the owner chooses to share. Photos are re-encoded on your phone before upload, which removes location data.',
-      terms: 'Evlog helps owners and tenants keep a shared record of a home. You are responsible for the content you upload. Ratings must reflect your own tenancy and be backed by your own receipts.',
-      verification: 'A condition record is a verification, not a contract. Photos are fingerprinted and time-stamped by the server when they arrive; once locked, the set of photos cannot change without the fingerprint changing. Owner and tenant each confirm the record.',
-    },
+    body: legal,
   },
 } as const;
 
@@ -326,3 +325,5 @@ export default en;
 type Widen<T> = { [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
 /** Every locale must provide the same keys as English. */
 export type Translation = Widen<typeof en>;
+/** The legal texts of a locale: same documents, same number of sections. */
+export type LegalTexts = Widen<typeof legal>;
