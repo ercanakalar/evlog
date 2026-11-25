@@ -59,7 +59,6 @@ const tr: Translation = {
     tagline: 'Ne harcadığını bil. Aldığını kullan.',
     hero: { chicken: 'TAVUK GÖĞÜS', spinach: 'ISPANAK', milk: 'TAM YAĞLI SÜT' },
     google: 'Google ile devam et',
-    googleUnavailable: 'Google ile giriş bu sürümde henüz ayarlı değil. Şimdilik e-postanı kullan.',
     orEmail: 'ya da e-posta ile',
     signUp: 'Kaydol',
     logIn: 'Giriş yap',

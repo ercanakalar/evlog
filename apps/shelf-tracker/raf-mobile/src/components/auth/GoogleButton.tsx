@@ -1,7 +1,7 @@
 import * as Google from 'expo-auth-session/providers/google';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/components/ui';
 import { env } from '@/config/env';
 import { radius, space } from '@/constants/layout';
@@ -10,21 +10,18 @@ import { GoogleLogo } from './GoogleLogo';
 
 interface Props {
   onIdToken: (idToken: string) => void;
-  onUnavailable: () => void;
   loading?: boolean;
 }
 
-const configured = Boolean(env.google.webClientId || env.google.iosClientId || env.google.androidClientId);
-
 /**
- * "Continue with Google". Without client ids in .env the button stays,
- * but explains that Google sign-in is not set up yet.
+ * Whether to offer Google. Not without client ids; and not on iOS, where
+ * Apple then requires an equivalent such as Sign in with Apple.
  */
-export function GoogleButton(props: Props) {
-  return configured ? <ConfiguredGoogleButton {...props} /> : <GoogleButtonView onPress={props.onUnavailable} />;
-}
+export const googleAvailable =
+  Platform.OS !== 'ios' && Boolean(env.google.webClientId || env.google.androidClientId);
 
-function ConfiguredGoogleButton({ onIdToken, loading }: Props) {
+/** "Continue with Google". Render it only when `googleAvailable`. */
+export function GoogleButton({ onIdToken, loading }: Props) {
   const [request, response, prompt] = Google.useIdTokenAuthRequest({
     webClientId: env.google.webClientId,
     iosClientId: env.google.iosClientId,

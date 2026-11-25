@@ -57,7 +57,6 @@ export function useAuthForm() {
     isLoading: loginState.isLoading || registerState.isLoading,
     googleLoading: googleState.isLoading,
     signInWithGoogle,
-    setServerError,
     serverError,
     email: () => form.getValues('email').trim(),
   };

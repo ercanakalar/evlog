@@ -2,7 +2,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GoogleButton } from '@/components/auth/GoogleButton';
+import { GoogleButton, googleAvailable } from '@/components/auth/GoogleButton';
 import { ReceiptHero } from '@/components/brand/ReceiptHero';
 import { Button, FormField, Segmented, Text, TextLink } from '@/components/ui';
 import { space } from '@/constants/layout';
@@ -35,19 +35,18 @@ export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
               {t('auth.tagline')}
             </Text>
 
-            <GoogleButton
-              loading={auth.googleLoading}
-              onIdToken={(token) => void auth.signInWithGoogle(token)}
-              onUnavailable={() => auth.setServerError(t('auth.googleUnavailable'))}
-            />
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              <Text variant="caption" muted style={{ fontSize: 12 }}>
-                {t('auth.orEmail')}
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-            </View>
+            {googleAvailable ? (
+              <>
+                <GoogleButton loading={auth.googleLoading} onIdToken={(token) => void auth.signInWithGoogle(token)} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  <Text variant="caption" muted style={{ fontSize: 12 }}>
+                    {t('auth.orEmail')}
+                  </Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                </View>
+              </>
+            ) : null}
 
             <Segmented<AuthMode>
               value={auth.mode}

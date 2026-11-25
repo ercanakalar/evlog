@@ -57,7 +57,6 @@ const en = {
     tagline: 'Know what you spend. Use what you buy.',
     hero: { chicken: 'CHICKEN BREAST', spinach: 'SPINACH', milk: 'WHOLE MILK' },
     google: 'Continue with Google',
-    googleUnavailable: 'Google sign-in is not set up in this build yet. Use your email for now.',
     orEmail: 'or use email',
     signUp: 'Sign up',
     logIn: 'Log in',

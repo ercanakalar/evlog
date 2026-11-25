@@ -9,7 +9,7 @@ const optional = (value: string | undefined) => (value ? value : undefined);
 export const env = {
   /** Base URL of the versioned API, e.g. http://localhost:3100/api/v1 */
   apiUrl: `${raw.replace(/\/+$/, '')}/api/v1`,
-  /** Google OAuth client ids; Google sign-in is hidden behind a notice when none is set. */
+  /** Google OAuth client ids; the Google button is hidden when none is set. */
   google: {
     webClientId: optional(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),
     iosClientId: optional(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),

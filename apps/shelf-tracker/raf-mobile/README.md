@@ -72,8 +72,8 @@ and a Google service account key for `submit` after that.
 
 Create OAuth client ids in Google Cloud Console (web, iOS, Android), put them in
 `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` here and in `GOOGLE_CLIENT_IDS` in
-`apps/shelf-tracker/raf-api/.env`. Without them the button stays and explains that Google
-sign-in is not set up yet.
+`apps/shelf-tracker/raf-api/.env`. Without them the button is hidden; it is also hidden on iOS,
+where Apple then requires Sign in with Apple.
 
 ## Screens
 
