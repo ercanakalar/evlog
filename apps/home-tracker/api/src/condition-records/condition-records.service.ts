@@ -61,7 +61,12 @@ export class ConditionRecordsService {
       orderBy: [{ room: 'asc' }, { receivedAt: 'asc' }],
       omit: { storageKey: true },
     });
-    return { ...session, rooms: countByRoom(photos), photos };
+    return {
+      ...session,
+      rooms: countByRoom(photos),
+      // A hidden photo stays listed: it is part of the record's fingerprint.
+      photos: photos.map((p) => (p.hiddenAt ? { ...p, note: null } : p)),
+    };
   }
 
   async addPhoto(
@@ -164,6 +169,7 @@ export class ConditionRecordsService {
     });
     if (!photo) throw new NotFoundException('Photo not found');
     await this.access.get(photo.session.homeId, userId);
+    if (photo.hiddenAt) throw new NotFoundException('This photo was hidden by a moderator');
     return { stream: await this.storage.open(photo.storageKey), mimeType: photo.mimeType };
   }
 

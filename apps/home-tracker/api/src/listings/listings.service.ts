@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,12 +8,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.validation';
 import { Prisma } from '../generated/prisma/client';
+import { ReportTarget } from '../generated/prisma/enums';
 import { HomeAccessService } from '../homes/home-access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RatingsService } from '../ratings/ratings.service';
 import { StorageService } from '../storage/storage.service';
 import { randomToken, sha256 } from '../common/utils/crypto';
 import { AddBrokerDto, LinkListingDto, UpdateListingDto } from './dto/listing.dto';
+import { visiblePart } from './listing-snapshot';
 import { SahibindenProvider } from './providers/sahibinden.provider';
 
 @Injectable()
@@ -64,7 +67,7 @@ export class ListingsService {
     const listing = await this.owned(listingId, userId);
     if (dto.coverPhotoId) {
       const photo = await this.prisma.conditionPhoto.findFirst({
-        where: { id: dto.coverPhotoId, session: { homeId: listing.homeId } },
+        where: { id: dto.coverPhotoId, hiddenAt: null, session: { homeId: listing.homeId } },
       });
       if (!photo) throw new BadRequestException('Cover photo must be from this home');
     }
@@ -109,6 +112,7 @@ export class ListingsService {
   /** "Send update": freezes what is shared right now for the brokers. */
   async sendUpdate(listingId: string, userId: string) {
     const listing = await this.owned(listingId, userId);
+    if (listing.hiddenAt) throw new ForbiddenException('A moderator hid this listing');
     const snapshot = await this.buildSnapshot(listing.id);
     const update = await this.prisma.listingUpdate.create({
       data: { listingId, snapshot: snapshot as Prisma.InputJsonValue },
@@ -123,26 +127,23 @@ export class ListingsService {
   /** Public, token-based view for brokers. */
   async sharedView(token: string) {
     const broker = await this.brokerByToken(token);
-    const latest = await this.prisma.listingUpdate.findFirst({
-      where: { listingId: broker.listingId },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!latest) throw new NotFoundException('Nothing has been shared yet');
+    const { sharedAt, snapshot } = await this.latestShared(broker);
     await this.prisma.brokerAccess.update({
       where: { id: broker.id },
       data: { lastViewAt: new Date() },
     });
-    return { sharedAt: latest.createdAt, ...(latest.snapshot as object) };
+    return { sharedAt, ...snapshot };
+  }
+
+  /** Whether this link shows that rating or photo. */
+  async shares(token: string, targetType: ReportTarget, targetId: string): Promise<boolean> {
+    const { snapshot } = await this.latestShared(await this.brokerByToken(token));
+    const list = targetType === ReportTarget.RATING ? snapshot.ratings : snapshot.photos;
+    return ((list ?? []) as { id: string }[]).some((item) => item.id === targetId);
   }
 
   async sharedPhoto(token: string, photoId: string) {
-    const broker = await this.brokerByToken(token);
-    const latest = await this.prisma.listingUpdate.findFirst({
-      where: { listingId: broker.listingId },
-      orderBy: { createdAt: 'desc' },
-    });
-    const snapshot = latest?.snapshot as { photos?: { id: string }[] } | undefined;
-    if (!snapshot?.photos?.some((p) => p.id === photoId)) {
+    if (!(await this.shares(token, ReportTarget.CONDITION_PHOTO, photoId))) {
       throw new NotFoundException('Photo not found');
     }
     const photo = await this.prisma.conditionPhoto.findUniqueOrThrow({ where: { id: photoId } });
@@ -179,6 +180,7 @@ export class ListingsService {
         orderBy: { startedAt: 'desc' },
         include: {
           photos: {
+            where: { hiddenAt: null },
             orderBy: [{ room: 'asc' }, { receivedAt: 'asc' }],
             select: { id: true, room: true, receivedAt: true, sha256: true },
           },
@@ -191,7 +193,13 @@ export class ListingsService {
         confirmedByOwner: record.ownerConfirmedAt !== null,
         confirmedByTenant: record.tenantConfirmedAt !== null,
       };
-      snapshot.coverPhotoId = listing.coverPhotoId ?? record?.photos[0]?.id ?? null;
+      const cover = listing.coverPhotoId
+        ? await this.prisma.conditionPhoto.findFirst({
+            where: { id: listing.coverPhotoId, hiddenAt: null },
+            select: { id: true },
+          })
+        : null;
+      snapshot.coverPhotoId = cover?.id ?? record?.photos[0]?.id ?? null;
       snapshot.photos = record?.photos ?? [];
     }
 
@@ -250,11 +258,46 @@ export class ListingsService {
     return listing;
   }
 
-  private async brokerByToken(token: string) {
+  /** The broker behind a share link, while the link works. */
+  async brokerByToken(token: string) {
     const broker = await this.prisma.brokerAccess.findUnique({
       where: { tokenHash: sha256(token) },
+      include: { listing: { select: { homeId: true, hiddenAt: true } } },
     });
-    if (!broker || broker.revokedAt) throw new NotFoundException('Link is invalid or revoked');
+    if (!broker || broker.revokedAt || broker.listing.hiddenAt) {
+      throw new NotFoundException('Link is invalid or revoked');
+    }
     return broker;
+  }
+
+  private async latestShared(broker: { listingId: string; listing: { homeId: string } }) {
+    const latest = await this.prisma.listingUpdate.findFirst({
+      where: { listingId: broker.listingId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!latest) throw new NotFoundException('Nothing has been shared yet');
+    return {
+      sharedAt: latest.createdAt,
+      snapshot: await this.visible(broker.listing.homeId, latest.snapshot as Record<string, unknown>),
+    };
+  }
+
+  /** Leaves out what moderators hid after the owner sent the snapshot. */
+  private async visible(homeId: string, snapshot: Record<string, unknown>) {
+    const [ratings, photos] = await Promise.all([
+      this.prisma.rating.findMany({
+        where: { homeId, hiddenAt: null },
+        select: { id: true, noteHiddenAt: true },
+      }),
+      this.prisma.conditionPhoto.findMany({
+        where: { session: { homeId }, hiddenAt: null },
+        select: { id: true },
+      }),
+    ]);
+    return visiblePart(snapshot, {
+      ratings: new Set(ratings.map((r) => r.id)),
+      notes: new Set(ratings.filter((r) => !r.noteHiddenAt).map((r) => r.id)),
+      photos: new Set(photos.map((p) => p.id)),
+    });
   }
 }

@@ -30,3 +30,37 @@ export function withoutPerson(
   if (person.hasGasBills) delete result.heatingBills;
   return result;
 }
+
+/** Ids in a snapshot that may still be shown; a moderator can hide any of them later. */
+export interface Visible {
+  ratings: ReadonlySet<string>;
+  notes: ReadonlySet<string>;
+  photos: ReadonlySet<string>;
+}
+
+/** What a broker may see today of a snapshot the owner sent earlier. */
+export function visiblePart(
+  snapshot: Record<string, unknown>,
+  visible: Visible,
+): Record<string, unknown> {
+  let result = snapshot;
+  if (snapshot.ratings) {
+    const ratings = ratingsOf(snapshot)
+      .filter((r) => visible.ratings.has(r.id))
+      .map((r) => (visible.notes.has(r.id) ? r : { ...r, noteForNextTenant: null }));
+    result =
+      ratings.length === ratingsOf(snapshot).length
+        ? { ...result, ratings }
+        : withRatings(result, ratings);
+  }
+  if (snapshot.photos) {
+    const photos = (snapshot.photos as { id: string }[]).filter((p) => visible.photos.has(p.id));
+    const cover = snapshot.coverPhotoId as string | null;
+    result = {
+      ...result,
+      photos,
+      coverPhotoId: cover && visible.photos.has(cover) ? cover : (photos[0]?.id ?? null),
+    };
+  }
+  return result;
+}

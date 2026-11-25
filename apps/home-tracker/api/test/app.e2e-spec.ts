@@ -302,6 +302,11 @@ describe('Evlog API (e2e)', () => {
       expect(home.body.score).toEqual(
         expect.objectContaining({ score: 3.3, ratingCount: 1 }),
       );
+      for (const [token, mine] of [[owner, false], [tenant, true]] as const) {
+        const list = await api().get(`/api/v1/homes/${homeId}/ratings`).set(auth(token)).expect(200);
+        expect(list.body).toEqual([expect.objectContaining({ mine })]);
+        expect(list.body[0].authorId).toBeUndefined();
+      }
     });
 
     it('validates scores', () =>
@@ -496,6 +501,125 @@ describe('Evlog API (e2e)', () => {
     });
   });
 
+  describe('reports & moderation', () => {
+    let moderator: string;
+    let shareToken: string;
+    let listingId: string;
+    let ratingId: string;
+    let photoId: string;
+
+    const report = (token: string, targetType: string, targetId: string) =>
+      api().post('/api/v1/reports').set(auth(token)).send({ targetType, targetId, reason: 'OFFENSIVE' });
+    const resolve = (reportId: string, action: string) =>
+      api().post(`/api/v1/moderation/reports/${reportId}/resolve`).set(auth(moderator)).send({ action });
+    const shared = () => api().get(`/api/v1/shared/listings/${shareToken}`);
+
+    beforeAll(async () => {
+      moderator = await register('moderator@example.com');
+      const listings = await api().get(`/api/v1/homes/${homeId}/listings`).set(auth(owner)).expect(200);
+      listingId = listings.body[0].id;
+      const broker = await api()
+        .post(`/api/v1/listings/${listingId}/brokers`)
+        .set(auth(owner))
+        .send({ agencyName: 'Moda Emlak', email: 'moda@example.com' })
+        .expect(201);
+      shareToken = broker.body.shareToken;
+      await api().post(`/api/v1/listings/${listingId}/send-update`).set(auth(owner)).expect(200);
+      const view = await shared().expect(200);
+      ratingId = view.body.ratings[0].id;
+      photoId = view.body.photos[0].id;
+    });
+
+    it('takes reports about visible content, once, and not about your own', async () => {
+      const first = await report(owner, 'RATING', ratingId).expect(201);
+      const again = await report(owner, 'RATING', ratingId).expect(201);
+      expect(again.body.id).toBe(first.body.id);
+
+      await report(tenant, 'RATING', ratingId).expect(400); // their own rating
+      await report(moderator, 'RATING', ratingId).expect(404); // not their home
+      await report(owner, 'LISTING', listingId).expect(400);
+      await report(tenant, 'CONDITION_PHOTO', photoId).expect(201);
+    });
+
+    it('takes reports from brokers about what their link shows', async () => {
+      const send = (body: object) =>
+        api().post(`/api/v1/shared/listings/${shareToken}/reports`).send({ reason: 'SPAM', ...body });
+      await send({ targetType: 'LISTING' }).expect(201);
+      await send({ targetType: 'RATING', targetId: ratingId }).expect(201);
+      await send({ targetType: 'RATING', targetId: photoId }).expect(404);
+      await send({ targetType: 'RATING' }).expect(400);
+      await api()
+        .post('/api/v1/shared/listings/wrong/reports')
+        .send({ reason: 'SPAM', targetType: 'LISTING' })
+        .expect(404);
+    });
+
+    it('is for moderators only', async () => {
+      await api().get('/api/v1/moderation/reports').set(auth(owner)).expect(403);
+      await api().get(`/api/v1/moderation/photos/${photoId}/file`).set(auth(moderator)).expect(403);
+      await app.get(PrismaService).user.update({
+        where: { email: 'moderator@example.com' },
+        data: { role: 'MODERATOR' },
+      });
+      const open = await api().get('/api/v1/moderation/reports').set(auth(moderator)).expect(200);
+      expect(open.body).toHaveLength(4);
+      expect(open.body[0].content.noteForNextTenant).toBe('Bleed the radiators in October.');
+      await api().get(`/api/v1/moderation/photos/${photoId}/file`).set(auth(moderator)).expect(200);
+      // Nobody reported this one, so it stays private.
+      const other = (await shared()).body.photos[1].id as string;
+      await api().get(`/api/v1/moderation/photos/${other}/file`).set(auth(moderator)).expect(404);
+    });
+
+    it('hides a note, then the rating, also in what was already sent to brokers', async () => {
+      const open = await api().get('/api/v1/moderation/reports').set(auth(moderator)).expect(200);
+      const { id } = open.body.find((r: { targetType: string }) => r.targetType === 'RATING');
+      await resolve(id, 'HIDE_NOTE').expect(200);
+      expect((await shared()).body.ratings[0]).toEqual(
+        expect.objectContaining({ id: ratingId, noteForNextTenant: null }),
+      );
+      expect((await shared()).body.score.score).toBe(3.3);
+
+      await resolve(id, 'HIDE').expect(200);
+      expect((await shared()).body).toEqual(
+        expect.objectContaining({ ratings: [], score: { score: null, ratingCount: 0, categories: {} } }),
+      );
+      const list = await api().get(`/api/v1/homes/${homeId}/ratings`).set(auth(owner)).expect(200);
+      expect(list.body).toEqual([]);
+      const home = await api().get(`/api/v1/homes/${homeId}`).set(auth(owner)).expect(200);
+      expect(home.body.score.score).toBeNull();
+
+      // Both reports about the rating are closed by one decision.
+      const left = await api().get('/api/v1/moderation/reports').set(auth(moderator)).expect(200);
+      expect(left.body.map((r: { targetType: string }) => r.targetType).sort()).toEqual([
+        'CONDITION_PHOTO',
+        'LISTING',
+      ]);
+
+      await resolve(id, 'RESTORE').expect(200);
+      expect((await shared()).body.ratings[0].noteForNextTenant).toBe('Bleed the radiators in October.');
+    });
+
+    it('hides photos and listings', async () => {
+      const open = await api().get('/api/v1/moderation/reports').set(auth(moderator)).expect(200);
+      const of = (type: string) =>
+        open.body.find((r: { targetType: string }) => r.targetType === type).id as string;
+
+      await resolve(of('CONDITION_PHOTO'), 'HIDE_NOTE').expect(400);
+      await resolve(of('CONDITION_PHOTO'), 'HIDE').expect(200);
+      await api().get(`/api/v1/condition-photos/${photoId}/file`).set(auth(owner)).expect(404);
+      await api().get(`/api/v1/shared/listings/${shareToken}/photos/${photoId}`).expect(404);
+      const view = await shared().expect(200);
+      expect(view.body.photos).toHaveLength(2);
+      expect(view.body.coverPhotoId).not.toBe(photoId);
+
+      await resolve(of('LISTING'), 'HIDE').expect(200);
+      await shared().expect(404);
+      await api().post(`/api/v1/listings/${listingId}/send-update`).set(auth(owner)).expect(403);
+      await resolve(of('LISTING'), 'RESTORE').expect(200);
+      await shared().expect(200);
+    });
+  });
+
   describe('account deletion', () => {
     let landlord: string;
 
@@ -576,6 +700,7 @@ describe('Evlog API (e2e)', () => {
       expect(await prisma().conditionPhoto.count()).toBe(0);
       expect(await prisma().rating.count()).toBe(0);
       expect(storedFiles()).toBe(0);
+      expect(await prisma().report.count({ where: { reporterId: { not: null } } })).toBe(0);
     });
 
     it('lets a tenant go: their rating leaves the home and what was sent to brokers', async () => {

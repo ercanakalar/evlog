@@ -91,6 +91,7 @@ export class AccountDeletionService {
       where: { uploadedById: userId },
       data: { latitude: null, longitude: null },
     });
+    await tx.report.updateMany({ where: { reporterId: userId }, data: { details: null } });
     await tx.user.delete({ where: { id: userId } });
   }
 

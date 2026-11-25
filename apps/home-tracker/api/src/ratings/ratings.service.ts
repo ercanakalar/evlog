@@ -113,18 +113,24 @@ export class RatingsService {
 
   async list(homeId: string, userId: string) {
     await this.access.get(homeId, userId);
-    return this.published(homeId);
+    const [ratings, own] = await Promise.all([
+      this.published(homeId),
+      this.prisma.rating.findMany({ where: { homeId, authorId: userId }, select: { id: true } }),
+    ]);
+    // Only tells callers which rating is theirs, never who wrote the others.
+    return ratings.map((r) => ({ ...r, mine: own.some((o) => o.id === r.id) }));
   }
 
   /** Ratings as shown to owners, tenants and brokers: no author identity. */
-  published(homeId: string) {
-    return this.prisma.rating.findMany({
-      where: { homeId },
+  async published(homeId: string) {
+    const ratings = await this.prisma.rating.findMany({
+      where: { homeId, hiddenAt: null },
       orderBy: { submittedAt: 'desc' },
       select: {
         id: true,
         submittedAt: true,
         noteForNextTenant: true,
+        noteHiddenAt: true,
         tenancy: { select: { startDate: true, endDate: true } },
         scores: {
           select: {
@@ -135,12 +141,16 @@ export class RatingsService {
         },
       },
     });
+    return ratings.map(({ noteHiddenAt, noteForNextTenant, ...rating }) => ({
+      ...rating,
+      noteForNextTenant: noteHiddenAt ? null : noteForNextTenant,
+    }));
   }
 
   async homeScore(homeId: string) {
     return averageScores(
       await this.prisma.rating.findMany({
-        where: { homeId },
+        where: { homeId, hiddenAt: null },
         select: { scores: { select: { category: true, score: true } } },
       }),
     );

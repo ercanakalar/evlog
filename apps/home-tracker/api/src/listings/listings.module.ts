@@ -11,5 +11,6 @@ import { SahibindenProvider } from './providers/sahibinden.provider';
   imports: [RatingsModule],
   controllers: [ListingsController, SharedListingsController],
   providers: [ListingsService, SahibindenProvider],
+  exports: [ListingsService],
 })
 export class ListingsModule {}

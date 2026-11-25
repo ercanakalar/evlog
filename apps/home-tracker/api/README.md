@@ -30,6 +30,7 @@ To run it in Docker instead: `docker compose up -d --build api` from the repo ro
 | `ratings` | One rating per tenancy across 5 categories. Evidence is gathered server-side: condition record, rent receipts, utility / gas bills, renovation receipts. Categories without evidence are refused. |
 | `listings` | Links sahibinden.com listings, grants brokers token-based read-only access, "Send update" snapshots exactly what the owner chose to share. |
 | `kitchen` | Confirmed grocery receipts feed the pantry ("running low" learned from purchase gaps), price watch vs. last purchase, and anonymous market averages (hidden below 3 households). |
+| `reports` | Reports about ratings, condition photos and shared listings (from users and, by share link, brokers), and the moderator endpoints that hide or restore them. |
 | `appliances` | Appliances with recommended maintenance schedules, "mark as done" logs, next-due overview. |
 
 ## Validation & safety

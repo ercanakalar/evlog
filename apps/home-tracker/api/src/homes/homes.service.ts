@@ -46,7 +46,7 @@ export class HomesService {
           orderBy: { startedAt: 'desc' },
           include: {
             photos: {
-              select: { id: true, room: true },
+              select: { id: true, room: true, hiddenAt: true },
               orderBy: { receivedAt: 'asc' },
             },
           },
@@ -74,7 +74,10 @@ export class HomesService {
             status: latestRecord.status,
             startedAt: latestRecord.startedAt,
             photoCount: latestRecord.photos.length,
-            previewPhotoIds: latestRecord.photos.slice(0, 3).map((p) => p.id),
+            previewPhotoIds: latestRecord.photos
+              .filter((p) => !p.hiddenAt)
+              .slice(0, 3)
+              .map((p) => p.id),
           }
         : null,
       listings: { count: listingCount },

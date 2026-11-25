@@ -13,12 +13,18 @@ datasource db {
 
 // ───────────────────────────── Identity ─────────────────────────────
 
+enum UserRole {
+  USER
+  MODERATOR /// reviews reports; granted in the database only
+}
+
 model User {
   id           String   @id @default(uuid(7)) @db.Uuid
   email        String   @unique
   passwordHash String
   fullName     String
   phone        String?
+  role         UserRole @default(USER)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
@@ -30,6 +36,8 @@ model User {
   conditionSessions ConditionSession[] @relation("ConditionSessionCreator")
   conditionPhotos   ConditionPhoto[]
   maintenanceLogs   MaintenanceLog[]
+  reports           Report[]           @relation("Reporter")
+  resolvedReports   Report[]           @relation("Moderator")
 }
 
 /// One row per logged-in device. Only a hash of the refresh token is stored.
@@ -153,21 +161,23 @@ model ConditionSession {
 }
 
 model ConditionPhoto {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  sessionId    String   @db.Uuid
-  uploadedById String?  @db.Uuid
+  id           String    @id @default(uuid(7)) @db.Uuid
+  sessionId    String    @db.Uuid
+  uploadedById String?   @db.Uuid
   room         Room
-  storageKey   String   @unique
+  storageKey   String    @unique
   mimeType     String
   sizeBytes    Int
   sha256       String
   /// Time reported by the device camera.
-  capturedAt   DateTime @db.Timestamptz(3)
+  capturedAt   DateTime  @db.Timestamptz(3)
   /// Server time the file arrived; this is the trusted timestamp.
-  receivedAt   DateTime @default(now()) @db.Timestamptz(3)
+  receivedAt   DateTime  @default(now()) @db.Timestamptz(3)
   latitude     Float?
   longitude    Float?
   note         String?
+  /// Set by a moderator: the file is no longer shown.
+  hiddenAt     DateTime? @db.Timestamptz(3)
 
   session    ConditionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   uploadedBy User?            @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
@@ -259,12 +269,15 @@ enum RatingCategory {
 
 /// One verified rating per tenancy.
 model Rating {
-  id                String   @id @default(uuid(7)) @db.Uuid
-  homeId            String   @db.Uuid
-  tenancyId         String   @unique @db.Uuid
-  authorId          String   @db.Uuid
+  id                String    @id @default(uuid(7)) @db.Uuid
+  homeId            String    @db.Uuid
+  tenancyId         String    @unique @db.Uuid
+  authorId          String    @db.Uuid
   noteForNextTenant String?
-  submittedAt       DateTime @default(now()) @db.Timestamptz(3)
+  submittedAt       DateTime  @default(now()) @db.Timestamptz(3)
+  /// Set by a moderator: hides the note, or the whole rating with its scores.
+  noteHiddenAt      DateTime? @db.Timestamptz(3)
+  hiddenAt          DateTime? @db.Timestamptz(3)
 
   home    Home          @relation(fields: [homeId], references: [id], onDelete: Cascade)
   tenancy Tenancy       @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
@@ -326,6 +339,8 @@ model Listing {
   sharePhotos       Boolean         @default(true)
   shareRatings      Boolean         @default(true)
   shareHeatingBills Boolean         @default(false)
+  /// Set by a moderator: brokers can no longer open it.
+  hiddenAt          DateTime?       @db.Timestamptz(3)
   createdAt         DateTime        @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
 
@@ -350,7 +365,8 @@ model BrokerAccess {
   lastViewAt  DateTime? @db.Timestamptz(3)
   createdAt   DateTime  @default(now()) @db.Timestamptz(3)
 
-  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listing Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reports Report[]
 
   @@index([listingId])
 }
@@ -365,6 +381,55 @@ model ListingUpdate {
   listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId, createdAt(sort: Desc)])
+}
+
+// ───────────────────────────── Reports & moderation ─────────────────────────────
+
+enum ReportTarget {
+  RATING
+  CONDITION_PHOTO
+  LISTING
+}
+
+enum ReportReason {
+  OFFENSIVE
+  PERSONAL_DATA
+  FALSE_INFORMATION
+  SPAM
+  ILLEGAL
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  DISMISSED
+  ACTIONED
+}
+
+/// Content someone reported: a signed-in user, or a broker through a share link.
+/// `targetId` has no foreign key, so the report outlives deleted content.
+model Report {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  reporterId     String?      @db.Uuid
+  brokerAccessId String?      @db.Uuid
+  targetType     ReportTarget
+  targetId       String       @db.Uuid
+  reason         ReportReason
+  details        String?
+  status         ReportStatus @default(OPEN)
+  resolvedById   String?      @db.Uuid
+  resolvedAt     DateTime?    @db.Timestamptz(3)
+  resolutionNote String?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  reporter     User?         @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  brokerAccess BrokerAccess? @relation(fields: [brokerAccessId], references: [id], onDelete: SetNull)
+  resolvedBy   User?         @relation("Moderator", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([reporterId, targetType, targetId])
+  @@unique([brokerAccessId, targetType, targetId])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
 }
 
 // ───────────────────────────── Kitchen & market data ─────────────────────────────
