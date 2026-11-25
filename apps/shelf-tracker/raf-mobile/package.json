@@ -1,6 +1,6 @@
 {
   "name": "@evlog/raf-mobile",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/atkinson-hyperlegible-mono": "^0.4.1",
