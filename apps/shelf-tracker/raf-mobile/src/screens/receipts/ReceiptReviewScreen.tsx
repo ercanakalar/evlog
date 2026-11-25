@@ -81,6 +81,9 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
         <Card style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
           <ActivityIndicator color={colors.text} />
           <Text variant="bodyMedium">{t('scan.reading')}</Text>
+          <Text variant="small" muted style={{ textAlign: 'center' }}>
+            {t('review.leaveWhileReading')}
+          </Text>
         </Card>
       ) : null}
 

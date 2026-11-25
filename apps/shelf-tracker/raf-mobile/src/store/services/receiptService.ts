@@ -17,6 +17,11 @@ export const receiptService = baseApi.injectEndpoints({
       }),
       providesTags: [{ type: 'Receipt', id: 'LIST' }],
     }),
+    /** Being read, waiting for review, or unreadable: newest first. */
+    listUnsaved: build.query<Receipt[], void>({
+      query: () => ({ url: '/receipts', params: { unsaved: true, take: 20 } }),
+      providesTags: [{ type: 'Receipt', id: 'LIST' }],
+    }),
     listMarkets: build.query<Market[], void>({
       query: () => '/receipts/markets',
       providesTags: [{ type: 'Receipt', id: 'LIST' }],
@@ -29,7 +34,7 @@ export const receiptService = baseApi.injectEndpoints({
       query: ({ files }) => {
         const body = new FormData();
         for (const file of files) body.append('files', formDataFile(file));
-        // The API waits for the receipt reader before answering.
+        // Read in the background; the review screen polls until that is done.
         return { url: '/receipts', method: 'POST', body, timeout: UPLOAD_RECEIPT_TIMEOUT_MS };
       },
       invalidatesTags: [{ type: 'Receipt', id: 'LIST' }],
@@ -47,8 +52,8 @@ export const receiptService = baseApi.injectEndpoints({
       },
     }),
     rescanReceipt: build.mutation<Receipt, string>({
-      query: (id) => ({ url: `/receipts/${id}/rescan`, method: 'POST', timeout: UPLOAD_RECEIPT_TIMEOUT_MS }),
-      invalidatesTags: (_r, _e, id) => [{ type: 'Receipt', id }],
+      query: (id) => ({ url: `/receipts/${id}/rescan`, method: 'POST' }),
+      invalidatesTags: (_r, _e, id) => [{ type: 'Receipt', id }, { type: 'Receipt', id: 'LIST' }],
     }),
     /** Saving starts every countdown and raises matching at-home counts. */
     confirmReceipt: build.mutation<Receipt, string>({
@@ -73,6 +78,7 @@ export const receiptService = baseApi.injectEndpoints({
 
 export const {
   useListReceiptsInfiniteQuery,
+  useListUnsavedQuery,
   useListMarketsQuery,
   useGetReceiptQuery,
   useUploadReceiptMutation,

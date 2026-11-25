@@ -15,8 +15,8 @@ export const MAX_RECEIPT_PARTS = 6;
 /** Polling interval while the receipt reader is still working. */
 export const RECEIPT_POLL_MS = 2000;
 export const TRIPS_PAGE_SIZE = 30;
-/** The API waits up to 90 s per photo for the receipt reader; allow for the upload too. */
-export const UPLOAD_RECEIPT_TIMEOUT_MS = 180_000;
+/** Sending up to six photos over a slow connection. */
+export const UPLOAD_RECEIPT_TIMEOUT_MS = 120_000;
 /** Months shown in the spending chart. */
 export const SPENDING_MONTHS = 6;
 /** Reminder lead-time options in Settings. */

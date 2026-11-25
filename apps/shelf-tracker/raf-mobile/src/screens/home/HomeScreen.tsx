@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { UnsavedReceiptRow } from '@/components/receipts/UnsavedReceiptRow';
 import { CountdownRow } from '@/components/shelf/CountdownRow';
 import {
   Button,
@@ -81,6 +82,22 @@ export function HomeScreen() {
           <Text variant="mono">{t('home.items', { count: insights.items }).toLocaleUpperCase()}</Text>
         </SpaceBetween>
       </ReceiptPaper>
+
+      {h.unsaved.length > 0 ? (
+        <View style={{ gap: 10 }}>
+          <SectionHeader title={t('home.toReview')} />
+          <View style={{ gap: 8 }}>
+            {h.unsaved.map((receipt) => (
+              <UnsavedReceiptRow
+                key={receipt.id}
+                receipt={receipt}
+                reading={receipt.reading}
+                onPress={() => h.openReview(receipt.id)}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={{ gap: 4 }}>
         <SectionHeader
