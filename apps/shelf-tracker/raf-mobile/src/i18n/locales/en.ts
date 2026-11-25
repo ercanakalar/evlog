@@ -349,7 +349,6 @@ const en = {
     about: 'About Raf',
     help: 'Help',
     version: 'Raf {{version}}',
-    usage: 'Share anonymous usage',
     saveFailed: 'Could not save the setting',
     logOut: 'Log out',
     deleteAccount: 'Delete account',

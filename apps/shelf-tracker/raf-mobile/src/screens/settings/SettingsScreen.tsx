@@ -97,7 +97,6 @@ export function SettingsScreen() {
           nameOf={(p) => t(`settings.palettes.${p}`)}
         />
         <FontRow divider label={t('settings.font')} value={s.font} onChange={s.setFont} nameOf={(f) => t(`settings.fonts.${f}`)} />
-        <SwitchRow divider label={t('settings.usage')} value={s.usageReporting} onChange={s.setUsageReporting} />
       </SettingGroup>
 
       <SettingGroup title={t('settings.about')}>

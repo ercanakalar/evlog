@@ -2,18 +2,15 @@ import { combineReducers, configureStore, type ThunkAction, type UnknownAction }
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { AppState } from 'react-native';
 import { registerAuthListeners } from './middlewares/authMiddleware';
-import { consentMiddleware } from './middlewares/consentMiddleware';
 import { baseApi } from './middlewares/createApi';
 import { listenerMiddleware } from './middlewares/listener';
 import { registerPersistenceListeners } from './middlewares/persistenceMiddleware';
 import auth from './slices/authSlice';
-import consent from './slices/consentSlice';
 import settings from './slices/settingsSlice';
 
 const rootReducer = combineReducers({
   auth,
   settings,
-  consent,
   [baseApi.reducerPath]: baseApi.reducer,
 });
 
@@ -23,7 +20,7 @@ export const store = configureStore({
     getDefault()
       // The listener runs first so its effects see every action.
       .prepend(listenerMiddleware.middleware)
-      .concat(baseApi.middleware, consentMiddleware),
+      .concat(baseApi.middleware),
 });
 
 registerAuthListeners();

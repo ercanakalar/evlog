@@ -4,19 +4,15 @@ import type { PersistedState } from '@/types/store/state';
 import { persistedStateHydrated } from '../actions/hydration';
 import { startAppListening } from './listener';
 
-const PERSISTED_SLICES = ['settings/', 'consent/'];
-
-/** Writes settings and consent to AsyncStorage (debounced). */
+/** Writes settings to AsyncStorage (debounced). */
 export function registerPersistenceListeners() {
   startAppListening({
     predicate: (action) =>
-      action.type !== persistedStateHydrated.type &&
-      PERSISTED_SLICES.some((prefix) => action.type.startsWith(prefix)),
+      action.type !== persistedStateHydrated.type && action.type.startsWith('settings/'),
     effect: async (_action, { getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       await delay(300);
-      const { settings, consent } = getState();
-      const snapshot: PersistedState = { settings, consent };
+      const snapshot: PersistedState = { settings: getState().settings };
       await jsonStorage.write(StorageKeys.persistedState, snapshot);
     },
   });

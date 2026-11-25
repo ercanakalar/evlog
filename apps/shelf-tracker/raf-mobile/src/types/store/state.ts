@@ -20,15 +20,7 @@ export interface SettingsState {
   language: LanguagePreference;
 }
 
-export type ConsentDecision = 'unknown' | 'granted' | 'denied';
-
-export interface ConsentState {
-  /** Anonymous usage reporting (which features are used, never content). */
-  usageReporting: ConsentDecision;
-}
-
 /** The subset of state written to AsyncStorage. */
 export interface PersistedState {
   settings: SettingsState;
-  consent: ConsentState;
 }

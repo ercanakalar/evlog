@@ -8,7 +8,6 @@ import { useLegalLinks } from '@/hooks/common/useLegalLinks';
 import { signOut } from '@/store/actions/sessionActions';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useDeleteAccountMutation, useGetMeQuery, useUpdateSettingsMutation } from '@/store/services/meService';
-import { selectUsageReportingConsent, usageReportingDecided } from '@/store/slices/consentSlice';
 import {
   fontChanged,
   languageChanged,
@@ -40,7 +39,6 @@ export function useSettings() {
   const theme = useAppSelector(selectThemePreference);
   const palette = useAppSelector(selectPalettePreference);
   const font = useAppSelector(selectFontPreference);
-  const usage = useAppSelector(selectUsageReportingConsent);
   const legal = useLegalLinks();
 
   const set = (changes: UpdateSettingsRequest) =>
@@ -70,8 +68,6 @@ export function useSettings() {
     setPalette: (p: PalettePreference) => dispatch(paletteChanged(p)),
     font,
     setFont: (f: FontPreference) => dispatch(fontChanged(f)),
-    usageReporting: usage === 'granted',
-    setUsageReporting: (on: boolean) => dispatch(usageReportingDecided(on ? 'granted' : 'denied')),
     ...legal,
     supportEmail: env.supportEmail,
     contactSupport: () => void Linking.openURL(`mailto:${env.supportEmail}?subject=Raf%20${appVersion}`).catch(() => undefined),

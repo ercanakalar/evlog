@@ -351,7 +351,6 @@ const tr: Translation = {
     about: 'Raf hakkında',
     help: 'Yardım',
     version: 'Raf {{version}}',
-    usage: 'Anonim kullanım verisi paylaş',
     saveFailed: 'Ayar kaydedilemedi',
     logOut: 'Çıkış yap',
     deleteAccount: 'Hesabı sil',
