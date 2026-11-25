@@ -1,5 +1,5 @@
 """
-Receipt reader that runs on your own computer.
+Receipt reader that runs on your own computer or server.
 
 It speaks the HTTP contract the Evlog API expects:
 
@@ -50,7 +50,15 @@ import label_parser
 import ocr
 import receipt_parser
 
-TOKEN = os.environ.get("OCR_SERVICE_TOKEN", "change-me-ocr-token")
+TOKEN = os.environ.get("OCR_SERVICE_TOKEN", "")
+# Anyone who can reach the reader could use it with a token that is in the repository.
+if os.environ.get("ALLOW_DEV_TOKEN") != "1" and (len(TOKEN) < 16 or TOKEN.startswith("change-me")):
+    raise SystemExit(
+        "Set OCR_SERVICE_TOKEN to a secret of at least 16 characters (openssl rand -hex 32), "
+        "or ALLOW_DEV_TOKEN=1 on your own computer."
+    )
+if not TOKEN:
+    raise SystemExit("Set OCR_SERVICE_TOKEN.")
 MAX_BYTES = 15 * 1024 * 1024
 
 logger = logging.getLogger("uvicorn.error")

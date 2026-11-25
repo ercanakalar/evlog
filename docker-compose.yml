@@ -80,6 +80,8 @@ services:
     restart: unless-stopped
     environment:
       OCR_SERVICE_TOKEN: ${OCR_SERVICE_TOKEN:-change-me-ocr-token}
+      # The example token is fine here: only this computer can reach the port.
+      ALLOW_DEV_TOKEN: '1'
     command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./services/receipt-reader:/app

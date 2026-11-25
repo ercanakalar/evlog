@@ -28,9 +28,12 @@ OCR_SERVICE_TOKEN=change-me-ocr-token
 OCR_TIMEOUT_MS=90000
 ```
 
-The port is only open to this computer. If an API runs elsewhere (in the cloud),
-expose the reader through a tunnel (Cloudflare Tunnel, Tailscale) rather than
-opening the port.
+The port is only open to this computer, and `docker-compose.yml` sets `ALLOW_DEV_TOKEN=1`
+so the example token works. Anywhere else the reader only starts with an
+`OCR_SERVICE_TOKEN` of at least 16 characters.
+
+If an API runs elsewhere (in the cloud), expose the reader through a tunnel (Cloudflare
+Tunnel, Tailscale) rather than opening the port.
 
 ## How it reads
 
