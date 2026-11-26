@@ -1,6 +1,8 @@
-Sources of the images in `../images`. After changing one, from `apps/shelf-tracker/raf-mobile`
-(uses sharp from the API's packages):
+Sources of the images in `../images`. After changing one, from `mobile-react-native`
+(uses sharp from the backend's packages, so run `npm install` in `../backend` once):
 
 ```bash
-node assets/source/render.mjs
+npm run icons
 ```
+
+It also writes `build/play-icon-512.png`, the icon for the Google Play listing.
