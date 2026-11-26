@@ -43,9 +43,10 @@ SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-${PROJECT_NUMBER}-compute@developer.gservice
 # Cloud Run's address for the service is known before it exists.
 PUBLIC_API_URL="${PUBLIC_API_URL:-https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app}"
 
-# The receipt reader runs inside the API and needs about 1 GB on its own.
+# The receipt reader runs inside the API and needs about 1 GB on its own; the
+# API and the bucket mount share the rest. With 2Gi it ran out while reading.
 CPU="${CPU:-2}"
-MEMORY="${MEMORY:-2Gi}"
+MEMORY="${MEMORY:-4Gi}"
 MIN_INSTANCES="${MIN_INSTANCES:-0}"
 MAX_INSTANCES="${MAX_INSTANCES:-2}"
 

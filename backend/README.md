@@ -122,7 +122,8 @@ It stops before building anything when a setting the API needs in production is 
 defaults to the service's Cloud Run address, which is also what the app's
 `EXPO_PUBLIC_API_URL` should be.
 
-The service has 2 CPUs and 2 GiB by default (`CPU`, `MEMORY`), scales from 0 to 2 instances
+The service has 2 CPUs and 4 GiB by default (`CPU`, `MEMORY`; the reader, the API and the
+bucket mount share the memory, and 2 GiB runs out while reading), scales from 0 to 2 instances
 (`MIN_INSTANCES`, `MAX_INSTANCES`), and keeps its CPU on between requests, because receipts
 are read after the upload has been answered. Receipts being read when an instance stops are
 taken up again at the next start. The first request after an idle spell waits for the API
