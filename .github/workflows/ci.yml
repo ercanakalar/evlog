@@ -97,7 +97,7 @@ jobs:
       run:
         working-directory: apps/shelf-tracker/raf-mobile
     env:
-      EXPO_PUBLIC_API_URL: http://localhost:3100
+      EXPO_PUBLIC_API_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

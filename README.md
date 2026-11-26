@@ -16,7 +16,7 @@ evlog/
 │   │   ├── api/                    NestJS API, port 3000
 │   │   └── mobile-react-native/    Expo phone app
 │   └── shelf-tracker/              Raf
-│       ├── raf-api/                NestJS API, port 3100, receipt reader built in
+│       ├── raf-api/                NestJS API, port 3000, receipt reader built in
 │       └── raf-mobile/             Expo phone app
 ├── services/
 │   └── receipt-reader/             OCR service that reads Evlog's receipts, port 8000
@@ -44,7 +44,7 @@ apps pin different React/TypeScript toolchains and are deployed separately.
                      ▼
          receipt reader :8000 (OCR, on your computer)
 
- Raf app ────▶ Raf API   :3100 ──▶ PostgreSQL, database raf
+ Raf app ────▶ Raf API   :3000 ──▶ PostgreSQL, database raf
                (OCR built in)
 ```
 
@@ -94,7 +94,7 @@ docker compose up -d --build api raf-api    # both APIs + Evlog's receipt reader
 | Compose service | Built from | Address | Check |
 | --- | --- | --- | --- |
 | `api` | `apps/home-tracker/api` | `http://localhost:3000/api/v1` | `curl localhost:3000/health` |
-| `raf-api` | `apps/shelf-tracker/raf-api` | `http://localhost:3100/api/v1` | `curl localhost:3100/health` |
+| `raf-api` | `apps/shelf-tracker/raf-api` | `http://localhost:3000/api/v1` | `curl localhost:3000/health` |
 | `receipt-reader` | `services/receipt-reader` | `http://localhost:8000` (this computer only) | `curl localhost:8000/health` |
 
 The first build takes several minutes: it downloads the OCR models into the
@@ -122,7 +122,7 @@ npm install && npm start
 
 ```bash
 cd apps/shelf-tracker/raf-mobile
-cp .env.example .env          # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3100
+cp .env.example .env          # EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000
 npm install && npm start
 ```
 
@@ -134,7 +134,7 @@ To install Raf without Expo, build its APK in Docker. This writes `build/raf.apk
 
 ```bash
 cd apps/shelf-tracker/raf-mobile
-npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100
+npm run apk -- --build-arg API_URL=http://<LAN-IP>:3000
 ```
 
 ### Everyday commands

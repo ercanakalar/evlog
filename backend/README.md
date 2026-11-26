@@ -17,7 +17,7 @@ npm run start:dev
 To run it in Docker instead: `docker compose up -d --build raf-api` from the repo root
 (see [Run with Docker](../../../README.md#run-with-docker)).
 
-* API: `http://localhost:3100/api/v1` · Swagger UI: `http://localhost:3100/docs` (non-production) · Health: `/health` (with the database), `/health/live` (the API alone)
+* API: `http://localhost:3000/api/v1` · Swagger UI: `http://localhost:3000/docs` (non-production) · Health: `/health` (with the database), `/health/live` (the API alone)
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
 * Raf has its **own database** (`raf`) and its own receipt reader (below); it
   shares nothing with the Evlog API.

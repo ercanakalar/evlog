@@ -33,6 +33,6 @@ COPY --from=models --chown=app:app /models ./models
 COPY --chown=app:app package.json prisma.config.ts ./
 COPY --chown=app:app prisma ./prisma
 USER app
-EXPOSE 3100
-HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://localhost:'+(process.env.PORT||3100)+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main"]

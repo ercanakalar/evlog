@@ -13,7 +13,7 @@ const NEEDED_IN_PRODUCTION = ['SMTP_URL', 'MAIL_FROM', 'LEGAL_OPERATOR', 'SUPPOR
 /** Every environment variable the API reads. The app refuses to start if one is invalid. */
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3100),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   PUBLIC_API_URL: httpUrl,
   CORS_ORIGINS: z.string().default(''),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),

@@ -5,12 +5,12 @@ lasts, keep market lists, count what is at home and see where the money goes.
 Run these commands in `apps/shelf-tracker/raf-mobile`:
 
 ```bash
-cp .env.example .env      # EXPO_PUBLIC_API_URL → the Raf API (../raf-api, port 3100)
+cp .env.example .env      # EXPO_PUBLIC_API_URL → the Raf API (../raf-api, port 3000)
 npm install
 npm start                 # i / a, or scan the QR code
 ```
 
-`EXPO_PUBLIC_API_URL` must be reachable from the phone: `http://10.0.2.2:3100` on the
+`EXPO_PUBLIC_API_URL` must be reachable from the phone: `http://10.0.2.2:3000` on the
 Android emulator, your computer's LAN IP on a real device.
 
 `EXPO_PUBLIC_SUPPORT_EMAIL` is shown under Settings → Help.
@@ -29,7 +29,7 @@ with no Android Studio or Expo account:
 ```bash
 hostname -I                                                    # this computer's LAN IP (first one)
 npm run apk                                                    # -> build/raf.apk, API from .env
-npm run apk -- --build-arg API_URL=http://<LAN-IP>:3100        # another API than .env
+npm run apk -- --build-arg API_URL=http://<LAN-IP>:3000        # another API than .env
 adb install -r build/raf.apk                                   # or copy it to the phone
 ```
 
@@ -40,7 +40,7 @@ another network; rebuild the APK then. Release builds block plain `http://`; `ap
 allows it only when the API's address starts with `http://`, so a build that points at an
 HTTPS API never allows it, and a production EAS build refuses anything but HTTPS.
 If the phone still cannot connect, open the port on this computer's firewall
-(`sudo ufw allow 3100/tcp`) and check `http://<LAN-IP>:3100/health` in the phone's browser. Only `arm64-v8a` is built by default; add
+(`sudo ufw allow 3000/tcp`) and check `http://<LAN-IP>:3000/health` in the phone's browser. Only `arm64-v8a` is built by default; add
 `--build-arg ABIS=arm64-v8a,armeabi-v7a,x86_64` for old phones or the emulator.
 The first build downloads the Android SDK, NDK and Gradle (several GB); later
 builds reuse them. The APK is signed with the debug key, which is fine for

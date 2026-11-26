@@ -9,7 +9,7 @@
 #   docker buildx build -f Dockerfile.android --output type=local,dest=build .
 #
 # EXPO_PUBLIC_* values (API URL, Google client IDs) come from .env.
-# Pass --build-arg API_URL=http://<lan-ip>:3100 to point this build at another
+# Pass --build-arg API_URL=http://<lan-ip>:3000 to point this build at another
 # API than the one in .env (e.g. this computer's current LAN IP).
 # The first build downloads the Android SDK, NDK and Gradle (several GB) and
 # takes a while; later builds reuse them.

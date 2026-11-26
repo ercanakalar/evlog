@@ -7,7 +7,7 @@ if (!raw) {
 const optional = (value: string | undefined) => (value ? value : undefined);
 
 export const env = {
-  /** Base URL of the versioned API, e.g. http://localhost:3100/api/v1 */
+  /** Base URL of the versioned API, e.g. http://localhost:3000/api/v1 */
   apiUrl: `${raw.replace(/\/+$/, '')}/api/v1`,
   /** Legal pages served by the API (also linked from the store listing). */
   legalUrl: (page: 'privacy' | 'terms', lang: string) => `${raw.replace(/\/+$/, '')}/${page}?lang=${lang}`,
