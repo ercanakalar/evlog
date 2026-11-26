@@ -43,6 +43,7 @@ example
 /android
 
 .env
+.env.production
 
 # APK built with Docker (npm run apk)
 /build/

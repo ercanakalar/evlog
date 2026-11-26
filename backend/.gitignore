@@ -8,3 +8,4 @@ src/generated/
 uploads-test/
 # OCR models (npm run models)
 models/
+.env.production
