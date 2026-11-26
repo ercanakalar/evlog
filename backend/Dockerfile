@@ -26,7 +26,8 @@ RUN npm run build && npm prune --omit=dev --ignore-scripts \
     ! -path "*/linux/$(node -p process.arch)" -exec rm -rf {} +
 
 FROM base AS runtime
-RUN groupadd -r app && useradd -r -g app app && mkdir -p /app/uploads && chown app:app /app/uploads
+# A fixed id: Cloud Run mounts the uploads bucket for this user (scripts/deploy-manual.sh).
+RUN groupadd -r -g 10001 app && useradd -r -u 10001 -g app app && mkdir -p /app/uploads && chown app:app /app/uploads
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/dist ./dist
 COPY --from=models --chown=app:app /models ./models

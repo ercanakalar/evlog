@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Deploys the backend to the Cloud Run service/job that already exist
-# (raf-tracker-backend / raf-tracker-migrate), using the secrets in
-# Secret Manager.
+# Deploys the Raf API to Cloud Run: builds one image, runs the database
+# migrations with it as a Cloud Run job, then rolls the service onto it.
 #
-# This is the same flow as the old scripts/deploy-cloudrun.sh, written out
-# flat and commented so each step is visible instead of hidden behind a
-# single command. Run it from the backend/ directory: ./scripts/deploy-manual.sh
+# Run scripts/setup-project.sh once per Google Cloud project first. Then, from
+# the backend/ folder, for every release:
+#
+#   ./scripts/deploy-manual.sh
+#
+# Settings come from .env.production (copy .env.production.example).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,314 +17,188 @@ if [ ! -f "${ENV_FILE}" ]; then
   echo "  cp .env.production.example ${ENV_FILE}" >&2
   exit 1
 fi
-
 set -a; source "${ENV_FILE}"; set +a
-
-# Everything the rest of this script interpolates, checked here. `set -u`
-# would otherwise abort with "JOB: unbound variable" at step 5 — after two
-# image builds and pushes have already been paid for.
-: "${PROJECT_ID:?set PROJECT_ID in ${ENV_FILE}}"
-: "${REGION:?set REGION in ${ENV_FILE}}"
-: "${SERVICE:?set SERVICE in ${ENV_FILE} — the Cloud Run service name}"
-: "${JOB:?set JOB in ${ENV_FILE} — the Cloud Run migration job name}"
-: "${MAX_INSTANCES:?set MAX_INSTANCES in ${ENV_FILE}}"
-: "${SERVICE_ACCOUNT:?set SERVICE_ACCOUNT in ${ENV_FILE}}"
-: "${SA_EMAIL:?set SA_EMAIL in ${ENV_FILE}}"
-# The plain settings the API refuses to start without (src/config/
-# env.validation.ts). Missing, they would surface only once the new revision
-# failed to boot — after the builds and the migration.
-: "${FRONTEND_URL:?set FRONTEND_URL in ${ENV_FILE}}"
-: "${MAIL_HOST:?set MAIL_HOST in ${ENV_FILE}}"
-: "${MAIL_USERNAME:?set MAIL_USERNAME in ${ENV_FILE}}"
-: "${MAIL_FROM:?set MAIL_FROM in ${ENV_FILE}}"
-
-REPO="raf-tracker"
-BUCKET="${PROJECT_ID}-raf-tracker-uploads"
 
 say() { printf '\n=== %s\n' "$1"; }
 warn() { printf '\n!!! %s\n' "$1" >&2; }
 
-# The identity both the API and the migration job run as. Cloud Run's default
-# compute identity is <project-number>-compute@developer.gserviceaccount.com,
-# and the project number differs per project — so it is read from the project
-# rather than written down here, where it would silently be another project's.
-# SERVICE_ACCOUNT in the env file overrides it.
-if [ -z "${SERVICE_ACCOUNT:-}" ]; then
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
-fi
+# Checked before anything is built: the API refuses to start in production
+# without these (src/config/env.validation.ts), which would otherwise only show
+# once the new revision failed to boot.
+: "${PROJECT_ID:?set PROJECT_ID in ${ENV_FILE}}"
+: "${REGION:?set REGION in ${ENV_FILE}}"
+: "${SERVICE:?set SERVICE in ${ENV_FILE}: the Cloud Run service name}"
+: "${JOB:?set JOB in ${ENV_FILE}: the Cloud Run migration job name}"
+: "${MAIL_FROM:?set MAIL_FROM in ${ENV_FILE}, e.g. Raf <no-reply@example.com>}"
+: "${LEGAL_OPERATOR:?set LEGAL_OPERATOR in ${ENV_FILE}: legal name and address, shown on /privacy and /terms}"
+: "${SUPPORT_EMAIL:?set SUPPORT_EMAIL in ${ENV_FILE}: shown on the legal pages}"
 
-# Cloud Run can only pull images from a registry its service account has IAM
-# access to — that's Google Artifact Registry, not Docker Hub. This is that
-# registry's address for this project: region / project / repo-name.
+REPO="raf-tracker"
+BUCKET="${PROJECT_ID}-raf-tracker-uploads"
+# The user the image runs as (Dockerfile); it has to own the uploads mount.
+APP_UID=10001
+
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-${PROJECT_NUMBER}-compute@developer.gserviceaccount.com}"
+# Cloud Run's address for the service is known before it exists.
+PUBLIC_API_URL="${PUBLIC_API_URL:-https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app}"
+
+# The receipt reader runs inside the API and needs about 1 GB on its own.
+CPU="${CPU:-2}"
+MEMORY="${MEMORY:-2Gi}"
+MIN_INSTANCES="${MIN_INSTANCES:-0}"
+MAX_INSTANCES="${MAX_INSTANCES:-2}"
+
 REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}"
-
-# The tag identifies exactly which build this is. Using the git commit hash
-# instead of "latest" means every deploy is traceable back to the code that
-# produced it, and nothing gets silently overwritten.
+# Tagged with the commit it was built from, so every deploy can be traced back.
 TAG="$(git rev-parse --short HEAD)"
-API_IMAGE="${REGISTRY}/api:${TAG}"
-MIGRATOR_IMAGE="${REGISTRY}/migrator:${TAG}"
+git diff --quiet HEAD -- . || TAG="${TAG}-dirty"
+IMAGE="${REGISTRY}/api:${TAG}"
 
+say "1/6 Checking the project"
+if ! gcloud artifacts repositories describe "${REPO}" --location="${REGION}" \
+     --project "${PROJECT_ID}" >/dev/null 2>&1 \
+   || ! gcloud storage buckets describe "gs://${BUCKET}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
+  warn "The image registry ${REPO} or the bucket gs://${BUCKET} does not exist yet.
+Run ./scripts/setup-project.sh first."
+  exit 1
+fi
+echo "  service ${SERVICE} at ${PUBLIC_API_URL}, runs as ${SERVICE_ACCOUNT}"
+
+say "2/6 Storing the secrets"
 secret_exists() {
   gcloud secrets describe "$1" --project "${PROJECT_ID}" >/dev/null 2>&1
 }
-
-# Stores a value from the env file as a secret and grants the runtime service
-# account read access. Both halves matter: a secret Cloud Run cannot read
-# fails the same way a missing one does, only later, at container start.
-create_secret_from_env() {
-  local name="$1"
-  local value="$2"
-  printf '%s' "${value}" \
-    | gcloud secrets create "${name}" \
-        --project "${PROJECT_ID}" \
-        --replication-policy=automatic \
-        --data-file=- >/dev/null
-  gcloud secrets add-iam-policy-binding "${name}" \
-    --project "${PROJECT_ID}" \
-    --member="serviceAccount:${SA_EMAIL}" \
+# Creates the secret, or adds a version when the env file holds another value,
+# so a value changed there reaches the service. Old versions are kept:
+#   gcloud secrets versions list NAME --project PROJECT_ID
+store_secret() {
+  local name="$1" value="$2" current
+  if ! secret_exists "${name}"; then
+    printf '%s' "${value}" | gcloud secrets create "${name}" --project "${PROJECT_ID}" \
+      --replication-policy=automatic --data-file=- >/dev/null
+    echo "  created ${name}"
+  elif current="$(gcloud secrets versions access latest --secret "${name}" \
+                    --project "${PROJECT_ID}" 2>/dev/null)" && [ "${current}" = "${value}" ]; then
+    echo "  ${name} is current"
+  else
+    printf '%s' "${value}" | gcloud secrets versions add "${name}" --project "${PROJECT_ID}" \
+      --data-file=- >/dev/null
+    echo "  updated ${name} from ${ENV_FILE}"
+  fi
+}
+allow_read() {
+  gcloud secrets add-iam-policy-binding "$1" --project "${PROJECT_ID}" \
+    --member="serviceAccount:${SERVICE_ACCOUNT}" \
     --role=roles/secretmanager.secretAccessor >/dev/null
-  echo "  created ${name}"
 }
 
-# Adds a new version when the env file and the stored secret disagree.
-#
-# Without this, editing a value in ${ENV_FILE} and re-running looks like it
-# worked — every step is green — while Cloud Run keeps resolving :latest to the
-# old version. That is how MAP_API_KEY ended up holding a key that had been
-# deleted from the project: rotating it in the env file changed nothing here.
-#
-# Secret Manager keeps the old version, so this is additive and reversible:
-#   gcloud secrets versions list NAME --project ${PROJECT_ID}
-update_secret_from_env() {
-  local name="$1"
-  local value="$2"
-  local current
-
-  # A read failure is not a mismatch — no access, or every version disabled.
-  # Saying so and moving on beats pushing a version to paper over it.
-  if ! current="$(gcloud secrets versions access latest \
-      --secret "${name}" --project "${PROJECT_ID}" 2>/dev/null)"; then
-    warn "Cannot read the current value of ${name}; leaving it alone."
-    return 0
-  fi
-
-  [ "${current}" = "${value}" ] && return 0
-
-  printf '%s' "${value}" \
-    | gcloud secrets versions add "${name}" \
-        --project "${PROJECT_ID}" \
-        --data-file=- >/dev/null
-  echo "  updated ${name} from ${ENV_FILE} (new version added)"
-}
-
-say "1/7 Checking the secrets this deploy references"
-# Both `gcloud run deploy` and `gcloud run jobs deploy` resolve every name in
-# --set-secrets against Secret Manager and reject the whole revision if one is
-# missing:
-#
-#   spec.template.spec.containers[0].env[0].value_from.secret_key_ref.name:
-#   Secret projects/<n>/secrets/DATABASE_URL_UNPOOLED/versions/latest was not found
-#
-# Discovering that here costs a second. Discovering it at step 5 costs two
-# image builds and pushes first.
 missing=()
-# DATABASE_URL_UNPOOLED is in this list because it was once left out of it:
-# the create-if-missing block further down never refreshes a secret that
-# already exists, so it stayed pinned to a Neon endpoint that had been gone
-# for months while every deploy reported success. The migration job then
-# failed P1000 against credentials nothing in this repo mentioned any more.
-for name in DATABASE_URL DATABASE_URL_UNPOOLED ACCESS_KEY REFRESH_KEY \
-            AUDIT_HASH_KEY MAIL_PASSWORD; do
-  # A value present in the env file is one this script can store itself. The
-  # four keys are generated rather than configured, so they are never in that
-  # file and a missing one has to be created deliberately below.
-  eval "value=\${${name}:-}"
-
-  if secret_exists "${name}"; then
-    # The secret exists, but existing is not the same as current: an env file
-    # edited since the last deploy has to reach Secret Manager or it never
-    # reaches the running service.
-    [ -n "${value}" ] && update_secret_from_env "${name}" "${value}"
-    continue
-  fi
-
-  if [ -n "${value}" ]; then
-    create_secret_from_env "${name}" "${value}"
+for name in DATABASE_URL SMTP_URL; do
+  if [ -n "${!name:-}" ]; then
+    store_secret "${name}" "${!name}"
+  elif secret_exists "${name}"; then
+    echo "  ${name} not in ${ENV_FILE}; using the stored one"
   else
     missing+=("${name}")
   fi
 done
-
+# Generated, never written down; replacing it signs everybody out.
+if ! secret_exists JWT_ACCESS_SECRET; then
+  openssl rand -base64 48 | tr -d '\n' | gcloud secrets create JWT_ACCESS_SECRET \
+    --project "${PROJECT_ID}" --replication-policy=automatic --data-file=- >/dev/null
+  echo "  generated JWT_ACCESS_SECRET"
+fi
 if [ "${#missing[@]}" -gt 0 ]; then
-  warn "These secrets do not exist in ${PROJECT_ID}, and ${ENV_FILE} has no value for them:"
-  for name in "${missing[@]}"; do printf '  %s\n' "${name}" >&2; done
-  cat >&2 <<MSG
-
-ACCESS_KEY, REFRESH_KEY, and AUDIT_HASH_KEY are generated, not
-configured, and scripts/setup-project.sh creates them along with the rest of a
-new project's setup. Run that first. To create one by hand instead — four
-*different* random values, so that an access token cannot be replayed as a
-refresh token:
-
-  openssl rand -base64 48 \\
-    | gcloud secrets create ACCESS_KEY --data-file=- --project ${PROJECT_ID}
-
-Anything else is a value that belongs in ${ENV_FILE}: fill it in there and
-re-run, or store it directly:
-
-  printf '%s' 'THE VALUE' \\
-    | gcloud secrets create NAME --data-file=- --project ${PROJECT_ID}
-
-Either way the runtime identity has to be allowed to read it:
-
-  gcloud secrets add-iam-policy-binding NAME --project ${PROJECT_ID} \\
-    --member=serviceAccount:${SA_EMAIL} \\
-    --role=roles/secretmanager.secretAccessor
-MSG
+  warn "Set these in ${ENV_FILE} and run again: ${missing[*]}"
   exit 1
 fi
+for name in DATABASE_URL SMTP_URL JWT_ACCESS_SECRET; do allow_read "${name}"; done
+echo "  ${SERVICE_ACCOUNT} can read them"
 
-# DATABASE_URL_UNPOOLED, not DATABASE_URL, for the migration job: Prisma
-# Migrate over Neon's pooled (PgBouncer transaction-mode) endpoint is a
-# documented failure mode — prepared statements and SET do not persist across
-# statements. The job gets the direct URL; the API keeps the pooled one.
-#
-# Falling back to DATABASE_URL when there is no unpooled URL mirrors what
-# docker-entrypoint.sh already does with ${DATABASE_URL_UNPOOLED:-${DATABASE_URL}}.
-# The fallback is deliberately *not* a DATABASE_URL_UNPOOLED secret holding
-# the pooled URL: that would read as configured-and-correct forever after.
-MIGRATE_SECRET="DATABASE_URL_UNPOOLED"
-if ! secret_exists DATABASE_URL_UNPOOLED; then
-  if [ -n "${DATABASE_URL_UNPOOLED:-}" ]; then
-    create_secret_from_env DATABASE_URL_UNPOOLED "${DATABASE_URL_UNPOOLED}"
-  else
-    MIGRATE_SECRET="DATABASE_URL"
-    warn "No DATABASE_URL_UNPOOLED secret, and none set in ${ENV_FILE}.
-Migrating over the pooled DATABASE_URL instead. That is fine against a direct
-Postgres, and is the documented way for Prisma Migrate to fail against a
-PgBouncer transaction-mode pooler such as Neon's. Put the direct (unpooled)
-connection string in ${ENV_FILE} and re-run to fix it properly."
-  fi
-fi
-echo "  migrations will run against the ${MIGRATE_SECRET} secret"
-
-say "2/7 Authorizing Docker to push to Artifact Registry"
+say "3/6 Building and pushing ${IMAGE}"
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+docker build --platform linux/amd64 --target runtime -t "${IMAGE}" .
+docker push "${IMAGE}"
 
-say "3/7 Building and pushing the API image (Dockerfile target: production)"
-docker build --target production -t "${API_IMAGE}" .
-docker push "${API_IMAGE}"
-
-say "4/7 Building and pushing the migrator image (Dockerfile target: migrator)"
-# Same Dockerfile, different stage: this one only runs `prisma migrate deploy`
-# and exits — migrations run once, as their own step, not on every API boot.
-docker build --target migrator -t "${MIGRATOR_IMAGE}" .
-docker push "${MIGRATOR_IMAGE}"
-
-say "5/7 Pointing the migration Job at the new image"
+say "4/6 Pointing the migration job at the new image"
+# The same image as the API, with prisma instead of the server. Migrations run
+# once per deploy, before any instance of the new revision starts.
+# prisma.config.ts connects to Neon's direct address, not the pooled one.
 gcloud run jobs deploy "${JOB}" \
-  --image="${MIGRATOR_IMAGE}" \
+  --image="${IMAGE}" \
   --region="${REGION}" \
   --project "${PROJECT_ID}" \
-  --service-account="${SA_EMAIL}" \
-  --set-secrets="DATABASE_URL=${MIGRATE_SECRET}:latest" \
+  --service-account="${SERVICE_ACCOUNT}" \
+  --set-secrets="DATABASE_URL=DATABASE_URL:latest" \
+  --command=/app/node_modules/.bin/prisma \
+  --args=migrate,deploy \
   --max-retries=0 \
   --task-timeout=10m
 
-say "6/7 Running the migration and waiting for it to finish"
-gcloud run jobs execute "${JOB}" \
-  --region="${REGION}" \
-  --project "${PROJECT_ID}" \
-  --wait
+say "5/6 Running the migrations"
+gcloud run jobs execute "${JOB}" --region="${REGION}" --project "${PROJECT_ID}" --wait
 
-# RUN_MIGRATIONS=false below is load-bearing, not tidiness. Step 6 already ran
-# the migrations as their own job; without this the entrypoint runs
-# `prisma migrate deploy` again on every container start, which on a
-# scale-to-zero service means every cold start pays for the Prisma CLI booting
-# and connecting before the API listens — and a migration history that will not
-# apply stops the container from starting at all, turning a deploy problem into
-# an outage. --cpu-boost buys the remaining Nest/Prisma startup extra CPU for
-# the same reason: the first request after idle is the one users feel.
-#
-# --no-cpu-throttling keeps the CPU on between requests. Without it Cloud Run
-# all but stops an instance the moment a response is sent, and the work the
-# API does after answering — e-mailing followers about a published route,
-# writing usage statistics, the daily retention run — stalls or is lost when
-# the instance is shut down. It bills the instance for as long as it is up
-# (it still scales to zero when idle), not just while it serves a request.
-say "7/7 Deploying the API service"
-
-# The plain (non-secret) settings go through a YAML file rather than
-# --set-env-vars, because --set-env-vars splits on commas and CORS_ORIGINS and
-# GOOGLE_NATIVE_CLIENT_IDS are comma-separated lists. Values are written
-# single-quoted, so they stay strings (MAIL_PORT included) and the only
-# character to escape is ' itself, doubled. The quote goes through a variable
-# because bash before 4.3 keeps the backslashes of \' in a replacement.
+say "6/6 Deploying the API"
+# Plain settings go through a YAML file: --set-env-vars splits on commas, and
+# GOOGLE_CLIENT_IDS and CORS_ORIGINS are comma-separated. Values are single-quoted
+# so they stay strings; a ' inside one is doubled.
 ENV_VARS_FILE="$(mktemp)"
 trap 'rm -f "${ENV_VARS_FILE}"' EXIT
 yaml_env() {
   local q="'"
-  case "$2" in
-    *$'\n'*)
-      warn "$1 spans more than one line, which a YAML single-quoted value would fold into spaces."
-      exit 1
-      ;;
-  esac
+  case "$2" in *$'\n'*) warn "$1 spans more than one line"; exit 1 ;; esac
   printf "%s: '%s'\n" "$1" "${2//$q/$q$q}" >> "${ENV_VARS_FILE}"
 }
 yaml_env NODE_ENV production
-yaml_env RUN_MIGRATIONS false
+yaml_env PUBLIC_API_URL "${PUBLIC_API_URL}"
 yaml_env UPLOAD_DIR /mnt/uploads
-# Cloud Run's front end is the one proxy between a client and the API; the
-# rate limits read the client's address through it. See TRUST_PROXY in
-# src/config/env.validation.ts.
-yaml_env TRUST_PROXY 1
-# Optional settings are written only when set: an unset one keeps the API's
-# default rather than becoming an empty string (and `set -u` never trips here).
-for name in CORS_ORIGINS FRONTEND_URL SHARE_LINK_BASE_URL GOOGLE_CLIENT_ID \
-  GOOGLE_NATIVE_CLIENT_IDS MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_FROM; do
-  if [ -n "${!name:-}" ]; then
-    yaml_env "${name}" "${!name}"
-  fi
+yaml_env MAIL_FROM "${MAIL_FROM}"
+yaml_env LEGAL_OPERATOR "${LEGAL_OPERATOR}"
+yaml_env SUPPORT_EMAIL "${SUPPORT_EMAIL}"
+yaml_env OCR_THREADS "${OCR_THREADS:-${CPU}}"
+# Left out when not set, so the API keeps its default.
+for name in CORS_ORIGINS GOOGLE_CLIENT_IDS JWT_ACCESS_TTL JWT_REFRESH_TTL_DAYS \
+            MAX_UPLOAD_MB OCR_TIMEOUT_MS; do
+  if [ -n "${!name:-}" ]; then yaml_env "${name}" "${!name}"; fi
 done
 
+# --no-cpu-throttling: receipts are read after the upload has been answered, and
+# Cloud Run all but stops the CPU between requests without it. The instance is
+# billed while it is up, and still scales to zero when idle.
+# Receipt photos live in the bucket, so they outlast the instance that took them.
 gcloud run deploy "${SERVICE}" \
-  --image="${API_IMAGE}" \
+  --image="${IMAGE}" \
   --region="${REGION}" \
   --project "${PROJECT_ID}" \
-  --service-account="${SA_EMAIL}" \
+  --service-account="${SERVICE_ACCOUNT}" \
   --allow-unauthenticated \
   --execution-environment=gen2 \
   --env-vars-file="${ENV_VARS_FILE}" \
-  --set-secrets="DATABASE_URL=DATABASE_URL:latest,ACCESS_KEY=ACCESS_KEY:latest,REFRESH_KEY=REFRESH_KEY:latest,AUDIT_HASH_KEY=AUDIT_HASH_KEY:latest,MAIL_PASSWORD=MAIL_PASSWORD:latest" \
-  --add-volume=name=uploads,type=cloud-storage,bucket="${BUCKET}" \
+  --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET:latest,SMTP_URL=SMTP_URL:latest" \
+  --add-volume=name=uploads,type=cloud-storage,bucket="${BUCKET}",mount-options="uid=${APP_UID};gid=${APP_UID}" \
   --add-volume-mount=volume=uploads,mount-path=/mnt/uploads \
-  --min-instances=0 \
+  --min-instances="${MIN_INSTANCES}" \
   --max-instances="${MAX_INSTANCES}" \
-  --memory=512Mi \
-  --cpu=1 \
+  --cpu="${CPU}" \
+  --memory="${MEMORY}" \
   --cpu-boost \
   --no-cpu-throttling \
-  --timeout=60s
+  --timeout=120s
 
-# A deploy can succeed and change nothing: if traffic is pinned to a named
-# revision rather than tracking the latest, the new revision is built, started
-# and then never given a request. See docs/CLOUD_RUN_SOURCE_DEPLOY.md.
+# Traffic pinned to a named revision means the new one serves nobody.
 TRAFFIC="$(gcloud run services describe "${SERVICE}" --region "${REGION}" \
   --project "${PROJECT_ID}" --format='value(spec.traffic)')"
 case "${TRAFFIC}" in
   *latestRevision*) ;;
-  *)
-    warn "Traffic is pinned to a specific revision, so this deploy is not serving anyone:
-  ${TRAFFIC}
+  *) warn "Traffic is pinned to a revision, so this deploy serves nobody: ${TRAFFIC}
 Move it with:
-  gcloud run services update-traffic ${SERVICE} --to-latest --region ${REGION} --project ${PROJECT_ID}"
-    ;;
+  gcloud run services update-traffic ${SERVICE} --to-latest --region ${REGION} --project ${PROJECT_ID}" ;;
 esac
 
 URL="$(gcloud run services describe "${SERVICE}" --region "${REGION}" \
   --project "${PROJECT_ID}" --format='value(status.url)')"
-
 say "Deployed: ${URL}"
-curl -fsS "${URL}/api/health" && echo || echo "health check did not pass — check the logs"
+[ "${URL}" = "${PUBLIC_API_URL}" ] || warn "PUBLIC_API_URL is ${PUBLIC_API_URL}, but the service answers at ${URL}."
+curl -fsS "${URL}/health" && echo || echo "health check did not pass; see the logs:
+  gcloud run services logs read ${SERVICE} --region ${REGION} --project ${PROJECT_ID}"
