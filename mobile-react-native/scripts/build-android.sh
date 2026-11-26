@@ -12,6 +12,18 @@ set -euo pipefail
 
 say() { printf '\n=== %s\n' "$1"; }
 
+# It needs the Android SDK and the mounts of docker-compose.apk.yml, and it
+# replaces /work: never run it on your own computer.
+if [ ! -f /.dockerenv ] || [ ! -f /app/package.json ]; then
+  cat >&2 <<'HOST'
+This script runs inside the Android toolchain container. From the repository root:
+
+  docker compose -f docker-compose.apk.yml run --rm build-apk                      # APK
+  OUTPUT_FORMAT=aab docker compose -f docker-compose.apk.yml run --rm build-apk    # for Google Play
+HOST
+  exit 2
+fi
+
 ENV_FILE="${ENV_FILE:-/app/.env.production}"
 if [ -f "${ENV_FILE}" ]; then
   while IFS= read -r line || [ -n "${line}" ]; do
