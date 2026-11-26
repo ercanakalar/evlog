@@ -136,13 +136,21 @@ cd android
   -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 cd /work
 
-# Fails the build when the output is not signed with the upload key.
+# Fails the build when the output is not signed with the upload key. APKs carry
+# only v2/v3 signatures, which keytool cannot read; an AAB is a signed jar.
 check_signer() {
-  local file="$1" signer
-  signer="$(keytool -printcert -jarfile "${file}" | grep -oP 'SHA256: \K[0-9A-F:]+' | head -1 \
-    | tr -d ':' | tr 'A-F' 'a-f')"
+  local file="$1" signer apksigner
+  case "${file}" in
+    *.apk)
+      apksigner="$(ls -d "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)"
+      signer="$("${apksigner}" verify --print-certs "${file}" \
+        | grep -oP 'SHA-256 digest: \K[0-9a-f]+' | head -1 || true)" ;;
+    *)
+      signer="$(keytool -printcert -jarfile "${file}" | grep -oP 'SHA256: \K[0-9A-F:]+' | head -1 \
+        | tr -d ':' | tr 'A-F' 'a-f' || true)" ;;
+  esac
   if [ "${signer}" != "${EXPECTED_SHA256}" ]; then
-    echo "${file} is not signed with ${KEYSTORE}" >&2
+    echo "${file} is not signed with ${KEYSTORE} (signer: ${signer:-none found})" >&2
     exit 1
   fi
 }
