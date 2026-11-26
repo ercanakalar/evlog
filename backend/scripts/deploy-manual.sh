@@ -55,7 +55,40 @@ TAG="$(git rev-parse --short HEAD)"
 git diff --quiet HEAD -- . || TAG="${TAG}-dirty"
 IMAGE="${REGISTRY}/api:${TAG}"
 
-say "1/6 Checking the project"
+# Settings the API reads that are left out when not set, so it keeps its default.
+OPTIONAL_SETTINGS=(CORS_ORIGINS GOOGLE_CLIENT_IDS JWT_ACCESS_TTL JWT_REFRESH_TTL_DAYS
+                   MAX_UPLOAD_MB OCR_TIMEOUT_MS)
+
+say "1/6 Checking the settings and the project"
+# The API's own rules (src/config/env.validation.ts) on the settings the service
+# will get, so a bad value stops the deploy here rather than after the build, as
+# a revision that cannot start. Secrets not in the env file get a stand-in.
+if [ ! -d node_modules/zod ]; then
+  warn "Run npm install in backend/ first: the settings are checked with the API's own code."
+  exit 1
+fi
+settings=(NODE_ENV=production PUBLIC_API_URL="${PUBLIC_API_URL}" UPLOAD_DIR=/mnt/uploads
+          MAIL_FROM="${MAIL_FROM}" LEGAL_OPERATOR="${LEGAL_OPERATOR}" SUPPORT_EMAIL="${SUPPORT_EMAIL}"
+          OCR_THREADS="${OCR_THREADS:-${CPU}}"
+          JWT_ACCESS_SECRET="stand-in-for-the-generated-secret-0123456789"
+          DATABASE_URL="${DATABASE_URL:-postgresql://stored@secret/raf}"
+          SMTP_URL="${SMTP_URL:-smtp://stored.secret}")
+for name in "${OPTIONAL_SETTINGS[@]}"; do
+  if [ -n "${!name:-}" ]; then settings+=("${name}=${!name}"); fi
+done
+if ! env -i PATH="${PATH}" "${settings[@]}" node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+     --input-type=module -e '
+  const { envSchema } = await import("./src/config/env.validation.ts");
+  const result = envSchema.safeParse(process.env);
+  if (!result.success) {
+    for (const issue of result.error.issues) console.error(`  ${issue.path.join(".")}: ${issue.message}`);
+    process.exit(1);
+  }'; then
+  warn "The API would refuse to start with these settings; fix them in ${ENV_FILE}."
+  exit 1
+fi
+echo "  the API accepts the settings"
+
 if ! gcloud artifacts repositories describe "${REPO}" --location="${REGION}" \
      --project "${PROJECT_ID}" >/dev/null 2>&1 \
    || ! gcloud storage buckets describe "gs://${BUCKET}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
@@ -157,9 +190,7 @@ yaml_env MAIL_FROM "${MAIL_FROM}"
 yaml_env LEGAL_OPERATOR "${LEGAL_OPERATOR}"
 yaml_env SUPPORT_EMAIL "${SUPPORT_EMAIL}"
 yaml_env OCR_THREADS "${OCR_THREADS:-${CPU}}"
-# Left out when not set, so the API keeps its default.
-for name in CORS_ORIGINS GOOGLE_CLIENT_IDS JWT_ACCESS_TTL JWT_REFRESH_TTL_DAYS \
-            MAX_UPLOAD_MB OCR_TIMEOUT_MS; do
+for name in "${OPTIONAL_SETTINGS[@]}"; do
   if [ -n "${!name:-}" ]; then yaml_env "${name}" "${!name}"; fi
 done
 
