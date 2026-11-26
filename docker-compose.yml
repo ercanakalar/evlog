@@ -1,69 +1,59 @@
+# Local development with Docker. See "Run with Docker" in README.md.
+#
+#   docker compose up -d db                # Postgres, if you don't run your own
+#   docker compose up -d --build backend   # the API on port 3000
+#   docker compose run --rm mobile         # Expo's dev server (interactive)
+#   docker compose logs -f backend
+#   docker compose down
+#
+# The API and Expo use this computer's network: the API reads DATABASE_URL from
+# backend/.env just as `npm run start:dev` does (localhost works), and phones
+# reach both on this computer's LAN IP.
 services:
-    backend:
-        build:
-            context: ./backend
-            target: development
-        image: ercanakalar/road-map-backend
-        container_name: road-map-backend
-        ports:
-            - '3000:3000'
-        env_file:
-            - path: ./backend/.env
-              required: false
-        environment:
-            NODE_ENV: development
-        volumes:
-            - ./backend:/app
-            - backend-uploads:/app/uploads
-            - /app/node_modules
-        command: npm run start:dev
+  # Postgres for the API, on port 5433. Only started when named.
+  db:
+    image: postgres:18-alpine
+    profiles: [db]
+    environment:
+      POSTGRES_USER: raf
+      POSTGRES_PASSWORD: raf
+      POSTGRES_DB: raf
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U raf']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-    test-db:
-        image: postgres:16
-        container_name: road-map-db
-        ports:
-            - '5434:5432'
-        environment:
-            POSTGRES_DB: ${POSTGRES_DB:-roaddb}
-            POSTGRES_USER: ${POSTGRES_USER:-postgres}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-road-map}
-        healthcheck:
-            test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
-            interval: 5s
-            timeout: 5s
-            retries: 10
-        volumes:
-            - road-map-db:/var/lib/postgresql/data
+  # The API with its receipt reader, built like the Cloud Run image.
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    network_mode: host
+    env_file: ./backend/.env
+    environment:
+      UPLOAD_DIR: /app/uploads
+    command: sh -c "npx prisma migrate deploy && exec node dist/main"
+    volumes:
+      - uploads:/app/uploads
 
-    mobile:
-        build:
-            context: ./mobile-react-native
-        image: ercanakalar/road-map-mobile
-        container_name: road-map-mobile
-        depends_on:
-            - backend
-        ports:
-            - '8081:8081'
-            - '19000:19000'
-            - '19001:19001'
-            - '19002:19002'
-        environment:
-            EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
-            # This machine's LAN IP. The phone is a real device outside Docker's
-            # network, so it must reach `backend` at the host's address and the
-            # port mapping above (3000:3000) — the container name `backend` only
-            # resolves inside the compose network, not from the phone. Update
-            # both this and EXPO_PUBLIC_BASE_URL below if the machine's IP
-            # changes (a different network, a new DHCP lease, etc).
-            REACT_NATIVE_PACKAGER_HOSTNAME: 
-            EXPO_PUBLIC_BASE_URL: http://:3000
-        volumes:
-            - ./mobile-react-native:/app
-            - /app/node_modules
-        stdin_open: true
-        tty: true
-        command: npx expo start --tunnel
+  # Expo's dev server for a development build on your phone (npm run android once).
+  # EXPO_PUBLIC_API_URL comes from mobile-react-native/.env.
+  mobile:
+    image: node:24-bookworm
+    profiles: [mobile]
+    network_mode: host
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund && npx expo start --lan"
+    volumes:
+      - ./mobile-react-native:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
 
 volumes:
-    road-map-db:
-    backend-uploads:
+  pgdata:
+  uploads:
