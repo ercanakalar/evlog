@@ -1,37 +1,50 @@
+# Release builds of the Android app and crash logs from a phone, in Docker.
+# See "Android builds" in mobile-react-native/README.md.
+#
+#   docker compose -f docker-compose.apk.yml run --rm build-apk                      # signed APK
+#   OUTPUT_FORMAT=aab docker compose -f docker-compose.apk.yml run --rm build-apk    # for Google Play
+#   ADB_TARGET=<ip:port> docker compose -f docker-compose.apk.yml run --rm logcat
+#
+# Both write to apk-output/. Settings come from mobile-react-native/.env.production.
 services:
-    build-apk:
-        build:
-            context: ./mobile-react-native
-            dockerfile: Dockerfile.android
-        image: road-planner-android-builder
-        entrypoint: ['bash', '/app/scripts/build-android.sh']
-        environment:
-            BUILD_TYPE: ${BUILD_TYPE:-release}
-            # apk (default) or aab — Play only accepts the bundle
-            OUTPUT_FORMAT: ${OUTPUT_FORMAT:-apk}
-            # The keystore is mounted from the host (see ANDROID_KEYSTORE_DIR),
-            # so the path inside the container is fixed regardless of .env.
-            ANDROID_KEYSTORE_PATH: /keystore/raf-tracker.keystore
-        env_file:
-            - ./mobile-react-native/.env.production
-        volumes:
-            - ./mobile-react-native:/app
-            - ${ANDROID_KEYSTORE_DIR:-${HOME}/.keystores}:/keystore
-            - ./apk-output:/output
-            - apk-gradle-cache:/gradle-cache
+  build-apk:
+    build:
+      context: ./mobile-react-native
+      dockerfile: Dockerfile.android
+      target: toolchain
+    image: raf-android-toolchain
+    entrypoint: ['bash', '/app/scripts/build-android.sh']
+    environment:
+      BUILD_TYPE: ${BUILD_TYPE:-release}
+      # apk (default), aab (what Play accepts) or both
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-apk}
+      # The keystore folder is mounted from your computer (ANDROID_KEYSTORE_DIR),
+      # so the path inside the container is fixed.
+      ANDROID_KEYSTORE_PATH: /keystore/raf-upload.keystore
+      GRADLE_USER_HOME: /gradle-cache
+    volumes:
+      # Read only: the script builds a copy, so nothing is written into your folder.
+      - ./mobile-react-native:/app:ro
+      - ${ANDROID_KEYSTORE_DIR:-${HOME}/.keystores}:/keystore
+      - ./apk-output:/output
+      - gradle-cache:/gradle-cache
+      - npm-cache:/root/.npm
 
-    logcat:
-        build:
-            context: ./mobile-react-native
-            dockerfile: Dockerfile.android
-        image: road-planner-android-builder
-        entrypoint: /usr/local/bin/android-logcat
-        environment:
-            ADB_TARGET: ${ADB_TARGET:-}
-            ADB_PAIR: ${ADB_PAIR:-}
-            PAIR_CODE: ${PAIR_CODE:-}
-        volumes:
-            - ./apk-output:/output
+  logcat:
+    image: raf-android-toolchain
+    build:
+      context: ./mobile-react-native
+      dockerfile: Dockerfile.android
+      target: toolchain
+    entrypoint: ['bash', '/app/scripts/android-logcat.sh']
+    environment:
+      ADB_TARGET: ${ADB_TARGET:-}
+      ADB_PAIR: ${ADB_PAIR:-}
+      PAIR_CODE: ${PAIR_CODE:-}
+    volumes:
+      - ./mobile-react-native:/app:ro
+      - ./apk-output:/output
 
 volumes:
-    apk-gradle-cache:
+  gradle-cache:
+  npm-cache:

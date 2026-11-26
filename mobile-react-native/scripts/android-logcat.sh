@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
+# Reads why Raf crashed from a phone over wireless debugging. From the
+# repository root:
+#
+#   ADB_TARGET=<ip:port> docker compose -f docker-compose.apk.yml run --rm logcat
+#
+# The logs land in apk-output/.
 set -euo pipefail
 
 OUTPUT_DIR="${OUTPUT_DIR:-/output}"
-PACKAGE="${PACKAGE:-net.travelroutes.travelroutes}"
+PACKAGE="${PACKAGE:-app.evlog.raf}"
 
 say() { printf '\n=== %s\n' "$1"; }
 
@@ -14,7 +20,7 @@ Settings > Developer options > Wireless debugging.
 The first time, the phone also has to be paired. Tap "Pair device with
 pairing code" and pass that separate address and the six digits:
 
-  ADB_PAIR=<ip:pairing-port> PAIR_CODE=<six digits> ... run --rm logcat
+  ADB_PAIR=<ip:pairing-port> PAIR_CODE=<six digits> docker compose -f docker-compose.apk.yml run --rm logcat
 USAGE
   exit 2
 fi
@@ -54,5 +60,5 @@ adb logcat -d --pid="$(adb shell pidof -s "${PACKAGE}" 2>/dev/null || echo 0)" \
   > "${OUTPUT_DIR}/app.txt" 2>/dev/null || true
 
 say "Done"
-echo "Full crash buffer: apk-output/crash.txt"
+echo "Full crash buffer: apk-output/crash.txt; the app's own log: apk-output/app.txt"
 echo "Send that file over — the first 'Caused by:' line names the real fault."

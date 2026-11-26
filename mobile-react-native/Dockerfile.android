@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
 # Builds an installable Raf APK without Android Studio or an Expo account.
-# From apps/shelf-tracker/raf-mobile:
+# From mobile-react-native:
 #
 #   npm run apk            # -> build/raf.apk
 #
@@ -13,6 +13,10 @@
 # API than the one in .env (e.g. this computer's current LAN IP).
 # The first build downloads the Android SDK, NDK and Gradle (several GB) and
 # takes a while; later builds reuse them.
+#
+# This APK is signed with the debug key. For one signed with your upload key, or
+# an AAB for Google Play, see docker-compose.apk.yml at the repository root: it
+# runs scripts/build-android.sh in the "toolchain" stage below.
 
 FROM node:24-bookworm AS toolchain
 RUN apt-get update \
