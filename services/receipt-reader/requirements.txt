@@ -1,6 +1,0 @@
-fastapi==0.120.*
-uvicorn[standard]==0.38.*
-python-multipart==0.0.*
-rapidocr==3.10.*
-onnxruntime==1.32.*
-opencv-python-headless==4.14.*

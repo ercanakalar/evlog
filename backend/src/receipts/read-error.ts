@@ -1,7 +1,7 @@
 /** Why a photo could not be read, as a code the app has a text for. */
 export type ReadError = 'NO_TEXT' | 'NO_ITEMS' | 'NO_DATE' | 'UNREADABLE' | 'READER_UNAVAILABLE';
 
-/** What the readers (built in, and services/receipt-reader) say. */
+/** What the readers (built in, or a separate one at OCR_SERVICE_URL) say. */
 const KNOWN: [RegExp, ReadError][] = [
   [/^No text found/, 'NO_TEXT'],
   [/^Could not find any items/, 'NO_ITEMS'],
