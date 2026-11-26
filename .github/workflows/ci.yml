@@ -10,30 +10,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  api:
+  backend:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/home-tracker/api
+        working-directory: backend
     services:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: evlog
-          POSTGRES_PASSWORD: postgresql
-          POSTGRES_DB: evlog
-        ports: ["5432:5432"]
+          POSTGRES_USER: raf
+          POSTGRES_PASSWORD: raf
+          POSTGRES_DB: raf
+        ports: ["5433:5432"]
         options: >-
-          --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
+          --health-cmd "pg_isready -U raf" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5432/evlog
+      TEST_DATABASE_URL: postgresql://raf:raf@localhost:5433/raf
+      ONNXRUNTIME_NODE_INSTALL: skip # no GPU libraries
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version-file: .nvmrc
+          node-version: 24
           cache: npm
-          cache-dependency-path: apps/home-tracker/api/package-lock.json
+          cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -45,66 +46,16 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/home-tracker/mobile-react-native
+        working-directory: mobile-react-native
     env:
       EXPO_PUBLIC_API_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version-file: .nvmrc
+          node-version: 24
           cache: npm
-          cache-dependency-path: apps/home-tracker/mobile-react-native/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-
-  raf-api:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/shelf-tracker/raf-api
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: evlog
-          POSTGRES_PASSWORD: postgresql
-          POSTGRES_DB: raf
-        ports: ["5433:5432"]
-        options: >-
-          --health-cmd "pg_isready -U evlog" --health-interval 5s --health-timeout 3s --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgresql://evlog:postgresql@localhost:5433/raf
-      ONNXRUNTIME_NODE_INSTALL: skip # no GPU libraries
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: apps/shelf-tracker/raf-api/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run test:e2e
-      - run: npm run build
-
-  raf-mobile:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/shelf-tracker/raf-mobile
-    env:
-      EXPO_PUBLIC_API_URL: http://localhost:3000
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: apps/shelf-tracker/raf-mobile/package-lock.json
+          cache-dependency-path: mobile-react-native/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
