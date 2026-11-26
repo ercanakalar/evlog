@@ -2,11 +2,11 @@
 
 Backend for [Raf](../README.md), the grocery app: scan market receipts, see how much you
 spend and where, count down to when each product goes off, keep market lists
-and count what you have at home. Run these commands in `apps/shelf-tracker/raf-api`:
+and count what you have at home. Run these commands in `backend`:
 
 ```bash
 cp .env.example .env          # fill in secrets
-docker compose up -d raf-db   # port 5433, or use your own Postgres (database `raf`)
+docker compose up -d db       # port 5433, or use your own Postgres (database `raf`)
 ONNXRUNTIME_NODE_INSTALL=skip npm install   # also runs `prisma generate`; skips the GPU libraries
 npm run models                # the receipt reader's OCR models (135 MB, once)
 npx prisma migrate dev        # create tables
@@ -14,17 +14,17 @@ npm run db:seed               # shelf-life table + demo account (demo@raf.app / 
 npm run start:dev
 ```
 
-To run it in Docker instead: `docker compose up -d --build raf-api` from the repo root
-(see [Run with Docker](../../../README.md#run-with-docker)).
+To run it in Docker instead: `docker compose up -d --build backend` from the repository root
+(see [Run with Docker](../README.md#run-with-docker)).
 
 * API: `http://localhost:3000/api/v1` · Swagger UI: `http://localhost:3000/docs` (non-production) · Health: `/health` (with the database), `/health/live` (the API alone)
 * Requires Node ≥ 24.9 (NestJS 12 is ESM; Jest needs Node 24 to load it).
-* Raf has its **own database** (`raf`) and its own receipt reader (below); it
-  shares nothing with the Evlog API.
 * A hosted database (such as Neon) works; keep the API close to it. Saving a long
   receipt is about 80 queries: instant in the same region, 13 s at 160 ms away.
   Never run `prisma migrate dev` against it (it can reset the database);
-  `prisma migrate deploy` is safe and runs when the container starts.
+  `prisma migrate deploy` is safe; it runs when the Docker container starts, and as a
+  job before each Cloud Run deploy. `prisma.config.ts` migrates over Neon's direct
+  address, not the pooled one.
 * On first boot the API fills an empty shelf-life table itself; `SEED_DEMO=false npm run db:seed`
   updates the table without adding the demo account.
 
@@ -67,23 +67,79 @@ are read one at a time, pack labels before waiting receipts.
 | `label-parser.ts` | The expiry date on a pack |
 | `reader.service.ts` | The queue; restarts the process after a crash or a photo that takes too long |
 
-It is a port of [`services/receipt-reader`](../../../services/receipt-reader/README.md),
-whose README explains how receipts are read.
 `OCR_THREADS` limits the CPU it uses. Plan for about 1 GB of memory.
+
+How a receipt is read:
+
+1. `ocr.ts` finds every word and its position.
+2. `receipt-parser.ts` finds each item's quantity row (`1 ADET ₺98,90 … ₺98,90`), takes the
+   name from the rows above it and checks quantity × unit price = line total, trying every
+   likely reading of a misread number (the ₺ sign read as a digit, `0,968` read as `0.068`),
+   then the sum against the printed total. Header text above the first item (ETTN, loyalty
+   card, column headings) is kept out of names.
+3. `lexicon.ts` fixes letters OCR confuses in names (H/N/M, U/N, O/Q/0, 7/Y): `MANDALIHA` →
+   `MANDALINA`. Only words close to a word in its list change; Turkish endings, short words
+   and unknown brands stay as read.
+4. `barcode.ts` keeps the EAN-13 / EAN-8 printed beside an item when its check digit is right,
+   and repairs one misread digit when only one repair fits.
+
+Pack labels (`label-parser.ts`): the date labelled SKT / TETT / S.K.T. / EXP / BEST BEFORE,
+never the production date (ÜT / ÜRT / ÜRETİM / PROD) beside it; without a label, the latest
+date. Accepts 15.03.2027, 15/03/27, 15 03 2027, 150327 after SKT / TETT, 15 MAR 2027 /
+15.OCA.27 (Turkish and English months), 03/2027 (end of month) and 2027-03-15. A photo with
+no date is read again upside down, with the lighting evened out and turned 90°.
 
 ## A separate reader
 
-With `OCR_SERVICE_URL` set, the API uses a separate reader instead.
+With `OCR_SERVICE_URL` set, the API sends photos to a separate reader instead, with
+`OCR_SERVICE_TOKEN` as a bearer token. The contract is in `src/receipts/ocr.client.ts`:
+`POST /v1/receipts/parse` (multipart `file`, `receiptId`, `kind=GROCERY`, `callbackUrl`)
+answers `200` with the result, or `202` and later posts it to `callbackUrl` with
+`X-Ocr-Secret: <OCR_CALLBACK_SECRET>`. Long receipts need `200` for each part.
+`POST /v1/labels/parse` reads pack labels.
 
-Same reader and contract as Evlog ([`services/receipt-reader`](../../../services/receipt-reader/README.md)), always with
-`kind=GROCERY`. Single-photo receipts may be answered later via the callback;
-long receipts need the reader to answer each part with `200`.
+## On Cloud Run
 
-## On a server
+The API runs on Cloud Run with its receipt reader, receipt photos in a Cloud Storage
+bucket mounted at `/mnt/uploads`, and the database on Neon. You need the
+[gcloud CLI](https://cloud.google.com/sdk/docs/install) signed in (`gcloud auth login`)
+and Docker.
 
-[`deploy/raf`](../../../deploy/raf): HTTPS, database, backups. In production the API does not start
-with example secrets, or without email and legal settings. Request limits count per user, and
-per email and address when signing in, because mobile carriers put many phones behind one address.
+```bash
+cp .env.production.example .env.production   # fill it in; it is not committed
+./scripts/setup-project.sh                   # once per project: APIs, registry, bucket, signing key, IAM
+./scripts/deploy-manual.sh                   # every release
+```
+
+The deploy builds one image (tagged with the commit), runs `prisma migrate deploy` with it
+as the Cloud Run job `JOB`, then rolls the service `SERVICE` onto it, and checks `/health`.
+`DATABASE_URL` and `SMTP_URL` go from `.env.production` into Secret Manager, and a changed
+value there gets a new version on the next deploy. `JWT_ACCESS_SECRET` is generated once and
+never written down; replacing it signs everybody out.
+
+It stops before building anything when a setting the API needs in production is missing:
+`MAIL_FROM`, `LEGAL_OPERATOR`, `SUPPORT_EMAIL`, and the two secrets. `PUBLIC_API_URL`
+defaults to the service's Cloud Run address, which is also what the app's
+`EXPO_PUBLIC_API_URL` should be.
+
+The service has 2 CPUs and 2 GiB by default (`CPU`, `MEMORY`), scales from 0 to 2 instances
+(`MIN_INSTANCES`, `MAX_INSTANCES`), and keeps its CPU on between requests, because receipts
+are read after the upload has been answered. Receipts being read when an instance stops are
+taken up again at the next start. The first request after an idle spell waits for the API
+to start.
+
+Check these in a browser; the store listing links to them:
+`<address>/privacy`, `/terms` and `/delete-account` (`?lang=tr` for Turkish).
+
+In production the API does not start with example secrets, or without email and legal
+settings. Request limits count per user, and per email and address when signing in, because
+mobile carriers put many phones behind one address.
+
+### Deletion requests by email
+
+People without the app write to `SUPPORT_EMAIL` (see `/delete-account`). Check that the
+message comes from the account's own address, then send a password reset code to that
+address and let them delete the account in the app: that removes their photos too.
 
 ## Tests
 

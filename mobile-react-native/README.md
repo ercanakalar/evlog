@@ -2,12 +2,12 @@
 
 The phone app for [Raf](../README.md): scan market receipts, follow how long each product
 lasts, keep market lists, count what is at home and see where the money goes.
-Run these commands in `apps/shelf-tracker/raf-mobile`:
+Run these commands in `mobile-react-native`:
 
 ```bash
-cp .env.example .env      # EXPO_PUBLIC_API_URL → the Raf API (../raf-api, port 3000)
+cp .env.example .env      # EXPO_PUBLIC_API_URL → the Raf API (../backend, port 3000)
 npm install
-npm start                 # i / a, or scan the QR code
+npm run android           # or ios: builds and installs a development build, starts Expo
 ```
 
 `EXPO_PUBLIC_API_URL` must be reachable from the phone: `http://10.0.2.2:3000` on the
@@ -16,15 +16,25 @@ Android emulator, your computer's LAN IP on a real device.
 `EXPO_PUBLIC_SUPPORT_EMAIL` is shown under Settings → Help.
 
 The live scanner (`expo-camera`), reminders (`expo-notifications`) and Google
-sign-in need a development build (`npx expo run:ios|android`); Expo Go lacks some
-of these modules.
+sign-in need that development build; Expo Go lacks some of these modules. Once it is
+on the phone, `npm start` is enough until a native module changes.
 
-Checks: `npm run typecheck`, `npm run lint`.
+Checks: `npm run typecheck`, `npm run lint`, and `npm run check:contrast` after changing
+a colour in `src/theme/colors.ts` (WCAG AA in every palette, light and dark).
 
-## Android APK with Docker
+## Android builds
 
-Builds an installable release APK in Docker ([Dockerfile.android](Dockerfile.android)),
-with no Android Studio or Expo account:
+Three ways, none of which needs Android Studio:
+
+| Build | For | Signed with |
+| --- | --- | --- |
+| `npm run apk` | trying it on your own phone | the debug key |
+| `docker compose -f docker-compose.apk.yml run --rm build-apk` | release APK / AAB for Google Play | Raf's upload key |
+| EAS (`eas.json`) | store builds on Expo's servers | a key Expo keeps |
+
+### Quick APK
+
+Builds an installable release APK in Docker ([Dockerfile.android](Dockerfile.android)):
 
 ```bash
 hostname -I                                                    # this computer's LAN IP (first one)
@@ -44,7 +54,38 @@ If the phone still cannot connect, open the port on this computer's firewall
 `--build-arg ABIS=arm64-v8a,armeabi-v7a,x86_64` for old phones or the emulator.
 The first build downloads the Android SDK, NDK and Gradle (several GB); later
 builds reuse them. The APK is signed with the debug key, which is fine for
-installing it yourself but not for the Play Store (use EAS for that).
+installing it yourself but not for the Play Store.
+
+### Signed APK or AAB
+
+[`scripts/build-android.sh`](scripts/build-android.sh) runs in the same Android toolchain
+image and signs with Raf's upload key. Its settings are in `.env.production` (not committed):
+`EXPO_PUBLIC_API_URL` (the Cloud Run address), the `EXPO_PUBLIC_GOOGLE_*` client ids, and
+`ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD` for the keystore
+`~/.keystores/raf-upload.keystore` (`ANDROID_KEYSTORE_DIR` points elsewhere). From the
+repository root:
+
+```bash
+docker compose -f docker-compose.apk.yml run --rm build-apk                      # apk-output/raf-release.apk
+OUTPUT_FORMAT=aab docker compose -f docker-compose.apk.yml run --rm build-apk    # apk-output/raf-release.aab
+```
+
+It builds a copy of the project, so nothing is written into this folder, and fails when
+the output is not signed with the upload key. It prints the key's SHA-1, which Raf's
+Android OAuth client needs for Google sign-in. Without a keystore it makes one: keep it,
+because Play accepts updates only from the key of the first upload. The AAB includes
+`armeabi-v7a`, `arm64-v8a` and `x86_64`; set `ABIS` to change that. Play needs a higher
+`versionCode` for each upload.
+
+When the app crashes on a phone, read why over wireless debugging (Settings → Developer
+options → Wireless debugging):
+
+```bash
+ADB_TARGET=<ip:port> docker compose -f docker-compose.apk.yml run --rm logcat
+# the first time, also: ADB_PAIR=<ip:pairing-port> PAIR_CODE=<six digits>
+```
+
+It writes `apk-output/crash.txt`; the first `Caused by:` line names the fault.
 
 ## Store builds with EAS
 
@@ -76,7 +117,7 @@ and a Google service account key for `submit` after that.
 
 Create OAuth client ids in Google Cloud Console (web, iOS, Android), put them in
 `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` here and in `GOOGLE_CLIENT_IDS` in
-`apps/shelf-tracker/raf-api/.env`. Without them the button is hidden; it is also hidden on iOS,
+`../backend/.env` (and `.env.production` for release builds). Without them the button is hidden; it is also hidden on iOS,
 where Apple then requires Sign in with Apple.
 
 ## Screens
@@ -99,7 +140,6 @@ where Apple then requires Sign in with Apple.
 
 ## Structure
 
-Same layout and conventions as [`apps/home-tracker/mobile-react-native`](../../home-tracker/mobile-react-native/README.md#structure):
 
 ```
 src/
@@ -112,5 +152,8 @@ src/
 ├── theme/        colour palettes (each light + dark) and font styles, both chosen in Settings
 └── i18n/         English and Turkish
 ```
+
+App icons are drawn in `assets/source/*.svg`; `npm run icons` renders them (see
+[its README](assets/source/README.md)).
 
 Deep links: `raf://scan`, `raf://receipt/<id>`, `raf://trip/<id>`, `raf://product/<id>`, `raf://shelf`…
