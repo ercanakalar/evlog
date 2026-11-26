@@ -1,0 +1,37 @@
+services:
+    build-apk:
+        build:
+            context: ./mobile-react-native
+            dockerfile: Dockerfile.android
+        image: road-planner-android-builder
+        entrypoint: ['bash', '/app/scripts/build-android.sh']
+        environment:
+            BUILD_TYPE: ${BUILD_TYPE:-release}
+            # apk (default) or aab — Play only accepts the bundle
+            OUTPUT_FORMAT: ${OUTPUT_FORMAT:-apk}
+            # The keystore is mounted from the host (see ANDROID_KEYSTORE_DIR),
+            # so the path inside the container is fixed regardless of .env.
+            ANDROID_KEYSTORE_PATH: /keystore/travel-routes.keystore
+        env_file:
+            - ./mobile-react-native/.env.production
+        volumes:
+            - ./mobile-react-native:/app
+            - ${ANDROID_KEYSTORE_DIR:-${HOME}/.keystores}:/keystore
+            - ./apk-output:/output
+            - apk-gradle-cache:/gradle-cache
+
+    logcat:
+        build:
+            context: ./mobile-react-native
+            dockerfile: Dockerfile.android
+        image: road-planner-android-builder
+        entrypoint: /usr/local/bin/android-logcat
+        environment:
+            ADB_TARGET: ${ADB_TARGET:-}
+            ADB_PAIR: ${ADB_PAIR:-}
+            PAIR_CODE: ${PAIR_CODE:-}
+        volumes:
+            - ./apk-output:/output
+
+volumes:
+    apk-gradle-cache:
