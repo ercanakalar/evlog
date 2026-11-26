@@ -14,7 +14,7 @@ export type OcrDispatchResult =
 
 /**
  * Reads photos with the reader built into this API or, when OCR_SERVICE_URL
- * is set, with a separate receipt reader (services/receipt-reader):
+ * is set, with a separate receipt reader that answers this contract:
  *
  *   POST {OCR_SERVICE_URL}/v1/receipts/parse   (multipart/form-data)
  *     Authorization: Bearer {OCR_SERVICE_TOKEN}
