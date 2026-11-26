@@ -11,7 +11,7 @@ services:
             OUTPUT_FORMAT: ${OUTPUT_FORMAT:-apk}
             # The keystore is mounted from the host (see ANDROID_KEYSTORE_DIR),
             # so the path inside the container is fixed regardless of .env.
-            ANDROID_KEYSTORE_PATH: /keystore/travel-routes.keystore
+            ANDROID_KEYSTORE_PATH: /keystore/raf-tracker.keystore
         env_file:
             - ./mobile-react-native/.env.production
         volumes:

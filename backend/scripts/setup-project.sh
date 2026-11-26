@@ -23,8 +23,8 @@ set -a; source "${ENV_FILE}"; set +a
 : "${REGION:?set REGION in ${ENV_FILE}}"
 : "${SERVICE_ACCOUNT:?set SERVICE_ACCOUNT in ${ENV_FILE}}"
 
-REPO="travel-routes"
-BUCKET="${PROJECT_ID}-travel-routes-uploads"
+REPO="raf-tracker"
+BUCKET="${PROJECT_ID}-raf-tracker-uploads"
 
 say() { printf '\n=== %s\n' "$1"; }
 warn() { printf '\n!!! %s\n' "$1" >&2; }
@@ -104,7 +104,7 @@ say "5/6 Generating the token signing keys"
 # secret shared across token classes would let an access token be replayed as
 # a refresh token. Generated here and left alone afterwards — regenerating one
 # signs every user out, so a later run of this script must not touch them.
-for name in ACCESS_KEY REFRESH_KEY ROAD_SHARE_KEY AUDIT_HASH_KEY; do
+for name in ACCESS_KEY REFRESH_KEY AUDIT_HASH_KEY; do
   if gcloud secrets describe "${name}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
     echo "  ${name} already exists — left alone"
     continue

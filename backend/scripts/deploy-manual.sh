@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploys the backend to the Cloud Run service/job that already exist
-# (travel-routes-backend / travel-routes-migrate), using the secrets in
+# (raf-tracker-backend / raf-tracker-migrate), using the secrets in
 # Secret Manager.
 #
 # This is the same flow as the old scripts/deploy-cloudrun.sh, written out
@@ -36,8 +36,8 @@ set -a; source "${ENV_FILE}"; set +a
 : "${MAIL_USERNAME:?set MAIL_USERNAME in ${ENV_FILE}}"
 : "${MAIL_FROM:?set MAIL_FROM in ${ENV_FILE}}"
 
-REPO="travel-routes"
-BUCKET="${PROJECT_ID}-travel-routes-uploads"
+REPO="raf-tracker"
+BUCKET="${PROJECT_ID}-raf-tracker-uploads"
 
 say() { printf '\n=== %s\n' "$1"; }
 warn() { printf '\n!!! %s\n' "$1" >&2; }
@@ -133,7 +133,7 @@ missing=()
 # for months while every deploy reported success. The migration job then
 # failed P1000 against credentials nothing in this repo mentioned any more.
 for name in DATABASE_URL DATABASE_URL_UNPOOLED ACCESS_KEY REFRESH_KEY \
-            ROAD_SHARE_KEY AUDIT_HASH_KEY MAIL_PASSWORD; do
+            AUDIT_HASH_KEY MAIL_PASSWORD; do
   # A value present in the env file is one this script can store itself. The
   # four keys are generated rather than configured, so they are never in that
   # file and a missing one has to be created deliberately below.
@@ -159,7 +159,7 @@ if [ "${#missing[@]}" -gt 0 ]; then
   for name in "${missing[@]}"; do printf '  %s\n' "${name}" >&2; done
   cat >&2 <<MSG
 
-ACCESS_KEY, REFRESH_KEY, ROAD_SHARE_KEY and AUDIT_HASH_KEY are generated, not
+ACCESS_KEY, REFRESH_KEY, and AUDIT_HASH_KEY are generated, not
 configured, and scripts/setup-project.sh creates them along with the rest of a
 new project's setup. Run that first. To create one by hand instead — four
 *different* random values, so that an access token cannot be replayed as a
@@ -295,7 +295,7 @@ gcloud run deploy "${SERVICE}" \
   --allow-unauthenticated \
   --execution-environment=gen2 \
   --env-vars-file="${ENV_VARS_FILE}" \
-  --set-secrets="DATABASE_URL=DATABASE_URL:latest,ACCESS_KEY=ACCESS_KEY:latest,REFRESH_KEY=REFRESH_KEY:latest,AUDIT_HASH_KEY=AUDIT_HASH_KEY:latest,ROAD_SHARE_KEY=ROAD_SHARE_KEY:latest,MAIL_PASSWORD=MAIL_PASSWORD:latest" \
+  --set-secrets="DATABASE_URL=DATABASE_URL:latest,ACCESS_KEY=ACCESS_KEY:latest,REFRESH_KEY=REFRESH_KEY:latest,AUDIT_HASH_KEY=AUDIT_HASH_KEY:latest,MAIL_PASSWORD=MAIL_PASSWORD:latest" \
   --add-volume=name=uploads,type=cloud-storage,bucket="${BUCKET}" \
   --add-volume-mount=volume=uploads,mount-path=/mnt/uploads \
   --min-instances=0 \
