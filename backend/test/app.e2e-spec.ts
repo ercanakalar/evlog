@@ -791,6 +791,9 @@ describe('Raf API (e2e)', () => {
   describe('a shared household', () => {
     let ali: string;
     let ayse: string;
+    let shared: string;
+    // A fixed time: both photos of one receipt read the same minute.
+    const printed = { ...cityGross, issuedAt: '2026-11-20T12:34:00+03:00' };
     const homeItems = async (t: string) =>
       Object.fromEntries(
         (await api().get('/api/v1/home-items').set(auth(t)).expect(200)).body.map(
@@ -828,9 +831,11 @@ describe('Raf API (e2e)', () => {
     });
 
     it('shares receipts and at-home counts both ways', async () => {
-      ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(2) } });
+      ocr.respond = () => ({ status: 200, body: printed });
       const scanned = await read(scan(1, ali), ali);
+      shared = scanned.body.id;
       expect(scanned.body.scannedBy).toMatchObject({ fullName: 'ali' });
+      expect(scanned.body.duplicateOf).toBeNull();
       // Ayşe sees and saves the receipt Ali scanned; the same photo is the same receipt for her.
       await api().get(`/api/v1/receipts/${scanned.body.id}`).set(auth(ayse)).expect(200);
       await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(ayse)).expect(200);
@@ -840,6 +845,27 @@ describe('Raf API (e2e)', () => {
       );
       await api().patch(`/api/v1/home-items/${yogurt.id}`).set(auth(ayse)).send({ count: 1 }).expect(200);
       expect((await homeItems(ali)).Yogurt).toBe(1);
+    });
+
+    it('warns when someone in the household already scanned the same receipt', async () => {
+      // Ayşe photographs the paper receipt Ali already scanned: another photo, the same receipt.
+      ocr.respond = () => ({ status: 200, body: printed });
+      const again = await read(scan(1, ayse), ayse);
+      expect(again.body.duplicateOf).toMatchObject({ id: shared, status: 'CONFIRMED', scannedBy: { fullName: 'ali' } });
+      // A corrected total makes it another purchase.
+      const fixed = await api()
+        .patch(`/api/v1/receipts/${again.body.id}`)
+        .set(auth(ayse))
+        .send({ totalAmount: 1.5 })
+        .expect(200);
+      expect(fixed.body.duplicateOf).toBeNull();
+      await api().delete(`/api/v1/receipts/${again.body.id}`).set(auth(ayse)).expect(204);
+
+      // Another purchase that day with the same total, at another time, is not one.
+      ocr.respond = () => ({ status: 200, body: { ...printed, issuedAt: '2026-11-20T18:05:00+03:00' } });
+      const later = await read(scan(1, ayse), ayse);
+      expect(later.body.duplicateOf).toBeNull();
+      await api().delete(`/api/v1/receipts/${later.body.id}`).set(auth(ayse)).expect(204);
     });
 
     it('needs whoever shares a household to leave it before joining another', async () => {

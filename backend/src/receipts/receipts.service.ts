@@ -17,10 +17,11 @@ import type { ProductLanguage } from '../products/product-matcher';
 import { ProductsService } from '../products/products.service';
 import { StorageService } from '../storage/storage.service';
 import { sha256 } from '../common/utils/crypto';
-import { normalizeProductName } from '../common/utils/normalize';
+import { DAY_MS, normalizeProductName } from '../common/utils/normalize';
 import { OcrItemDto, OcrResultDto } from './dto/ocr-result.dto';
 import { ListReceiptsQueryDto, ReceiptLineDto, UpdateReceiptDto } from './dto/receipt.dto';
 import { OcrClient, OcrDispatchResult } from './ocr.client';
+import { sameReceipt } from './receipt-duplicates';
 import { mergeReceiptParts } from './receipt-merge';
 
 const withItems = {
@@ -36,6 +37,17 @@ const withItems = {
     },
   },
   scannedBy: { select: { id: true, fullName: true } },
+  // The earlier receipt this one repeats, for "Ayşe already scanned this".
+  duplicateOf: {
+    select: {
+      id: true,
+      status: true,
+      merchantName: true,
+      issuedAt: true,
+      createdAt: true,
+      scannedBy: { select: { id: true, fullName: true } },
+    },
+  },
 } satisfies Prisma.ReceiptInclude;
 
 /** Photos are read one at a time, so nobody may fill the queue. */
@@ -207,7 +219,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
     }
     const { items, issuedAt, ...fields } = dto;
     const lines = items ? await this.linesFromUser(items, receipt.language as ProductLanguage) : undefined;
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       if (lines) {
         await tx.receiptItem.deleteMany({ where: { receiptId } });
         await tx.receiptItem.createMany({ data: lines.map((line) => ({ ...line, receiptId })) });
@@ -224,6 +236,10 @@ export class ReceiptsService implements OnApplicationBootstrap {
         omit: { imageKeys: true },
       });
     });
+    // A corrected date or total can make it, or stop it being, a receipt scanned before.
+    if (issuedAt === undefined && fields.totalAmount === undefined) return updated;
+    await this.flagDuplicates(receiptId);
+    return this.get(receiptId, householdId);
   }
 
   /**
@@ -395,6 +411,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
           status: 'PARSED',
           merchantName: result.merchantName?.trim(),
           issuedAt: result.issuedAt ? new Date(result.issuedAt) : undefined,
+          receiptNo: result.receiptNo,
           totalAmount: round2(total),
           currency: result.currency ?? 'TRY',
           ocrRaw: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue,
@@ -402,6 +419,50 @@ export class ReceiptsService implements OnApplicationBootstrap {
         },
       }),
     ]);
+    await this.flagDuplicates(receiptId);
+  }
+
+  /**
+   * Marks a receipt that repeats an earlier one in the household (someone
+   * else photographed the same paper receipt), and unsaved later receipts
+   * that repeat this one, which was read last. The app warns before saving
+   * one twice; it is never refused, as only the user can tell for sure.
+   */
+  private async flagDuplicates(receiptId: string) {
+    const receipt = await this.prisma.receipt.findUniqueOrThrow({
+      where: { id: receiptId },
+      select: { householdId: true, issuedAt: true, totalAmount: true, receiptNo: true, createdAt: true },
+    });
+    const same =
+      receipt.issuedAt && receipt.totalAmount !== null
+        ? (
+            await this.prisma.receipt.findMany({
+              where: {
+                householdId: receipt.householdId,
+                id: { not: receiptId },
+                status: { in: ['PARSED', 'CONFIRMED'] },
+                totalAmount: receipt.totalAmount,
+                issuedAt: {
+                  gte: new Date(receipt.issuedAt.getTime() - DAY_MS),
+                  lte: new Date(receipt.issuedAt.getTime() + DAY_MS),
+                },
+              },
+              select: { id: true, issuedAt: true, totalAmount: true, receiptNo: true, createdAt: true, status: true, duplicateOfId: true },
+              orderBy: { createdAt: 'asc' },
+            })
+          ).filter((other) => sameReceipt(receipt, other))
+        : [];
+    const original = same.find((other) => other.createdAt < receipt.createdAt);
+    await this.prisma.receipt.update({ where: { id: receiptId }, data: { duplicateOfId: original?.id ?? null } });
+    if (original) return;
+    // Sent later but read sooner (a long receipt takes longer): those repeat this one.
+    const later = same.filter((o) => o.createdAt > receipt.createdAt && o.status !== 'CONFIRMED' && !o.duplicateOfId);
+    if (later.length > 0) {
+      await this.prisma.receipt.updateMany({
+        where: { id: { in: later.map((o) => o.id) } },
+        data: { duplicateOfId: receiptId },
+      });
+    }
   }
 
   /** Reader lines -> stored lines, each matched with the shelf-life table. */
