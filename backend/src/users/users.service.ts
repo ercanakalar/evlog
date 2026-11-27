@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { EventsService } from '../events/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { UpdateSettingsDto } from './dto/settings.dto';
@@ -22,6 +23,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly events: EventsService,
   ) {}
 
   async me(userId: string) {
@@ -63,6 +65,7 @@ export class UsersService {
    * stay for the others, and receipts this person scanned no longer say who.
    */
   async remove(userId: string) {
+    let left: string | undefined;
     const imageKeys = await this.prisma.$transaction(async (tx) => {
       // Holds back uploads in flight, so no photo is added after the keys are read.
       await tx.$queryRaw`SELECT 1 FROM "User" WHERE "id" = ${userId}::uuid FOR UPDATE`;
@@ -70,11 +73,17 @@ export class UsersService {
       // Holds back someone joining meanwhile.
       await tx.$queryRaw`SELECT 1 FROM "Household" WHERE "id" = ${householdId}::uuid FOR UPDATE`;
       await tx.user.delete({ where: { id: userId } });
-      if ((await tx.user.count({ where: { householdId } })) > 0) return [];
+      if ((await tx.user.count({ where: { householdId } })) > 0) {
+        left = householdId;
+        return [];
+      }
       const receipts = await tx.receipt.findMany({ where: { householdId }, select: { imageKeys: true } });
       await tx.household.delete({ where: { id: householdId } });
       return receipts.flatMap((r) => r.imageKeys);
     });
     await this.storage.remove(imageKeys);
+    // Their apps disconnect; the others see one member fewer.
+    void this.events.moved(userId);
+    if (left) void this.events.changed(left, ['Household', 'Receipt']);
   }
 }

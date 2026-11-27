@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { requestTracker } from './common/guards/request-tracker';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { envSchema } from './config/env.validation';
+import { EventsModule } from './events/events.module';
 import { HealthModule } from './health/health.module';
 import { HomeItemsModule } from './home-items/home-items.module';
 import { HouseholdsModule } from './households/households.module';
@@ -39,6 +40,7 @@ import { UsersModule } from './users/users.module';
       ],
     }),
     PrismaModule,
+    EventsModule,
     StorageModule,
     MailModule,
     ProductsModule,

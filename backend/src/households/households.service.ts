@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import type { Member } from '../common/decorators/current-user.decorator';
+import { ALL_TAGS, EventsService } from '../events/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { newInviteCode, parseInviteCode, showInviteCode } from './invite-code';
 
@@ -21,7 +22,10 @@ type Tx = Prisma.TransactionClient;
  */
 @Injectable()
 export class HouseholdsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   /** The members, and the invite code while one can be used. */
   async get({ id: userId, householdId }: Member) {
@@ -57,6 +61,7 @@ export class HouseholdsService {
           where: { id: member.householdId },
           data: { inviteCode: newInviteCode(), inviteExpiresAt },
         });
+        void this.events.changed(member.householdId, ['Household'], member.id);
         return this.get(member);
       } catch (error) {
         const clash = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -70,6 +75,7 @@ export class HouseholdsService {
       where: { id: member.householdId },
       data: { inviteCode: null, inviteExpiresAt: null },
     });
+    void this.events.changed(member.householdId, ['Household'], member.id);
     return this.get(member);
   }
 
@@ -112,6 +118,9 @@ export class HouseholdsService {
       // One code, one person: the next one gets a new code.
       await tx.household.update({ where: { id: target.id }, data: { inviteCode: null, inviteExpiresAt: null } });
     });
+    // Their data arrived: everyone fetches everything; their app reconnects to the new household.
+    void this.events.changed(target.id, ALL_TAGS, member.id);
+    void this.events.moved(member.id);
     return this.get({ id: member.id, householdId: target.id });
   }
 
@@ -129,6 +138,8 @@ export class HouseholdsService {
       await tx.user.update({ where: { id: member.id }, data: { householdId: fresh.id } });
       return fresh.id;
     });
+    void this.events.changed(member.householdId, ['Household'], member.id);
+    void this.events.moved(member.id);
     return this.get({ id: member.id, householdId });
   }
 

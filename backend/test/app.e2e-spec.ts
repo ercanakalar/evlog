@@ -2,6 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomBytes } from 'node:crypto';
 import { existsSync, readdirSync } from 'node:fs';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import WebSocket from 'ws';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
@@ -800,6 +803,25 @@ describe('Raf API (e2e)', () => {
           (h: { name: string; count: number }) => [h.name, h.count],
         ),
       );
+    /** The live-updates socket, as the app opens it, with what it was sent. */
+    const live = async (t?: string) => {
+      const server = app.getHttpServer() as unknown as Server;
+      if (!server.listening) await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+      const { port } = server.address() as AddressInfo;
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/api/v1/events`, t ? ['raf', t] : ['raf']);
+      const messages: { type: string; tags?: string[] }[] = [];
+      socket.on('message', (data: Buffer) => messages.push(JSON.parse(data.toString('utf8'))));
+      await new Promise((opened, failed) => {
+        socket.once('open', opened);
+        socket.once('unexpected-response', (_req, res) => failed(new Error(`HTTP ${res.statusCode}`)));
+        socket.once('error', failed);
+      });
+      const until = async (seen: () => boolean) => {
+        for (let i = 0; i < 100 && !seen(); i++) await new Promise((done) => setTimeout(done, 20));
+        return seen();
+      };
+      return { socket, messages, until };
+    };
     const inviteCode = async (t: string) =>
       (await api().post('/api/v1/household/invite').set(auth(t)).expect(200)).body.invite.code as string;
 
@@ -868,6 +890,17 @@ describe('Raf API (e2e)', () => {
       await api().delete(`/api/v1/receipts/${later.body.id}`).set(auth(ayse)).expect(204);
     });
 
+    it('tells the others live what to fetch again', async () => {
+      await expect(live()).rejects.toThrow('HTTP 401');
+      const alis = await live(ali);
+      const rice = (await api().get('/api/v1/home-items').set(auth(ayse))).body.find(
+        (h: { name: string }) => h.name === 'Rice',
+      );
+      await api().patch(`/api/v1/home-items/${rice.id}`).set(auth(ayse)).send({ count: 3 }).expect(200);
+      expect(await alis.until(() => alis.messages.some((m) => m.type === 'changed' && m.tags?.includes('HomeItem')))).toBe(true);
+      alis.socket.close();
+    });
+
     it('needs whoever shares a household to leave it before joining another', async () => {
       const other = await register('deniz2@example.com');
       await api()
@@ -879,10 +912,14 @@ describe('Raf API (e2e)', () => {
     });
 
     it('keeps what was shared with the household when someone leaves', async () => {
+      const ayses = await live(ayse);
+      const closed = new Promise<number>((done) => ayses.socket.once('close', done));
       const left = await api().post('/api/v1/household/leave').set(auth(ayse)).expect(200);
+      // Her app reconnects to her new household.
+      expect(await closed).toBe(4001);
       expect(left.body.members).toHaveLength(1);
       expect(await homeItems(ayse)).toEqual({});
-      expect(await homeItems(ali)).toMatchObject({ Yogurt: 1, Rice: 1 });
+      expect(await homeItems(ali)).toMatchObject({ Yogurt: 1, Rice: 3 });
       await api().post('/api/v1/household/leave').set(auth(ayse)).expect(409);
     });
   });

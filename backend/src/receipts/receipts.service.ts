@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import type { Member } from '../common/decorators/current-user.decorator';
 import { Prisma } from '../generated/prisma/client';
+import { EventsService } from '../events/events.service';
 import { HomeItemsService } from '../home-items/home-items.service';
 import { ItemsService } from '../items/items.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -68,6 +69,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
     private readonly products: ProductsService,
     private readonly items: ItemsService,
     private readonly homeItems: HomeItemsService,
+    private readonly events: EventsService,
   ) {}
 
   onApplicationBootstrap() {
@@ -324,9 +326,11 @@ export class ReceiptsService implements OnApplicationBootstrap {
 
   /** Reads the stored photos and saves what was found. Never throws. */
   private async read(receiptId: string): Promise<void> {
+    let householdId: string | undefined;
     try {
       const receipt = await this.prisma.receipt.findUnique({ where: { id: receiptId } });
       if (!receipt) return;
+      householdId = receipt.householdId;
       const outcomes: OcrDispatchResult[] = [];
       for (const [index, key] of receipt.imageKeys.entries()) {
         const chunks: Buffer[] = [];
@@ -356,6 +360,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
           data: { status: 'FAILED', ocrError: 'UNREADABLE' },
         })
         .catch(() => undefined);
+      if (householdId) void this.events.changed(householdId, ['Receipt']);
     }
   }
 
@@ -387,8 +392,9 @@ export class ReceiptsService implements OnApplicationBootstrap {
     return { kind: 'parsed', result: mergeReceiptParts(parts) };
   }
 
+  /** Saves what the reader found, and tells the household the receipt is read. */
   private async apply(
-    { id: receiptId, language }: { id: string; language: string },
+    { id: receiptId, language, householdId }: { id: string; language: string; householdId: string },
     outcome: OcrDispatchResult,
   ) {
     if (outcome.kind === 'accepted') return;
@@ -397,6 +403,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
         where: { id: receiptId },
         data: { status: 'FAILED', ocrError: outcome.error },
       });
+      void this.events.changed(householdId, ['Receipt']);
       return;
     }
     const result: OcrResultDto = outcome.result;
@@ -420,6 +427,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
       }),
     ]);
     await this.flagDuplicates(receiptId);
+    void this.events.changed(householdId, ['Receipt']);
   }
 
   /**
