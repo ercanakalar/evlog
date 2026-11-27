@@ -1,9 +1,11 @@
 import Feather from '@expo/vector-icons/Feather';
 import { CameraView } from 'expo-camera';
+import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScanProgress } from '@/components/scan/ScanProgress';
 import { Button, IconButton, Text } from '@/components/ui';
 import { MAX_RECEIPT_PARTS } from '@/constants/domain';
 import { useScanner } from '@/hooks/scan/useScanner';
@@ -18,9 +20,7 @@ export function ScanScreen() {
   const s = useScanner(camera);
   const { granted } = s.cameraAccess;
 
-  const hint = s.busy === 'uploading'
-    ? t('scan.reading')
-    : s.long
+  const hint = s.long
       ? s.parts === 0
         ? t('scan.longHintFirst')
         : t('scan.longHintNext', { count: s.parts })
@@ -33,9 +33,21 @@ export function ScanScreen() {
           ref={camera}
           style={StyleSheet.absoluteFill}
           facing="back"
-          enableTorch={s.torch}
+          enableTorch={s.torch && !s.stage}
           onCameraReady={s.onReady}
         />
+      ) : null}
+      {s.preview ? (
+        <>
+          <Image
+            source={{ uri: s.preview.uri }}
+            contentFit={s.preview.fit}
+            style={StyleSheet.absoluteFill}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(14,16,17,0.45)' }]} />
+        </>
       ) : null}
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>
@@ -43,26 +55,47 @@ export function ScanScreen() {
           <Text variant="heading" color={WHITE} accessibilityRole="header">
             {t('scan.title')}
           </Text>
-          <IconButton
-            icon="zap"
-            label={t('scan.flash')}
-            selected={s.torch}
-            iconSize={22}
-            color={s.torch ? colors.onAccent : WHITE}
-            background={s.torch ? colors.accent : undefined}
-            onPress={s.toggleTorch}
-          />
+          {s.stage ? (
+            <View style={{ width: 44 }} />
+          ) : (
+            <IconButton
+              icon="zap"
+              label={t('scan.flash')}
+              selected={s.torch}
+              iconSize={22}
+              color={s.torch ? colors.onAccent : WHITE}
+              background={s.torch ? colors.accent : undefined}
+              onPress={s.toggleTorch}
+            />
+          )}
         </View>
 
-        {granted ? (
+        {s.stage ? (
           <>
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 }}>
-              <Viewfinder busy={s.busy === 'uploading'} />
+              <Viewfinder busy />
+            </View>
+            <View style={{ paddingHorizontal: 20, paddingBottom: 20, gap: 12 }}>
+              <ScanProgress stage={s.stage} photos={s.photoCount} found={s.found} />
+              {s.stage === 'reading' ? (
+                <>
+                  <Text variant="small" color={WHITE} style={{ textAlign: 'center' }}>
+                    {t('review.leaveWhileReading')}
+                  </Text>
+                  <Button title={t('scan.inBackground')} variant="onDark" compact onPress={s.close} />
+                </>
+              ) : null}
+            </View>
+          </>
+        ) : granted ? (
+          <>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 }}>
+              <Viewfinder busy={false} />
             </View>
             <Text variant="bodyMedium" color={WHITE} style={{ textAlign: 'center', paddingHorizontal: 24 }}>
               {hint}
             </Text>
-            {s.long && s.parts > 0 && s.busy !== 'uploading' ? (
+            {s.long && s.parts > 0 ? (
               <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
                 <Button
                   title={t('scan.doneParts', { count: s.parts, max: MAX_RECEIPT_PARTS })}
@@ -77,12 +110,12 @@ export function ScanScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('scan.takePhoto')}
-                accessibilityState={{ busy: s.busy !== null }}
-                disabled={s.busy !== null}
+                accessibilityState={{ busy: s.capturing }}
+                disabled={s.capturing}
                 onPress={s.capture}
                 style={({ pressed }) => [styles.shutter, { opacity: pressed ? 0.8 : 1 }]}>
                 <View style={[styles.shutterInner, { backgroundColor: colors.accent }]}>
-                  {s.busy ? <ActivityIndicator color={colors.onAccent} /> : null}
+                  {s.capturing ? <ActivityIndicator color={colors.onAccent} /> : null}
                 </View>
               </Pressable>
               <ControlButton icon="layers" label={t('scan.longReceipt')} selected={s.long} onPress={s.toggleLong} />

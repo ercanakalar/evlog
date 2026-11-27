@@ -140,6 +140,16 @@ const tr: Translation = {
     failed: 'Fiş taranamadı',
     cameraError: 'Kamera fotoğraf çekemedi. Tekrar dene.',
     photoUnreadable: 'Fotoğraf açılamadı. Başka bir tane dene.',
+    inBackground: 'Ana sayfada bekle',
+    steps: {
+      preparing: 'Fotoğraf hazırlanıyor',
+      sending_one: 'Fotoğraf gönderiliyor',
+      sending_other: '{{count}} fotoğraf gönderiliyor',
+      reading: 'Ürünler ve fiyatlar okunuyor',
+      review: 'Kontrole hazır',
+      found_one: '{{count}} ürün bulundu',
+      found_other: '{{count}} ürün bulundu',
+    },
   },
   review: {
     title: 'Fişi kontrol et',

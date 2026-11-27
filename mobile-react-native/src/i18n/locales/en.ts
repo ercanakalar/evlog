@@ -138,6 +138,16 @@ const en = {
     failed: 'Could not scan the receipt',
     cameraError: 'The camera could not take the photo. Try again.',
     photoUnreadable: 'The photo could not be opened. Try another one.',
+    inBackground: 'Wait on the home screen',
+    steps: {
+      preparing: 'Getting the photo ready',
+      sending_one: 'Sending the photo',
+      sending_other: 'Sending {{count}} photos',
+      reading: 'Reading items and prices',
+      review: 'Ready to check',
+      found_one: 'Found {{count}} item',
+      found_other: 'Found {{count}} items',
+    },
   },
   review: {
     title: 'Review receipt',
