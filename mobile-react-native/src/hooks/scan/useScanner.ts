@@ -14,7 +14,7 @@ import { useGetReceiptQuery } from '@/store/services/receiptService';
 import type { UploadFile } from '@/types/api/requests';
 
 /** Where a sent receipt is: each step is one the app can see happen. */
-export type ScanStage = 'preparing' | 'sending' | 'reading' | 'done';
+export type ScanStage = 'preparing' | 'sending' | 'reading' | 'matching' | 'done';
 
 /** How long "Found N items" stays up before the review opens. */
 const DONE_PAUSE_MS = 700;
@@ -36,7 +36,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   const [long, setLong] = useState(false);
   const [parts, setParts] = useState<UploadFile[]>([]);
   const [capturing, setCapturing] = useState(false);
-  const [step, setStep] = useState<Exclude<ScanStage, 'done'> | null>(null);
+  const [step, setStep] = useState<Exclude<ScanStage, 'matching' | 'done'> | null>(null);
   /** The photo shown behind the progress; camera photos fill the screen like the preview did. */
   const [preview, setPreview] = useState<{ uri: string; fit: 'cover' | 'contain' } | null>(null);
   const [photoCount, setPhotoCount] = useState(0);
@@ -46,7 +46,11 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     pollingInterval: step === 'reading' ? RECEIPT_POLL_MS : 0,
   });
   const status = reading.data?.status;
-  const stage: ScanStage | null = step === 'reading' && status === 'PARSED' ? 'done' : step;
+  const partCount = reading.data?.partCount ?? photoCount;
+  const partsRead = reading.data?.partsRead ?? 0;
+  // Every photo read but not yet done: the lines are being matched with products.
+  const stage: ScanStage | null =
+    step !== 'reading' ? step : status === 'PARSED' ? 'done' : reading.data?.partCount && partsRead >= partCount ? 'matching' : step;
   const found = reading.data ? (reading.data.items?.length ?? reading.data._count?.items ?? 0) : 0;
 
   useEffect(() => {
@@ -144,6 +148,8 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     stage,
     preview,
     photoCount,
+    partCount,
+    partsRead,
     found,
     capture: () => void capture(),
     fromGallery: () => void fromGallery(),

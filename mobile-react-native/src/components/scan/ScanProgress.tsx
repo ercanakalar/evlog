@@ -7,10 +7,21 @@ import type { ScanStage } from '@/hooks/scan/useScanner';
 import { useTheme } from '@/theme';
 
 const WHITE = '#FCFCFA';
-const STEPS: ScanStage[] = ['preparing', 'sending', 'reading', 'done'];
+const STEPS: ScanStage[] = ['preparing', 'sending', 'reading', 'matching', 'done'];
 
 /** The steps a sent receipt goes through, over its photo on the scanner. */
-export function ScanProgress({ stage, photos, found }: { stage: ScanStage; photos: number; found: number }) {
+export function ScanProgress({
+  stage,
+  photos,
+  partsRead,
+  found,
+}: {
+  stage: ScanStage;
+  photos: number;
+  /** Photos the reader has finished, out of `photos`. */
+  partsRead: number;
+  found: number;
+}) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const current = STEPS.indexOf(stage);
@@ -19,7 +30,11 @@ export function ScanProgress({ stage, photos, found }: { stage: ScanStage; photo
     ({
       preparing: t('scan.steps.preparing'),
       sending: t('scan.steps.sending', { count: photos }),
-      reading: t('scan.steps.reading'),
+      reading:
+        photos > 1 && stage === 'reading'
+          ? t('scan.steps.readingPart', { part: Math.min(partsRead + 1, photos), count: photos })
+          : t('scan.steps.reading'),
+      matching: t('scan.steps.matching'),
       done: stage === 'done' ? t('scan.steps.found', { count: found }) : t('scan.steps.review'),
     })[step];
 

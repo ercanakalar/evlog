@@ -144,6 +144,8 @@ const en = {
       sending_one: 'Sending the photo',
       sending_other: 'Sending {{count}} photos',
       reading: 'Reading items and prices',
+      readingPart: 'Reading part {{part}} of {{count}}',
+      matching: 'Matching products',
       review: 'Ready to check',
       found_one: 'Found {{count}} item',
       found_other: 'Found {{count}} items',

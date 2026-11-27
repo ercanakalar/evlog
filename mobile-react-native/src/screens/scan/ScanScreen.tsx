@@ -76,7 +76,7 @@ export function ScanScreen() {
               <Viewfinder busy />
             </View>
             <View style={{ paddingHorizontal: 20, paddingBottom: 20, gap: 12 }}>
-              <ScanProgress stage={s.stage} photos={s.photoCount} found={s.found} />
+              <ScanProgress stage={s.stage} photos={s.partCount} partsRead={s.partsRead} found={s.found} />
               {s.stage === 'reading' ? (
                 <>
                   <Text variant="small" color={WHITE} style={{ textAlign: 'center' }}>

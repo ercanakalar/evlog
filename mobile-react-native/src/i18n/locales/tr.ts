@@ -146,6 +146,8 @@ const tr: Translation = {
       sending_one: 'Fotoğraf gönderiliyor',
       sending_other: '{{count}} fotoğraf gönderiliyor',
       reading: 'Ürünler ve fiyatlar okunuyor',
+      readingPart: '{{count}} parçadan {{part}}. okunuyor',
+      matching: 'Ürünler eşleştiriliyor',
       review: 'Kontrole hazır',
       found_one: '{{count}} ürün bulundu',
       found_other: '{{count}} ürün bulundu',

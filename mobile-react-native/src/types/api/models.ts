@@ -66,6 +66,9 @@ export interface Receipt {
   totalAmount: string | null;
   currency: string;
   ocrError: string | null;
+  /** How many photos it has, and how many the reader has finished (absent from older APIs). */
+  partCount?: number;
+  partsRead?: number;
   confirmedAt: string | null;
   createdAt: string;
   items?: ReceiptItem[];
