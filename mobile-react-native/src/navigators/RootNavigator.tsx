@@ -5,6 +5,7 @@ import { useExpiryReminders } from '@/hooks/app/useExpiryReminders';
 import { ForgotPasswordScreen } from '@/screens/auth/ForgotPasswordScreen';
 import { SignInScreen } from '@/screens/auth/SignInScreen';
 import { PackScanScreen } from '@/screens/packs/PackScanScreen';
+import { HouseholdScreen } from '@/screens/household/HouseholdScreen';
 import { HomeItemScreen } from '@/screens/shelf/HomeItemScreen';
 import { ProductScreen } from '@/screens/product/ProductScreen';
 import { ReceiptReviewScreen } from '@/screens/receipts/ReceiptReviewScreen';
@@ -50,6 +51,7 @@ export function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="TripDetail" component={TripDetailScreen} />
           <Stack.Screen name="Spending" component={SpendingScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Household" component={HouseholdScreen} />
         </Stack.Group>
       )}
     </Stack.Navigator>

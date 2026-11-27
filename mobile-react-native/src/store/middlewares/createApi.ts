@@ -4,7 +4,7 @@ import { baseQueryWithReauth } from '../bases/baseQueryWithReauth';
 /** RTK Query's createApi with the React hooks module, built explicitly. */
 const createApiWithHooks = buildCreateApi(coreModule(), reactHooksModule());
 
-export const TAG_TYPES = ['Me', 'Receipt', 'Item', 'HomeItem', 'List', 'Insights'] as const;
+export const TAG_TYPES = ['Me', 'Household', 'Receipt', 'Item', 'HomeItem', 'List', 'Insights'] as const;
 
 /**
  * The single API slice every service injects into. App-wide defaults live

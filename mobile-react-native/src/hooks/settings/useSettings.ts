@@ -7,6 +7,7 @@ import { useErrorAlert } from '@/hooks/common/useErrorAlert';
 import { useLegalLinks } from '@/hooks/common/useLegalLinks';
 import { signOut } from '@/store/actions/sessionActions';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useGetHouseholdQuery } from '@/store/services/householdService';
 import { useDeleteAccountMutation, useGetMeQuery, useUpdateSettingsMutation } from '@/store/services/meService';
 import {
   fontChanged,
@@ -33,6 +34,7 @@ export function useSettings() {
   const showError = useErrorAlert();
   const modal = useModal();
   const me = useGetMeQuery();
+  const household = useGetHouseholdQuery();
   const [update] = useUpdateSettingsMutation();
   const [deleteAccount, deleteState] = useDeleteAccountMutation();
   const language = useAppSelector(selectLanguagePreference);
@@ -58,6 +60,8 @@ export function useSettings() {
 
   return {
     me: me.data,
+    /** How many people share this Raf (1 until someone joins). */
+    householdSize: household.data?.members.length ?? 1,
     isLoading: me.isLoading,
     error: me.error,
     refetch: me.refetch,

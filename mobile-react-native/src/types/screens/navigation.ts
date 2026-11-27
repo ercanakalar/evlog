@@ -26,6 +26,8 @@ export type RootStackParamList = {
   TripDetail: { receiptId: string };
   Spending: { month?: string } | undefined;
   Settings: undefined;
+  /** Who shares this Raf; invite someone or join their household. */
+  Household: undefined;
 };
 
 export type RootScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;

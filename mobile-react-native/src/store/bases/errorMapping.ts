@@ -55,6 +55,11 @@ const CODES = [
   'RECEIPT_NOT_READ',
   'TOO_MANY_READING',
   'WHOLE_PIECES',
+  'INVITE_INVALID',
+  'ALREADY_MEMBER',
+  'HOUSEHOLD_FULL',
+  'LEAVE_FIRST',
+  'LIVES_ALONE',
 ] as const;
 
 type ErrorKey =

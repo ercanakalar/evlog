@@ -46,6 +46,14 @@ export function SettingsScreen() {
         </View>
       </Card>
 
+      <SettingGroup title={t('household.title')}>
+        <ValueRow
+          label={t('household.title')}
+          value={s.householdSize > 1 ? t('settings.people', { count: s.householdSize }) : t('settings.justYou')}
+          onPress={() => navigation.navigate('Household')}
+        />
+      </SettingGroup>
+
       <SettingGroup title={t('settings.countdown')}>
         <SwitchRow label={t('settings.reminders')} value={me.expiryReminders} onChange={(v) => s.set({ expiryReminders: v })} />
         {me.expiryReminders ? (

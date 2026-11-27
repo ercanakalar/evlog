@@ -32,6 +32,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
       TripDetail: 'trip/:receiptId',
       Spending: 'spending/:month?',
       Settings: 'settings',
+      Household: 'household',
     },
   },
 };

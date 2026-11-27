@@ -252,3 +252,12 @@ export interface SpendingInsights {
   byCategory: { category: Category; total: string }[];
   byMarket: { market: string | null; total: string }[];
 }
+
+/** The people who share one home's receipts, shelf, at-home counts, lists and spending. */
+export interface Household {
+  id: string;
+  members: (Person & { email: string; me: boolean })[];
+  /** A code someone else can type in to join, while it is valid. */
+  invite: { code: string; expiresAt: string } | null;
+  maxMembers: number;
+}
