@@ -16,6 +16,7 @@ export function ScanProgress({
   partsRead,
   found,
   failed = false,
+  alreadyScanned,
 }: {
   stage: ScanStage;
   photos: number;
@@ -24,6 +25,8 @@ export function ScanProgress({
   found: number;
   /** The current step went wrong (sending, when it can be tried again). */
   failed?: boolean;
+  /** Read, but someone in the household already scanned it: says who, in place of "Found N items". */
+  alreadyScanned?: string;
 }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -38,7 +41,8 @@ export function ScanProgress({
           ? t('scan.steps.readingPart', { part: Math.min(partsRead + 1, photos), count: photos })
           : t('scan.steps.reading'),
       matching: t('scan.steps.matching'),
-      done: stage === 'done' ? t('scan.steps.found', { count: found }) : t('scan.steps.review'),
+      done:
+        stage !== 'done' ? t('scan.steps.review') : (alreadyScanned ?? t('scan.steps.found', { count: found })),
     })[step];
 
   // Screen readers hear each step as it starts; the list itself is not read again.
@@ -54,7 +58,9 @@ export function ScanProgress({
         return (
           <View key={step} style={styles.row} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <View style={styles.mark}>
-              {state === 'done' ? (
+              {state === 'done' && step === 'done' && alreadyScanned ? (
+                <Feather name="alert-circle" size={20} color={colors.accent} />
+              ) : state === 'done' ? (
                 <View style={[styles.dot, { backgroundColor: colors.accent }]}>
                   <Feather name="check" size={13} color={colors.onAccent} />
                 </View>

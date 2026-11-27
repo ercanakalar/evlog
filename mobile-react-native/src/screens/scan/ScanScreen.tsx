@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScanProgress } from '@/components/scan/ScanProgress';
 import { Button, IconButton, Text } from '@/components/ui';
 import { MAX_RECEIPT_PARTS } from '@/constants/domain';
+import { useScannedBy } from '@/hooks/household/useScannedBy';
 import { useScanner } from '@/hooks/scan/useScanner';
 import { useTheme } from '@/theme';
 
@@ -18,6 +19,7 @@ export function ScanScreen() {
   const { colors } = useTheme();
   const camera = useRef<CameraView>(null);
   const s = useScanner(camera);
+  const duplicateBy = useScannedBy(s.duplicate?.scannedBy);
   const { granted } = s.cameraAccess;
 
   const hint = s.long
@@ -82,6 +84,15 @@ export function ScanScreen() {
                 partsRead={s.partsRead}
                 found={s.found}
                 failed={s.sendError !== null}
+                alreadyScanned={
+                  s.duplicate
+                    ? s.duplicate.scannedBy === null
+                      ? t('scan.steps.duplicateSomeone')
+                      : duplicateBy
+                        ? t('scan.steps.duplicateBy', { name: duplicateBy })
+                        : t('scan.steps.duplicateYou')
+                    : undefined
+                }
               />
               {s.sendError ? (
                 <>

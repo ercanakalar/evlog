@@ -11,7 +11,7 @@ import { pickImages, prepareImage } from '@/services/media/imageCapture';
 import { uploadReceipt } from '@/store/actions/receiptActions';
 import { describeError } from '@/store/bases/errorMapping';
 import { useAppDispatch } from '@/store/hooks';
-import { useGetReceiptQuery } from '@/store/services/receiptService';
+import { receiptService, useGetReceiptQuery } from '@/store/services/receiptService';
 import type { UploadFile } from '@/types/api/requests';
 
 /** Where a sent receipt is: each step is one the app can see happen. */
@@ -19,8 +19,9 @@ export type ScanStage = 'preparing' | 'sending' | 'reading' | 'matching' | 'done
 
 type Preview = { uri: string; fit: 'cover' | 'contain' };
 
-/** How long "Found N items" stays up before the review opens. */
+/** How long "Found N items" stays up before the review opens; longer for "already scanned". */
 const DONE_PAUSE_MS = 700;
+const DUPLICATE_PAUSE_MS = 1_600;
 
 /**
  * Camera -> photo(s) -> upload -> read -> review. A long receipt is
@@ -47,8 +48,11 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   /** Photos that could not be sent for a reason trying again can fix, with why. */
   const [unsent, setUnsent] = useState<{ files: UploadFile[]; shown: Preview; message: string } | null>(null);
 
+  const cached = receiptService.endpoints.getReceipt.useQueryState(receiptId ?? skipToken);
+  // Polled until read; then the review opens and polls no more.
+  const readDone = cached.data !== undefined && cached.data.status !== 'PENDING' && cached.data.status !== 'PROCESSING';
   const reading = useGetReceiptQuery(receiptId ?? skipToken, {
-    pollingInterval: step === 'reading' ? RECEIPT_POLL_MS : 0,
+    pollingInterval: step === 'reading' && !readDone ? RECEIPT_POLL_MS : 0,
   });
   const status = reading.data?.status;
   const partCount = reading.data?.partCount ?? photoCount;
@@ -57,6 +61,9 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   const stage: ScanStage | null =
     step !== 'reading' ? step : status === 'PARSED' ? 'done' : reading.data?.partCount && partsRead >= partCount ? 'matching' : step;
   const found = reading.data ? (reading.data.items?.length ?? reading.data._count?.items ?? 0) : 0;
+  /** Someone in the household already scanned this paper receipt. */
+  const duplicate = reading.data?.duplicateOf ?? null;
+  const isDuplicate = duplicate !== null;
 
   useEffect(() => {
     if (!receiptId || !status || status === 'PENDING' || status === 'PROCESSING') return;
@@ -67,10 +74,11 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     // Unreadable or already saved: the review explains it, no need to pause.
     if (status === 'FAILED') haptics.failed();
     if (status !== 'PARSED') return openReview();
-    haptics.succeeded();
-    const timer = setTimeout(openReview, DONE_PAUSE_MS);
+    if (isDuplicate) haptics.failed();
+    else haptics.succeeded();
+    const timer = setTimeout(openReview, isDuplicate ? DUPLICATE_PAUSE_MS : DONE_PAUSE_MS);
     return () => clearTimeout(timer);
-  }, [navigation, receiptId, status]);
+  }, [isDuplicate, navigation, receiptId, status]);
 
   const reset = () => {
     setStep(null);
@@ -172,6 +180,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     partCount,
     partsRead,
     found,
+    duplicate,
     capture: () => void capture(),
     fromGallery: () => void fromGallery(),
     /** Why the photos could not be sent, while they wait on screen to be sent again. */

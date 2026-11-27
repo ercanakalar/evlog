@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { ReceiptPhoto } from '@/components/trips/ReceiptPhoto';
+import { useScannedBy } from '@/hooks/household/useScannedBy';
 import { Button, ErrorView, Loading, ReceiptPaper, Rule, Screen, ScreenHeader, SpaceBetween, Tag, Text } from '@/components/ui';
 import { HIT } from '@/constants/layout';
 import { useFormatters } from '@/hooks/common/useFormatters';
@@ -15,6 +16,7 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
   const { colors, fonts } = useTheme();
   const f = useFormatters();
   const trip = useTripDetail(route.params.receiptId);
+  const scannedBy = useScannedBy(trip.receipt?.scannedBy);
 
   if (trip.isLoading) return <Loading />;
   if (!trip.receipt) return <ErrorView error={trip.error} onRetry={trip.refetch} />;
@@ -43,10 +45,15 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
         <Text variant="title" accessibilityRole="header" style={{ textAlign: 'center', letterSpacing: 1 }}>
           {f.upper(receipt.merchantName ?? t('trips.unknownMarket'))}
         </Text>
-        <SpaceBetween style={{ marginTop: 8, paddingBottom: 10 }}>
+        <SpaceBetween style={{ marginTop: 8, paddingBottom: scannedBy ? 2 : 10 }}>
           <Text variant="mono">{f.upper(f.longDate(receipt.issuedAt))}</Text>
           <Text variant="mono">{f.time(receipt.issuedAt)}</Text>
         </SpaceBetween>
+        {scannedBy ? (
+          <Text variant="monoSmall" muted style={{ paddingBottom: 10 }}>
+            {f.upper(t('review.scannedBy', { name: scannedBy }))}
+          </Text>
+        ) : null}
         <Rule strong />
 
         {trip.groups.map((group) => (

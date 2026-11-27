@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native';
+import { StackActions, useNavigation } from '@react-navigation/native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
@@ -164,13 +164,31 @@ export function useReceiptReview(receiptId: string) {
         return false;
       }
     },
-    save: async () => {
-      try {
-        await confirm(receiptId).unwrap();
-        navigation.navigate('TripDetail', { receiptId });
-      } catch (error) {
-        showError(t('review.saveFailed'), error);
-      }
+    /** Saves the receipt; one someone already scanned is only saved once the user says so. */
+    save: () => {
+      const run = async () => {
+        try {
+          await confirm(receiptId).unwrap();
+          navigation.navigate('TripDetail', { receiptId });
+        } catch (error) {
+          showError(t('review.saveFailed'), error);
+        }
+      };
+      if (!receipt?.duplicateOf) return void run();
+      modal.confirm({
+        title: t('review.saveTwiceTitle'),
+        message: t('review.saveTwiceBody'),
+        confirmLabel: t('review.saveAnyway'),
+        destructive: true,
+        onConfirm: run,
+      });
+    },
+    /** The receipt this one repeats: its trip once saved, else its review. */
+    openOriginal: () => {
+      const original = receipt?.duplicateOf;
+      if (!original) return;
+      if (original.status === 'CONFIRMED') navigation.navigate('TripDetail', { receiptId: original.id });
+      else navigation.dispatch(StackActions.push('ReceiptReview', { receiptId: original.id }));
     },
     rescan: () => void rescan(receiptId).unwrap().catch((error: unknown) => showError(t('scan.failed'), error)),
     discard: () =>

@@ -58,6 +58,22 @@ export interface ReceiptItem {
   homeChanges?: { amount: string; homeItem: { id: string; name: string; unit: HomeUnit } }[];
 }
 
+/** Someone in the household, as a receipt names who scanned it. */
+export interface Person {
+  id: string;
+  fullName: string;
+}
+
+/** An earlier receipt in the household that is the same paper receipt. */
+export interface ReceiptOriginal {
+  id: string;
+  status: ReceiptStatus;
+  merchantName: string | null;
+  issuedAt: string | null;
+  createdAt: string;
+  scannedBy: Person | null;
+}
+
 export interface Receipt {
   id: string;
   status: ReceiptStatus;
@@ -66,6 +82,10 @@ export interface Receipt {
   totalAmount: string | null;
   currency: string;
   ocrError: string | null;
+  /** Who in the household scanned it; null once they deleted their account. */
+  scannedBy?: Person | null;
+  /** Set when someone in the household already scanned this paper receipt (single receipt only). */
+  duplicateOf?: ReceiptOriginal | null;
   /** How many photos it has, and how many the reader has finished (absent from older APIs). */
   partCount?: number;
   partsRead?: number;

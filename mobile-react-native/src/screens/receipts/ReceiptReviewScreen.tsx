@@ -7,6 +7,7 @@ import { ReviewLine } from '@/components/receipts/ReviewLine';
 import { ReceiptPhoto } from '@/components/trips/ReceiptPhoto';
 import { Button, Card, ErrorView, FooterBar, Loading, Row, Screen, ScreenHeader, SpaceBetween, Text } from '@/components/ui';
 import { useFormatters } from '@/hooks/common/useFormatters';
+import { useScannedBy } from '@/hooks/household/useScannedBy';
 import { useReceiptReview } from '@/hooks/receipts/useReceiptReview';
 import { useTheme } from '@/theme';
 import type { RootScreenProps } from '@/types/screens/navigation';
@@ -22,6 +23,8 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
   const r = useReceiptReview(route.params.receiptId);
   const [editingHeader, setEditingHeader] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const scannedBy = useScannedBy(r.receipt?.scannedBy);
+  const originalBy = useScannedBy(r.receipt?.duplicateOf?.scannedBy);
 
   if (r.isLoading) return <Loading />;
   if (!r.receipt) return <ErrorView error={r.error} onRetry={r.refetch} />;
@@ -64,7 +67,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
         variant="accent"
         loading={r.saving}
         disabled={r.updating}
-        onPress={() => void r.save()}
+        onPress={r.save}
         trailing={<Text variant="amount" color={colors.onAccent}>{f.money(receipt.totalAmount, receipt.currency)}</Text>}
       />
     </FooterBar>
@@ -86,6 +89,26 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
           <Text variant="small" muted style={{ textAlign: 'center' }}>
             {t('review.leaveWhileReading')}
           </Text>
+        </Card>
+      ) : null}
+
+      {receipt.duplicateOf && !saved && !r.waiting ? (
+        <Card style={{ gap: 12, borderWidth: 1.5, borderColor: colors.urgentText }}>
+          <Row style={{ gap: 8 }}>
+            <Feather name="copy" size={18} color={colors.urgentText} />
+            <Text variant="bodyStrong" color={colors.urgentText} accessibilityRole="alert" style={{ flexShrink: 1 }}>
+              {t('review.alreadyScanned')}
+            </Text>
+          </Row>
+          <Text variant="small">
+            {receipt.duplicateOf.scannedBy === null
+              ? t('review.duplicateSomeone', { day: f.day(receipt.duplicateOf.createdAt) })
+              : originalBy
+                ? t('review.duplicateBy', { name: originalBy, day: f.day(receipt.duplicateOf.createdAt) })
+                : t('review.duplicateYou', { day: f.day(receipt.duplicateOf.createdAt) })}
+          </Text>
+          <Button title={t('review.openOriginal')} variant="outline" compact onPress={r.openOriginal} />
+          <Button title={t('review.discardCopy')} variant="dangerFilled" compact onPress={r.discard} />
         </Card>
       ) : null}
 
@@ -116,6 +139,11 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
                 <Text variant="mono" color={colors.onInkMuted}>
                   {f.upper(`${f.longDate(receipt.issuedAt)} · ${f.time(receipt.issuedAt)}`)}
                 </Text>
+                {scannedBy ? (
+                  <Text variant="small" color={colors.onInkMuted}>
+                    {t('review.scannedBy', { name: scannedBy })}
+                  </Text>
+                ) : null}
               </View>
               <Pressable
                 accessibilityRole="button"
