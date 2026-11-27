@@ -134,6 +134,7 @@ const tr: Translation = {
     partsTaken_one: '{{count}} parça çekildi',
     partsTaken_other: '{{count}} parça çekildi',
     retakeLast: 'Sonuncuyu yeniden çek',
+    retake: 'Yeni fotoğraf çek',
     doneParts: 'Tamam · {{max}} parçadan {{count}} tanesini oku',
     reading: 'Fiş okunuyor…',
     gallery: 'Galeri',

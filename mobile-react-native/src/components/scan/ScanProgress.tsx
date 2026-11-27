@@ -15,12 +15,15 @@ export function ScanProgress({
   photos,
   partsRead,
   found,
+  failed = false,
 }: {
   stage: ScanStage;
   photos: number;
   /** Photos the reader has finished, out of `photos`. */
   partsRead: number;
   found: number;
+  /** The current step went wrong (sending, when it can be tried again). */
+  failed?: boolean;
 }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -55,6 +58,8 @@ export function ScanProgress({
                 <View style={[styles.dot, { backgroundColor: colors.accent }]}>
                   <Feather name="check" size={13} color={colors.onAccent} />
                 </View>
+              ) : state === 'active' && failed ? (
+                <Feather name="alert-circle" size={20} color={WHITE} />
               ) : state === 'active' ? (
                 <ActivityIndicator size="small" color={colors.accent} />
               ) : (

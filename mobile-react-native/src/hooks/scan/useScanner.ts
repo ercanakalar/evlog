@@ -17,6 +17,8 @@ import type { UploadFile } from '@/types/api/requests';
 /** Where a sent receipt is: each step is one the app can see happen. */
 export type ScanStage = 'preparing' | 'sending' | 'reading' | 'matching' | 'done';
 
+type Preview = { uri: string; fit: 'cover' | 'contain' };
+
 /** How long "Found N items" stays up before the review opens. */
 const DONE_PAUSE_MS = 700;
 
@@ -39,9 +41,11 @@ export function useScanner(camera: RefObject<CameraView | null>) {
   const [capturing, setCapturing] = useState(false);
   const [step, setStep] = useState<Exclude<ScanStage, 'matching' | 'done'> | null>(null);
   /** The photo shown behind the progress; camera photos fill the screen like the preview did. */
-  const [preview, setPreview] = useState<{ uri: string; fit: 'cover' | 'contain' } | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
   const [photoCount, setPhotoCount] = useState(0);
   const [receiptId, setReceiptId] = useState<string | null>(null);
+  /** Photos that could not be sent for a reason trying again can fix, with why. */
+  const [unsent, setUnsent] = useState<{ files: UploadFile[]; shown: Preview; message: string } | null>(null);
 
   const reading = useGetReceiptQuery(receiptId ?? skipToken, {
     pollingInterval: step === 'reading' ? RECEIPT_POLL_MS : 0,
@@ -73,9 +77,11 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     setPreview(null);
     setParts([]);
     setReceiptId(null);
+    setUnsent(null);
   };
 
-  const upload = async (files: UploadFile[], shown: { uri: string; fit: 'cover' | 'contain' }) => {
+  const upload = async (files: UploadFile[], shown: Preview) => {
+    setUnsent(null);
     setPreview(shown);
     setPhotoCount(files.length);
     setStep('sending');
@@ -85,9 +91,15 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       setReceiptId(result.payload);
       return;
     }
-    reset();
     haptics.failed();
-    modal.alert(t('scan.failed'), describeError(result.payload, t));
+    const error = result.payload;
+    // Offline, timed out or a server fault: keep the photos on screen to send again.
+    if (error && (error.status === 0 || error.status >= 500)) {
+      setUnsent({ files, shown, message: describeError(error, t) });
+      return;
+    }
+    reset();
+    modal.alert(t('scan.failed'), describeError(error, t));
   };
 
   const capture = async () => {
@@ -162,6 +174,13 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     found,
     capture: () => void capture(),
     fromGallery: () => void fromGallery(),
+    /** Why the photos could not be sent, while they wait on screen to be sent again. */
+    sendError: unsent?.message ?? null,
+    retrySend: () => {
+      if (unsent) void upload(unsent.files, unsent.shown);
+    },
+    /** Gives up on photos that could not be sent, back to the camera. */
+    retake: reset,
     finishLong: () => {
       const last = parts[parts.length - 1];
       if (last) void upload(parts, { uri: last.uri, fit: 'cover' });

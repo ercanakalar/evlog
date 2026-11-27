@@ -132,6 +132,7 @@ const en = {
     partsTaken_one: '{{count}} part taken',
     partsTaken_other: '{{count}} parts taken',
     retakeLast: 'Retake last',
+    retake: 'Take a new photo',
     doneParts: 'Done · read {{count}} of {{max}} parts',
     reading: 'Reading the receipt…',
     gallery: 'Gallery',

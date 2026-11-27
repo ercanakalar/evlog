@@ -76,7 +76,22 @@ export function ScanScreen() {
               <Viewfinder busy />
             </View>
             <View style={{ paddingHorizontal: 20, paddingBottom: 20, gap: 12 }}>
-              <ScanProgress stage={s.stage} photos={s.partCount} partsRead={s.partsRead} found={s.found} />
+              <ScanProgress
+                stage={s.stage}
+                photos={s.partCount}
+                partsRead={s.partsRead}
+                found={s.found}
+                failed={s.sendError !== null}
+              />
+              {s.sendError ? (
+                <>
+                  <Text variant="small" color={WHITE} accessibilityRole="alert" style={{ textAlign: 'center' }}>
+                    {s.sendError}
+                  </Text>
+                  <Button title={t('common.retry')} variant="accent" compact onPress={s.retrySend} />
+                  <Button title={t('scan.retake')} variant="onDark" compact onPress={s.retake} />
+                </>
+              ) : null}
               {s.stage === 'reading' ? (
                 <>
                   <Text variant="small" color={WHITE} style={{ textAlign: 'center' }}>
