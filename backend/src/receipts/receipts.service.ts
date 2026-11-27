@@ -110,7 +110,14 @@ export class ReceiptsService implements OnApplicationBootstrap {
         imageKeys.push(await this.storage.save('receipts', file.buffer, file.mimetype));
       }
       receipt = await this.prisma.receipt.create({
-        data: { userId, imageKeys, mimeType: files[0].mimetype, sha256: hash, language },
+        data: {
+          userId,
+          imageKeys,
+          partCount: imageKeys.length,
+          mimeType: files[0].mimetype,
+          sha256: hash,
+          language,
+        },
       });
     } catch (error) {
       // e.g. the account was deleted meanwhile: leave no photo behind.
@@ -284,7 +291,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
   private async startReading(receiptId: string) {
     const receipt = await this.prisma.receipt.update({
       where: { id: receiptId },
-      data: { status: 'PROCESSING', ocrError: null },
+      data: { status: 'PROCESSING', ocrError: null, partsRead: 0 },
       include: withItems,
       omit: { imageKeys: true },
     });
@@ -298,7 +305,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
       const receipt = await this.prisma.receipt.findUnique({ where: { id: receiptId } });
       if (!receipt) return;
       const outcomes: OcrDispatchResult[] = [];
-      for (const key of receipt.imageKeys) {
+      for (const [index, key] of receipt.imageKeys.entries()) {
         const chunks: Buffer[] = [];
         for await (const chunk of await this.storage.open(key)) chunks.push(chunk as Buffer);
         outcomes.push(
@@ -312,7 +319,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
         // Interrupted, not unreadable: it is read again at the next start.
         if (this.ocr.stopping) return;
         // Deleted, or filled in by hand, while it was being read.
-        if (!(await this.isWaiting(receiptId))) return;
+        if (!(await this.markRead(receiptId, index + 1))) return;
       }
       await this.apply(receipt, this.combine(outcomes));
     } catch (error) {
@@ -327,6 +334,15 @@ export class ReceiptsService implements OnApplicationBootstrap {
         })
         .catch(() => undefined);
     }
+  }
+
+  /** Records how many parts are read; false when the receipt stopped waiting meanwhile. */
+  private async markRead(receiptId: string, partsRead: number): Promise<boolean> {
+    const { count } = await this.prisma.receipt.updateMany({
+      where: { id: receiptId, status: { in: ['PENDING', 'PROCESSING'] } },
+      data: { partsRead },
+    });
+    return count > 0;
   }
 
   private async isWaiting(receiptId: string): Promise<boolean> {

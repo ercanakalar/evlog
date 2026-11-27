@@ -124,6 +124,10 @@ model Receipt {
   status             ReceiptStatus @default(PENDING)
   /// A long receipt is photographed in parts, top to bottom.
   imageKeys          String[]
+  /// How many photos it has (imageKeys is never sent to the app).
+  partCount          Int           @default(1)
+  /// How many of them the reader has finished, so the app can show progress.
+  partsRead          Int           @default(0)
   mimeType           String
   /// Language of the product names ("en" or "tr"): the app's, when the photo was sent.
   language           String        @default("en") @db.VarChar(2)
