@@ -142,6 +142,10 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       setParts([]);
     },
     parts: parts.length,
+    /** The long-receipt parts taken so far, top first, for their thumbnails. */
+    partPhotos: parts.map((p) => p.uri),
+    /** Drops the last part taken, to take it again. */
+    undoPart: () => setParts((current) => current.slice(0, -1)),
     /** A photo is being taken (or a long-receipt part made ready). */
     capturing,
     /** Set once a receipt is on its way: the camera controls give way to its progress. */

@@ -21,10 +21,10 @@ export function ScanScreen() {
   const { granted } = s.cameraAccess;
 
   const hint = s.long
-      ? s.parts === 0
-        ? t('scan.longHintFirst')
-        : t('scan.longHintNext', { count: s.parts })
-      : t('scan.hint');
+    ? s.parts === 0
+      ? t('scan.longHintFirst')
+      : t('scan.longHintNext', { count: s.parts })
+    : t('scan.hint');
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.scanner }}>
@@ -90,13 +90,14 @@ export function ScanScreen() {
         ) : granted ? (
           <>
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 }}>
-              <Viewfinder busy={false} />
+              <Viewfinder busy={false} overlap={s.long && s.parts > 0} />
             </View>
             <Text variant="bodyMedium" color={WHITE} style={{ textAlign: 'center', paddingHorizontal: 24 }}>
               {hint}
             </Text>
             {s.long && s.parts > 0 ? (
-              <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
+              <View style={{ paddingHorizontal: 24, paddingTop: 12, gap: 12 }}>
+                <PartsStrip photos={s.partPhotos} onUndo={s.undoPart} />
                 <Button
                   title={t('scan.doneParts', { count: s.parts, max: MAX_RECEIPT_PARTS })}
                   variant="accent"
@@ -162,8 +163,49 @@ function ControlButton({
   );
 }
 
-/** Lime corner marks with a line sweeping over the receipt (still when motion is reduced). */
-function Viewfinder({ busy }: { busy: boolean }) {
+/** Thumbnails of the long-receipt parts taken so far, with a way to take the last one again. */
+function PartsStrip({ photos, onUndo }: { photos: string[]; onUndo: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View
+        style={{ flexDirection: 'row', gap: 6, flex: 1 }}
+        accessible
+        accessibilityLabel={t('scan.partsTaken', { count: photos.length })}>
+        {photos.map((uri, index) => (
+          <View key={uri} style={styles.thumb}>
+            <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+            <View style={styles.thumbBadge}>
+              <Text variant="caption" color={WHITE} style={{ fontSize: 10 }}>
+                {index + 1}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('scan.retakeLast')}
+        onPress={onUndo}
+        hitSlop={6}
+        style={({ pressed }) => [styles.undo, { opacity: pressed ? 0.7 : 1 }]}>
+        <Feather name="rotate-ccw" size={16} color={WHITE} />
+        <Text variant="smallMedium" color={WHITE}>
+          {t('scan.retakeLast')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Lime corner marks with a line sweeping over the receipt (still when motion
+ * is reduced). For the next part of a long receipt, a dashed line near the top
+ * shows where the last line of the previous part should sit, so the photos
+ * overlap and nothing between them is missed.
+ */
+function Viewfinder({ busy, overlap = false }: { busy: boolean; overlap?: boolean }) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const [sweep] = useState(() => new Animated.Value(0));
   const [height, setHeight] = useState(0);
@@ -203,6 +245,14 @@ function Viewfinder({ busy }: { busy: boolean }) {
           transform: [{ translateY: sweep.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, height - 2)] }) }],
         }}
       />
+      {overlap ? (
+        <View style={styles.overlap}>
+          <View style={[styles.overlapLine, { borderColor: colors.accent }]} />
+          <Text variant="caption" color={colors.accent} style={{ textAlign: 'center' }}>
+            {t('scan.overlapHere')}
+          </Text>
+        </View>
+      ) : null}
       <View style={[corner, { left: 0, top: 0, borderLeftWidth: 3, borderTopWidth: 3 }]} />
       <View style={[corner, { right: 0, top: 0, borderRightWidth: 3, borderTopWidth: 3 }]} />
       <View style={[corner, { left: 0, bottom: 0, borderLeftWidth: 3, borderBottomWidth: 3 }]} />
@@ -223,5 +273,19 @@ const styles = StyleSheet.create({
   },
   control: { width: 88, minHeight: 64, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 5 },
   shutter: { width: 78, height: 78, borderRadius: 39, borderWidth: 4, borderColor: WHITE, padding: 5 },
+  thumb: { width: 30, height: 42, borderRadius: 6, overflow: 'hidden', borderWidth: 1.5, borderColor: WHITE },
+  thumbBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    minWidth: 15,
+    paddingHorizontal: 3,
+    borderTopLeftRadius: 5,
+    backgroundColor: 'rgba(14,16,17,0.8)',
+    alignItems: 'center',
+  },
+  undo: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 8 },
+  overlap: { position: 'absolute', left: 14, right: 14, top: '14%', gap: 4 },
+  overlapLine: { borderTopWidth: 1.5, borderStyle: 'dashed' },
   shutterInner: { flex: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });
