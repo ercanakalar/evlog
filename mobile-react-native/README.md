@@ -70,6 +70,9 @@ docker compose -f docker-compose.apk.yml run --rm build-apk                     
 OUTPUT_FORMAT=aab docker compose -f docker-compose.apk.yml run --rm build-apk    # apk-output/raf-release.aab
 ```
 
+`bash mobile-react-native/scripts/build-android.sh` does the same: run outside the
+container, it starts it.
+
 It builds a copy of the project, so nothing is written into this folder, and fails when
 the output is not signed with the upload key. It prints the key's SHA-1, which Raf's
 Android OAuth client needs for Google sign-in. Without a keystore it makes one: keep it,

@@ -12,16 +12,16 @@ set -euo pipefail
 
 say() { printf '\n=== %s\n' "$1"; }
 
-# It needs the Android SDK and the mounts of docker-compose.apk.yml, and it
-# replaces /work: never run it on your own computer.
+# The build needs the Android SDK and the mounts of docker-compose.apk.yml, and it
+# replaces /work. Run on your own computer, it starts that container and runs
+# itself in there; BUILD_TYPE, OUTPUT_FORMAT and ABIS carry over:
+#   bash mobile-react-native/scripts/build-android.sh
+#   OUTPUT_FORMAT=aab bash mobile-react-native/scripts/build-android.sh
 if [ ! -f /.dockerenv ] || [ ! -f /app/package.json ]; then
-  cat >&2 <<'HOST'
-This script runs inside the Android toolchain container. From the repository root:
-
-  docker compose -f docker-compose.apk.yml run --rm build-apk                      # APK
-  OUTPUT_FORMAT=aab docker compose -f docker-compose.apk.yml run --rm build-apk    # for Google Play
-HOST
-  exit 2
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  echo "Building in the Android toolchain container (docker-compose.apk.yml)..." >&2
+  exec docker compose -f "${ROOT}/docker-compose.apk.yml" run --rm \
+    ${ABIS:+-e "ABIS=${ABIS}"} build-apk
 fi
 
 ENV_FILE="${ENV_FILE:-/app/.env.production}"
