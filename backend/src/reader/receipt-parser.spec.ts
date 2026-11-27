@@ -1,6 +1,6 @@
 import { correctName } from './lexicon';
 import {
-  cleanName, findQuantityLines, issuedAt, parsePrice, parseReceipt, priceCandidates, quantityCandidates, resolve,
+  cleanName, findQuantityLines, issuedAt, parsePrice, parseReceipt, priceCandidates, quantityCandidates, receiptNo, resolve,
   stripLeadingCodes,
 } from './receipt-parser';
 import { round, word } from './words';
@@ -83,6 +83,19 @@ describe('dates', () => {
 
   it('skips a date that does not exist', () => {
     expect(issuedAt([w('31.02.2026', 0, 0), w('08.11.2026', 200, 0)])).toBe('2026-11-08');
+  });
+});
+
+describe('receipt numbers', () => {
+  it('reads the number after FİŞ NO, however OCR spells it', () => {
+    expect(receiptNo([w('FİŞ', 0, 0), w('NO:', 40, 0), w('0045', 90, 0)])).toBe('45');
+    expect(receiptNo([w('FIS NO:12', 0, 0)])).toBe('12');
+    expect(receiptNo([w('F1Ş', 0, 0), w('N0', 40, 0), w('0300', 90, 0)])).toBe('300');
+  });
+
+  it('is left out when the receipt shows none', () => {
+    expect(receiptNo([w('KDV', 0, 0), w('NO', 40, 0), w('12', 90, 0)])).toBeUndefined();
+    expect(receiptNo([w('ETTN', 0, 0), w('0045', 90, 0)])).toBeUndefined();
   });
 });
 

@@ -429,6 +429,18 @@ export function issuedAt(words: Word[]): string | undefined {
   return undefined;
 }
 
+/**
+ * The receipt's number as the till prints it ("FİŞ NO: 0045", often read as
+ * "FIS NO:45" or "F1Ş N0 0045"), without leading zeros. With the date and
+ * total it tells two photos of one receipt apart from two purchases.
+ */
+export function receiptNo(words: Word[]): string | undefined {
+  const text = [...words].sort(byYThenX).map((w) => w.text).join(' ');
+  const m = /(?<![\p{L}])F\s?[İIiı1lL]\s?[ŞSşs$5]\s*N\s?[O0o]\s*[:.]?\s*(\d{1,8})(?!\d)/u.exec(text);
+  if (!m) return undefined;
+  return m[1].replace(/^0+(?=\d)/, '');
+}
+
 function merchant(words: Word[]): string | undefined {
   return [...words]
     .sort(byY)
@@ -468,6 +480,7 @@ export interface ReceiptItemResult {
 export interface ReceiptResult {
   merchantName?: string;
   issuedAt?: string;
+  receiptNo?: string;
   currency?: string;
   total?: number;
   items: ReceiptItemResult[];
@@ -504,6 +517,7 @@ export function parseReceipt(found: Word[]): ReceiptResult {
   return defined({
     merchantName: merchant(words),
     issuedAt: issuedAt(words),
+    receiptNo: receiptNo(words),
     currency: 'TRY',
     total,
     items: items.slice(0, 300).map((i) =>

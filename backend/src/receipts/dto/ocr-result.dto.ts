@@ -68,6 +68,10 @@ export class OcrResultDto {
   @IsOptional() @IsDateString()
   issuedAt?: string;
 
+  /** "FİŞ NO" as printed, without leading zeros. */
+  @IsOptional() @IsString() @MaxLength(20)
+  receiptNo?: string;
+
   @IsOptional() @IsISO4217CurrencyCode()
   currency?: string;
 

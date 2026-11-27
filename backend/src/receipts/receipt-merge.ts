@@ -120,6 +120,7 @@ export function mergeReceiptParts(parts: OcrResultDto[]): OcrResultDto {
   for (const part of parts) {
     merged.merchantName ??= part.merchantName;
     merged.issuedAt ??= part.issuedAt;
+    merged.receiptNo ??= part.receiptNo;
     merged.currency ??= part.currency;
     if (part.total !== undefined) merged.total = part.total;
     const seam = overlap(merged.items, part.items);
