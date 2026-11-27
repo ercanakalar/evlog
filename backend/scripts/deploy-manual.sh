@@ -199,6 +199,8 @@ done
 # Cloud Run all but stops the CPU between requests without it. The instance is
 # billed while it is up, and still scales to zero when idle.
 # Receipt photos live in the bucket, so they outlast the instance that took them.
+# --timeout=3600s: the app's live-updates WebSocket counts as one request and is
+# cut when it times out (the app then reconnects); ordinary requests end long before.
 gcloud run deploy "${SERVICE}" \
   --image="${IMAGE}" \
   --region="${REGION}" \
@@ -216,7 +218,7 @@ gcloud run deploy "${SERVICE}" \
   --memory="${MEMORY}" \
   --cpu-boost \
   --no-cpu-throttling \
-  --timeout=120s
+  --timeout=3600s
 
 # Traffic pinned to a named revision means the new one serves nobody.
 TRAFFIC="$(gcloud run services describe "${SERVICE}" --region "${REGION}" \
