@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { useExpiryReminders } from '@/hooks/app/useExpiryReminders';
+import { useLiveUpdates } from '@/hooks/app/useLiveUpdates';
 import { ForgotPasswordScreen } from '@/screens/auth/ForgotPasswordScreen';
 import { SignInScreen } from '@/screens/auth/SignInScreen';
 import { PackScanScreen } from '@/screens/packs/PackScanScreen';
@@ -26,6 +27,7 @@ export function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const signedIn = status === 'signedIn';
   const loading = status === 'restoring' || !fontsReady;
   useExpiryReminders(signedIn);
+  useLiveUpdates(signedIn);
 
   useEffect(() => {
     if (!loading) void SplashScreen.hideAsync();
