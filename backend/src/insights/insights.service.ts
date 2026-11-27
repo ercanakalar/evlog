@@ -37,7 +37,7 @@ export class InsightsService {
   ) {}
 
   /** Everything the home screen shows. */
-  async home(userId: string, utcOffset: number) {
+  async home(householdId: string, utcOffset: number) {
     const clock = new Clock(utcOffset);
     const now = new Date();
     const { year, month } = clock.local(now);
@@ -50,24 +50,24 @@ export class InsightsService {
 
     const [current, previous, soon, soonCount, lastTrip] = await Promise.all([
       this.prisma.receipt.findMany({
-        where: { userId, status: 'CONFIRMED', issuedAt: { gte: start } },
+        where: { householdId, status: 'CONFIRMED', issuedAt: { gte: start } },
         select: { totalAmount: true, _count: { select: { items: true } } },
       }),
       this.prisma.receipt.aggregate({
-        where: { userId, status: 'CONFIRMED', issuedAt: { gte: previousStart, lt: previousSameDay } },
+        where: { householdId, status: 'CONFIRMED', issuedAt: { gte: previousStart, lt: previousSameDay } },
         _sum: { totalAmount: true },
       }),
-      this.items.shelf(userId, { expiring: true, take: 3 }),
+      this.items.shelf(householdId, { expiring: true, take: 3 }),
       this.prisma.receiptItem.count({
         where: {
           usedUpAt: null,
           onShelf: true,
           expiresAt: { not: null },
-          receipt: { userId, status: 'CONFIRMED' },
+          receipt: { householdId, status: 'CONFIRMED' },
         },
       }),
       this.prisma.receipt.findFirst({
-        where: { userId, status: 'CONFIRMED' },
+        where: { householdId, status: 'CONFIRMED' },
         orderBy: { issuedAt: 'desc' },
         select: {
           id: true,
@@ -104,13 +104,13 @@ export class InsightsService {
   }
 
   /** Monthly totals and one month broken down by category and by market. */
-  async spending(userId: string, query: SpendingQueryDto) {
+  async spending(householdId: string, query: SpendingQueryDto) {
     const clock = new Clock(query.utcOffset);
     const { year, month } = clock.local(new Date());
     const first = clock.monthStart(year, month - (query.months - 1));
 
     const receipts = await this.prisma.receipt.findMany({
-      where: { userId, status: 'CONFIRMED', issuedAt: { gte: first } },
+      where: { householdId, status: 'CONFIRMED', issuedAt: { gte: first } },
       select: { id: true, issuedAt: true, totalAmount: true, merchantName: true },
     });
 

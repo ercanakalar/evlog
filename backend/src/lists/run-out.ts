@@ -12,13 +12,13 @@ export const DEFAULT_LIST_NAME = 'Shopping list';
  */
 export async function addRunOut(
   tx: Prisma.TransactionClient,
-  userId: string,
+  householdId: string,
   names: string[],
   newListName = DEFAULT_LIST_NAME,
 ) {
   if (names.length === 0) return null;
   const open = await tx.shoppingListItem.findMany({
-    where: { doneAt: null, list: { userId } },
+    where: { doneAt: null, list: { householdId } },
     select: { name: true },
   });
   const missing = names.filter(
@@ -28,8 +28,8 @@ export async function addRunOut(
   if (missing.length === 0) return null;
 
   const list =
-    (await tx.shoppingList.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } })) ??
-    (await tx.shoppingList.create({ data: { userId, name: newListName } }));
+    (await tx.shoppingList.findFirst({ where: { householdId }, orderBy: { createdAt: 'asc' } })) ??
+    (await tx.shoppingList.create({ data: { householdId, name: newListName } }));
   await tx.shoppingListItem.createMany({
     data: missing.map((name) => ({ listId: list.id, name, normalizedName: normalizeProductName(name) })),
   });

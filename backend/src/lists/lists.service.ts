@@ -21,15 +21,15 @@ export class ListsService {
     private readonly homeItems: HomeItemsService,
   ) {}
 
-  async all(userId: string) {
+  async all(householdId: string) {
     const [lists, prices, low] = await Promise.all([
       this.prisma.shoppingList.findMany({
-        where: { userId },
+        where: { householdId },
         orderBy: { createdAt: 'asc' },
         include: { items: { orderBy: { createdAt: 'asc' } } },
       }),
-      this.priceBook(userId),
-      this.homeItems.runningLow(userId),
+      this.priceBook(householdId),
+      this.homeItems.runningLow(householdId),
     ]);
     return {
       lists: lists.map((list) => ({
@@ -53,29 +53,29 @@ export class ListsService {
     };
   }
 
-  create(userId: string, dto: ListNameDto) {
-    return this.prisma.shoppingList.create({ data: { userId, name: dto.name } });
+  create(householdId: string, dto: ListNameDto) {
+    return this.prisma.shoppingList.create({ data: { householdId, name: dto.name } });
   }
 
-  async rename(listId: string, userId: string, dto: ListNameDto) {
-    await this.ownList(listId, userId);
+  async rename(listId: string, householdId: string, dto: ListNameDto) {
+    await this.ownList(listId, householdId);
     return this.prisma.shoppingList.update({ where: { id: listId }, data: { name: dto.name } });
   }
 
-  async remove(listId: string, userId: string) {
-    await this.ownList(listId, userId);
+  async remove(listId: string, householdId: string) {
+    await this.ownList(listId, householdId);
     await this.prisma.shoppingList.delete({ where: { id: listId } });
   }
 
-  async addItem(listId: string, userId: string, dto: AddListItemDto) {
-    await this.ownList(listId, userId);
+  async addItem(listId: string, householdId: string, dto: AddListItemDto) {
+    await this.ownList(listId, householdId);
     return this.prisma.shoppingListItem.create({
       data: { listId, name: dto.name, normalizedName: normalizeProductName(dto.name) },
     });
   }
 
-  async updateItem(itemId: string, userId: string, dto: UpdateListItemDto) {
-    await this.ownItem(itemId, userId);
+  async updateItem(itemId: string, householdId: string, dto: UpdateListItemDto) {
+    await this.ownItem(itemId, householdId);
     return this.prisma.shoppingListItem.update({
       where: { id: itemId },
       data: {
@@ -85,14 +85,14 @@ export class ListsService {
     });
   }
 
-  async removeItem(itemId: string, userId: string) {
-    await this.ownItem(itemId, userId);
+  async removeItem(itemId: string, householdId: string) {
+    await this.ownItem(itemId, householdId);
     await this.prisma.shoppingListItem.delete({ where: { id: itemId } });
   }
 
-  private async priceBook(userId: string): Promise<PriceBook> {
+  private async priceBook(householdId: string): Promise<PriceBook> {
     const rows = await this.prisma.receiptItem.findMany({
-      where: { receipt: { userId, status: 'CONFIRMED' } },
+      where: { receipt: { householdId, status: 'CONFIRMED' } },
       select: { name: true, rawName: true, unitPrice: true },
       orderBy: { receipt: { issuedAt: 'desc' } },
       take: PRICE_LOOKBACK,
@@ -100,15 +100,15 @@ export class ListsService {
     return rows.map((r) => ({ ...r, unitPrice: r.unitPrice?.toFixed(2) ?? null }));
   }
 
-  private async ownList(listId: string, userId: string) {
+  private async ownList(listId: string, householdId: string) {
     const list = await this.prisma.shoppingList.findUnique({ where: { id: listId } });
-    if (!list || list.userId !== userId) throw new NotFoundException('List not found');
+    if (!list || list.householdId !== householdId) throw new NotFoundException('List not found');
     return list;
   }
 
-  private async ownItem(itemId: string, userId: string) {
+  private async ownItem(itemId: string, householdId: string) {
     const item = await this.prisma.shoppingListItem.findFirst({
-      where: { id: itemId, list: { userId } },
+      where: { id: itemId, list: { householdId } },
     });
     if (!item) throw new NotFoundException('Item not found');
     return item;

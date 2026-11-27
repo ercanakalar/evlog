@@ -8,6 +8,7 @@ import {
   NotFoundException,
   OnApplicationBootstrap,
 } from '@nestjs/common';
+import type { Member } from '../common/decorators/current-user.decorator';
 import { Prisma } from '../generated/prisma/client';
 import { HomeItemsService } from '../home-items/home-items.service';
 import { ItemsService } from '../items/items.service';
@@ -34,6 +35,7 @@ const withItems = {
       },
     },
   },
+  scannedBy: { select: { id: true, fullName: true } },
 } satisfies Prisma.ReceiptInclude;
 
 /** Photos are read one at a time, so nobody may fill the queue. */
@@ -79,7 +81,11 @@ export class ReceiptsService implements OnApplicationBootstrap {
    * the background and the app polls until its status changes. A long receipt
    * arrives as several photos, top to bottom.
    */
-  async upload(userId: string, uploaded: Express.Multer.File[], language: ProductLanguage) {
+  async upload(
+    { id: userId, householdId }: Member,
+    uploaded: Express.Multer.File[],
+    language: ProductLanguage,
+  ) {
     if (uploaded.length === 0) throw new BadRequestException('Add a photo of the receipt');
     // The same photo sent twice as two parts would read every line twice.
     const seen = new Set<string>();
@@ -93,7 +99,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
     if (mimeTypes.size > 1) throw new BadRequestException('Send every part in the same format');
     const hash = sha256(Buffer.concat(files.map((f) => f.buffer)));
     const existing = await this.prisma.receipt.findUnique({
-      where: { userId_sha256: { userId, sha256: hash } },
+      where: { householdId_sha256: { householdId, sha256: hash } },
       select: { id: true },
     });
     if (existing) {
@@ -102,7 +108,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
         receiptId: existing.id,
       });
     }
-    await this.checkQueue(userId);
+    await this.checkQueue(householdId);
     const imageKeys: string[] = [];
     let receipt: { id: string };
     try {
@@ -111,6 +117,7 @@ export class ReceiptsService implements OnApplicationBootstrap {
       }
       receipt = await this.prisma.receipt.create({
         data: {
+          householdId,
           userId,
           imageKeys,
           partCount: imageKeys.length,
@@ -128,13 +135,13 @@ export class ReceiptsService implements OnApplicationBootstrap {
   }
 
   /** Sends the stored photos to the reader again (after a failure). */
-  async rescan(receiptId: string, userId: string) {
-    const receipt = await this.own(receiptId, userId);
+  async rescan(receiptId: string, householdId: string) {
+    const receipt = await this.own(receiptId, householdId);
     if (receipt.status === 'CONFIRMED') {
       throw new ConflictException('Saved receipts cannot be rescanned');
     }
-    if (receipt.status !== 'FAILED' && receipt.status !== 'PARSED') return this.get(receiptId, userId);
-    await this.checkQueue(userId);
+    if (receipt.status !== 'FAILED' && receipt.status !== 'PARSED') return this.get(receiptId, householdId);
+    await this.checkQueue(householdId);
     return this.startReading(receiptId);
   }
 
@@ -150,10 +157,10 @@ export class ReceiptsService implements OnApplicationBootstrap {
   }
 
   /** Trips, newest first. */
-  list(userId: string, query: ListReceiptsQueryDto) {
+  list(householdId: string, query: ListReceiptsQueryDto) {
     return this.prisma.receipt.findMany({
       where: {
-        userId,
+        householdId,
         status: query.unsaved ? { not: 'CONFIRMED' } : query.status,
         merchantName: query.market,
         ...(query.from || query.to
@@ -169,23 +176,23 @@ export class ReceiptsService implements OnApplicationBootstrap {
       take: query.take,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       omit: { imageKeys: true, ocrRaw: true },
-      include: { _count: { select: { items: true } } },
+      include: { _count: { select: { items: true } }, scannedBy: withItems.scannedBy },
     });
   }
 
-  /** Markets the user has shopped at, most visited first. */
-  async markets(userId: string) {
+  /** Markets the household has shopped at, most visited first. */
+  async markets(householdId: string) {
     const rows = await this.prisma.receipt.groupBy({
       by: ['merchantName'],
-      where: { userId, status: 'CONFIRMED', merchantName: { not: null } },
+      where: { householdId, status: 'CONFIRMED', merchantName: { not: null } },
       _count: { _all: true },
       orderBy: { _count: { merchantName: 'desc' } },
     });
     return rows.map((r) => ({ name: r.merchantName as string, trips: r._count._all }));
   }
 
-  async get(receiptId: string, userId: string) {
-    await this.own(receiptId, userId);
+  async get(receiptId: string, householdId: string) {
+    await this.own(receiptId, householdId);
     return this.prisma.receipt.findUniqueOrThrow({
       where: { id: receiptId },
       include: withItems,
@@ -193,8 +200,8 @@ export class ReceiptsService implements OnApplicationBootstrap {
     });
   }
 
-  async update(receiptId: string, userId: string, dto: UpdateReceiptDto) {
-    const receipt = await this.own(receiptId, userId);
+  async update(receiptId: string, householdId: string, dto: UpdateReceiptDto) {
+    const receipt = await this.own(receiptId, householdId);
     if (receipt.status === 'CONFIRMED') {
       throw new ConflictException('Saved receipts cannot be edited');
     }
@@ -223,9 +230,9 @@ export class ReceiptsService implements OnApplicationBootstrap {
    * The user checked the lines: the receipt becomes a trip, every product
    * starts its countdown and matching at-home counts go up.
    */
-  async confirm(receiptId: string, userId: string) {
-    const receipt = await this.own(receiptId, userId);
-    if (receipt.status === 'CONFIRMED') return this.get(receiptId, userId);
+  async confirm(receiptId: string, user: Member) {
+    const receipt = await this.own(receiptId, user.householdId);
+    if (receipt.status === 'CONFIRMED') return this.get(receiptId, user.householdId);
     if (receipt.status !== 'PARSED') {
       throw new ConflictException({
         message: 'Wait for the scan, or fill the fields in manually',
@@ -250,33 +257,33 @@ export class ReceiptsService implements OnApplicationBootstrap {
         data: { status: 'CONFIRMED', confirmedAt: new Date() },
       });
       await this.items.startCountdowns(tx, receiptId, receipt.issuedAt!);
-      await this.homeItems.countReceipt(tx, userId, receiptId);
+      await this.homeItems.countReceipt(tx, user, receiptId);
     });
-    return this.get(receiptId, userId);
+    return this.get(receiptId, user.householdId);
   }
 
   /** Deletes a receipt with its photos and takes back what it added to the at-home counts. */
-  async remove(receiptId: string, userId: string) {
-    const receipt = await this.own(receiptId, userId);
+  async remove(receiptId: string, householdId: string) {
+    const receipt = await this.own(receiptId, householdId);
     await this.prisma.$transaction(async (tx) => {
-      await this.homeItems.uncountReceipt(tx, userId, receipt.id);
+      await this.homeItems.uncountReceipt(tx, householdId, receipt.id);
       await tx.receipt.delete({ where: { id: receipt.id } });
     });
     await this.storage.remove(receipt.imageKeys);
   }
 
   /** The original photo; `part` picks one part of a long receipt. */
-  async image(receiptId: string, userId: string, part = 0) {
-    const receipt = await this.own(receiptId, userId);
+  async image(receiptId: string, householdId: string, part = 0) {
+    const receipt = await this.own(receiptId, householdId);
     const key = receipt.imageKeys[part];
     if (!key) throw new NotFoundException('No such part');
     return { stream: await this.storage.open(key), mimeType: receipt.mimeType };
   }
 
-  private async checkQueue(userId: string): Promise<void> {
+  private async checkQueue(householdId: string): Promise<void> {
     const reading = await this.prisma.receipt.count({
       where: {
-        userId,
+        householdId,
         status: { in: ['PENDING', 'PROCESSING'] },
         createdAt: { gt: new Date(Date.now() - RESUME_WITHIN_MS) },
       },
@@ -466,9 +473,9 @@ export class ReceiptsService implements OnApplicationBootstrap {
     });
   }
 
-  private async own(receiptId: string, userId: string) {
+  private async own(receiptId: string, householdId: string) {
     const receipt = await this.prisma.receipt.findUnique({ where: { id: receiptId } });
-    if (!receipt || receipt.userId !== userId) {
+    if (!receipt || receipt.householdId !== householdId) {
       throw new NotFoundException('Receipt not found');
     }
     return receipt;

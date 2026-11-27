@@ -13,11 +13,11 @@ export class InsightsController {
   /** This month's spending, products to use soon and the last trip. */
   @Get('home')
   home(@CurrentUser() user: AuthUser, @Query() query: ClockQueryDto) {
-    return this.insights.home(user.id, query.utcOffset);
+    return this.insights.home(user.householdId, query.utcOffset);
   }
 
   @Get('spending')
   spending(@CurrentUser() user: AuthUser, @Query() query: SpendingQueryDto) {
-    return this.insights.spending(user.id, query);
+    return this.insights.spending(user.householdId, query);
   }
 }

@@ -61,6 +61,7 @@ export class AuthService {
           email: dto.email,
           passwordHash,
           fullName: dto.fullName ?? dto.email.split('@')[0],
+          household: { create: {} },
         },
       })
       .catch((error: unknown) => {
@@ -113,6 +114,7 @@ export class AuthService {
             googleSub: profile.sub,
             fullName: profile.name,
             emailVerifiedAt: now,
+            household: { create: {} },
           },
         });
       }

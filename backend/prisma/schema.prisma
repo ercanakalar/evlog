@@ -14,6 +14,21 @@ datasource db {
 
 // ───────────────────────────── Identity ─────────────────────────────
 
+/// The people who share one home: its receipts, shelf, at-home counts, lists
+/// and spending. Everyone has one; at first only themselves.
+model Household {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  /// Lets someone join: short, shown to a member, valid until inviteExpiresAt.
+  inviteCode      String?   @unique
+  inviteExpiresAt DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  members       User[]
+  receipts      Receipt[]
+  shoppingLists ShoppingList[]
+  homeItems     HomeItem[]
+}
+
 model User {
   id              String    @id @default(uuid(7)) @db.Uuid
   email           String    @unique
@@ -22,6 +37,7 @@ model User {
   /// Google account id ("sub" claim), set once the user signs in with Google.
   googleSub       String?   @unique
   fullName        String
+  householdId     String    @db.Uuid
   /// Set once the person proved the address is theirs (Google, or a password reset code).
   emailVerifiedAt DateTime? @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
@@ -36,11 +52,13 @@ model User {
   /// Raise at-home counts when a confirmed receipt has a matching product.
   countFromReceipts Boolean @default(true)
 
+  household     Household      @relation(fields: [householdId], references: [id])
   sessions      AuthSession[]
   passwordReset PasswordReset?
+  /// Receipts this person scanned (they belong to the household).
   receipts      Receipt[]
-  shoppingLists ShoppingList[]
-  homeItems     HomeItem[]
+
+  @@index([householdId])
 }
 
 /// One row per logged-in device. Only a hash of the refresh token is stored.
@@ -120,7 +138,9 @@ enum ReceiptStatus {
 /// One receipt is one trip to the market.
 model Receipt {
   id                 String        @id @default(uuid(7)) @db.Uuid
-  userId             String        @db.Uuid
+  householdId        String        @db.Uuid
+  /// Who scanned it; null once they deleted their account (it stays with the household).
+  userId             String?       @db.Uuid
   status             ReceiptStatus @default(PENDING)
   /// A long receipt is photographed in parts, top to bottom.
   imageKeys          String[]
@@ -145,12 +165,13 @@ model Receipt {
   createdAt          DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime      @updatedAt @db.Timestamptz(3)
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household   Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  scannedBy   User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   items       ReceiptItem[]
   homeChanges HomeItemChange[]
 
-  @@unique([userId, sha256])
-  @@index([userId, status, issuedAt])
+  @@unique([householdId, sha256])
+  @@index([householdId, status, issuedAt])
 }
 
 model ReceiptItem {
@@ -215,15 +236,15 @@ model Brand {
 // ───────────────────────────── Lists & home ─────────────────────────────
 
 model ShoppingList {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  userId    String   @db.Uuid
-  name      String
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  id          String   @id @default(uuid(7)) @db.Uuid
+  householdId String   @db.Uuid
+  name        String
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
-  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items ShoppingListItem[]
+  household Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items     ShoppingListItem[]
 
-  @@index([userId])
+  @@index([householdId])
 }
 
 model ShoppingListItem {
@@ -245,10 +266,10 @@ enum HomeUnit {
   KG /// by weight: 1.25 kg of bananas
 }
 
-/// A product the user keeps at home and counts.
+/// A product the household keeps at home and counts.
 model HomeItem {
   id                 String    @id @default(uuid(7)) @db.Uuid
-  userId             String    @db.Uuid
+  householdId        String    @db.Uuid
   name               String
   normalizedName     String
   unit               HomeUnit  @default(PIECE)
@@ -262,10 +283,10 @@ model HomeItem {
   createdAt          DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
 
-  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  changes HomeItemChange[]
+  household Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  changes   HomeItemChange[]
 
-  @@unique([userId, normalizedName])
+  @@unique([householdId, normalizedName])
 }
 
 /// One receipt line raising one at-home count. Deleting the receipt takes

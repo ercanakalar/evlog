@@ -23,12 +23,12 @@ export class ListsController {
   /** Every market list with last prices, plus what is running low at home. */
   @Get('lists')
   all(@CurrentUser() user: AuthUser) {
-    return this.lists.all(user.id);
+    return this.lists.all(user.householdId);
   }
 
   @Post('lists')
   create(@CurrentUser() user: AuthUser, @Body() dto: ListNameDto) {
-    return this.lists.create(user.id, dto);
+    return this.lists.create(user.householdId, dto);
   }
 
   @Patch('lists/:listId')
@@ -37,13 +37,13 @@ export class ListsController {
     @Param('listId', ParseUUIDPipe) listId: string,
     @Body() dto: ListNameDto,
   ) {
-    return this.lists.rename(listId, user.id, dto);
+    return this.lists.rename(listId, user.householdId, dto);
   }
 
   @Delete('lists/:listId')
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('listId', ParseUUIDPipe) listId: string) {
-    return this.lists.remove(listId, user.id);
+    return this.lists.remove(listId, user.householdId);
   }
 
   @Post('lists/:listId/items')
@@ -52,7 +52,7 @@ export class ListsController {
     @Param('listId', ParseUUIDPipe) listId: string,
     @Body() dto: AddListItemDto,
   ) {
-    return this.lists.addItem(listId, user.id, dto);
+    return this.lists.addItem(listId, user.householdId, dto);
   }
 
   @Patch('list-items/:itemId')
@@ -61,12 +61,12 @@ export class ListsController {
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: UpdateListItemDto,
   ) {
-    return this.lists.updateItem(itemId, user.id, dto);
+    return this.lists.updateItem(itemId, user.householdId, dto);
   }
 
   @Delete('list-items/:itemId')
   @HttpCode(204)
   removeItem(@CurrentUser() user: AuthUser, @Param('itemId', ParseUUIDPipe) itemId: string) {
-    return this.lists.removeItem(itemId, user.id);
+    return this.lists.removeItem(itemId, user.householdId);
   }
 }

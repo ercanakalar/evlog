@@ -23,18 +23,18 @@ export class HomeItemsController {
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
-    return this.homeItems.list(user.id);
+    return this.homeItems.list(user.householdId);
   }
 
   /** One product with its brands and pack sizes. */
   @Get(':itemId')
   get(@CurrentUser() user: AuthUser, @Param('itemId', ParseUUIDPipe) itemId: string) {
-    return this.homeItems.get(itemId, user.id);
+    return this.homeItems.get(itemId, user.householdId);
   }
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateHomeItemDto) {
-    return this.homeItems.create(user.id, dto);
+    return this.homeItems.create(user.householdId, dto);
   }
 
   @Patch(':itemId')
@@ -43,7 +43,7 @@ export class HomeItemsController {
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: UpdateHomeItemDto,
   ) {
-    return this.homeItems.update(itemId, user.id, dto);
+    return this.homeItems.update(itemId, user.householdId, dto);
   }
 
   /** Put the product on the first market list (made if there is none); skipped if already on one. */
@@ -54,12 +54,12 @@ export class HomeItemsController {
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: AddToListDto,
   ) {
-    return this.homeItems.addToList(itemId, user.id, dto.newListName);
+    return this.homeItems.addToList(itemId, user.householdId, dto.newListName);
   }
 
   @Delete(':itemId')
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('itemId', ParseUUIDPipe) itemId: string) {
-    return this.homeItems.remove(itemId, user.id);
+    return this.homeItems.remove(itemId, user.householdId);
   }
 }

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Member } from '../common/decorators/current-user.decorator';
 import { Prisma } from '../generated/prisma/client';
 import type { Category } from '../generated/prisma/enums';
 import { addDays, DAY_MS } from '../common/utils/normalize';
@@ -78,16 +79,16 @@ export class ItemsService {
    * was read too, it is kept on the product if the receipt had none, and
    * `barcodeMatches` says whether it is the product's barcode.
    */
-  async readLabel(itemId: string, userId: string, image: Buffer, mimeType: string) {
-    const item = await this.own(itemId, userId);
+  async readLabel(itemId: string, user: Member, image: Buffer, mimeType: string) {
+    const item = await this.own(itemId, user.householdId);
     const label = await this.ocr.readLabel(image, mimeType);
     if (label.barcode && !item.barcode) {
       await this.prisma.receiptItem.update({ where: { id: itemId }, data: { barcode: label.barcode } });
     }
     const result = label.expiresOn
       // Noon in Istanbul, so the day is the printed day in the user's calendar.
-      ? await this.update(itemId, userId, { packExpiresAt: `${label.expiresOn}T09:00:00.000Z` })
-      : await this.get(itemId, userId);
+      ? await this.update(itemId, user, { packExpiresAt: `${label.expiresOn}T09:00:00.000Z` })
+      : await this.get(itemId, user.householdId);
     return {
       item: result,
       label: {
@@ -120,13 +121,13 @@ export class ItemsService {
    * can leave some out when saving) and not used up, soonest first.
    * Products that do not expire come last.
    */
-  async shelf(userId: string, query: ListItemsQueryDto) {
+  async shelf(householdId: string, query: ListItemsQueryDto) {
     const items = await this.prisma.receiptItem.findMany({
       where: {
         usedUpAt: null,
         onShelf: true,
         category: query.category,
-        receipt: { userId, status: 'CONFIRMED' },
+        receipt: { householdId, status: 'CONFIRMED' },
         ...(query.expiring ? { expiresAt: { not: null } } : {}),
       },
       select: itemSelect,
@@ -137,12 +138,12 @@ export class ItemsService {
   }
 
   /** One product with the times it was bought before (same normalised name). */
-  async get(itemId: string, userId: string) {
-    const item = await this.own(itemId, userId);
+  async get(itemId: string, householdId: string) {
+    const item = await this.own(itemId, householdId);
     const history = await this.prisma.receiptItem.findMany({
       where: {
         normalizedName: item.normalizedName,
-        receipt: { userId, status: 'CONFIRMED' },
+        receipt: { householdId, status: 'CONFIRMED' },
       },
       select: {
         id: true,
@@ -173,8 +174,8 @@ export class ItemsService {
    * Using a product up lowers the at-home counts it matches; any that reach 0
    * go on the market list, which `addedToList` reports.
    */
-  async update(itemId: string, userId: string, dto: UpdateItemDto) {
-    const item = await this.own(itemId, userId);
+  async update(itemId: string, user: Member, dto: UpdateItemDto) {
+    const item = await this.own(itemId, user.householdId);
     const data: Prisma.ReceiptItemUpdateInput = {};
 
     if (dto.category) data.category = dto.category as Category;
@@ -220,9 +221,9 @@ export class ItemsService {
         quantity: item.quantity,
         unit: item.unit,
       };
-      return this.homeItems.useUp(tx, userId, line, dto.newListName);
+      return this.homeItems.useUp(tx, user, line, dto.newListName);
     });
-    return { ...(await this.get(itemId, userId)), addedToList };
+    return { ...(await this.get(itemId, user.householdId)), addedToList };
   }
 
   private estimate(item: ItemRow, openedAt: Date | null): Date | null {
@@ -234,9 +235,9 @@ export class ItemsService {
     return opened < unopened ? opened : unopened;
   }
 
-  private async own(itemId: string, userId: string) {
+  private async own(itemId: string, householdId: string) {
     const item = await this.prisma.receiptItem.findFirst({
-      where: { id: itemId, receipt: { userId, status: 'CONFIRMED' } },
+      where: { id: itemId, receipt: { householdId, status: 'CONFIRMED' } },
       select: itemSelect,
     });
     if (!item) throw new NotFoundException('Product not found');

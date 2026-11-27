@@ -46,24 +46,24 @@ export class ReceiptsController {
     @UploadedFiles(ImageFilesPipe) files: Express.Multer.File[],
     @Headers('accept-language') language?: string,
   ) {
-    return this.receipts.upload(user.id, files, productLanguage(language));
+    return this.receipts.upload(user, files, productLanguage(language));
   }
 
   /** Trips, newest first; filter by market or date range. */
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: ListReceiptsQueryDto) {
-    return this.receipts.list(user.id, query);
+    return this.receipts.list(user.householdId, query);
   }
 
   /** Markets the user has saved receipts from, most visited first. */
   @Get('markets')
   markets(@CurrentUser() user: AuthUser) {
-    return this.receipts.markets(user.id);
+    return this.receipts.markets(user.householdId);
   }
 
   @Get(':receiptId')
   get(@CurrentUser() user: AuthUser, @Param('receiptId', ParseUUIDPipe) receiptId: string) {
-    return this.receipts.get(receiptId, user.id);
+    return this.receipts.get(receiptId, user.householdId);
   }
 
   @Patch(':receiptId')
@@ -72,26 +72,26 @@ export class ReceiptsController {
     @Param('receiptId', ParseUUIDPipe) receiptId: string,
     @Body() dto: UpdateReceiptDto,
   ) {
-    return this.receipts.update(receiptId, user.id, dto);
+    return this.receipts.update(receiptId, user.householdId, dto);
   }
 
   @Post(':receiptId/rescan')
   @HttpCode(200)
   rescan(@CurrentUser() user: AuthUser, @Param('receiptId', ParseUUIDPipe) receiptId: string) {
-    return this.receipts.rescan(receiptId, user.id);
+    return this.receipts.rescan(receiptId, user.householdId);
   }
 
   /** Save the reviewed receipt: starts countdowns and updates at-home counts. */
   @Post(':receiptId/confirm')
   @HttpCode(200)
   confirm(@CurrentUser() user: AuthUser, @Param('receiptId', ParseUUIDPipe) receiptId: string) {
-    return this.receipts.confirm(receiptId, user.id);
+    return this.receipts.confirm(receiptId, user);
   }
 
   @Delete(':receiptId')
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('receiptId', ParseUUIDPipe) receiptId: string) {
-    return this.receipts.remove(receiptId, user.id);
+    return this.receipts.remove(receiptId, user.householdId);
   }
 
   @Get(':receiptId/image')
@@ -100,7 +100,7 @@ export class ReceiptsController {
     @Param('receiptId', ParseUUIDPipe) receiptId: string,
     @Query() query: ImagePartQueryDto,
   ) {
-    const { stream, mimeType } = await this.receipts.image(receiptId, user.id, query.part);
+    const { stream, mimeType } = await this.receipts.image(receiptId, user.householdId, query.part);
     return new StreamableFile(stream, { type: mimeType, disposition: 'inline' });
   }
 }

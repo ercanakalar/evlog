@@ -467,8 +467,8 @@ describe('Raf API (e2e)', () => {
     await api().delete('/api/v1/me').set(auth(leaver)).expect(204);
     expect(storedFiles()).toBe(before);
 
-    // The access token outlives the account; an upload with it must not leave a photo.
-    await scan(1, leaver).expect(409);
+    // The access token outlives the account, but is refused: no photo is left.
+    await scan(1, leaver).expect(401);
     expect(storedFiles()).toBe(before);
   });
 

@@ -25,15 +25,19 @@ export class UsersService {
   ) {}
 
   async me(userId: string) {
+    const { householdId } = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { householdId: true },
+    });
     const [user, categories, markets] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: profileSelect }),
       this.prisma.receiptItem.groupBy({
         by: ['category'],
-        where: { receipt: { userId, status: 'CONFIRMED' } },
+        where: { receipt: { householdId, status: 'CONFIRMED' } },
       }),
       this.prisma.receipt.groupBy({
         by: ['merchantName'],
-        where: { userId, status: 'CONFIRMED', merchantName: { not: null } },
+        where: { householdId, status: 'CONFIRMED', merchantName: { not: null } },
       }),
     ]);
     const { googleSub, passwordHash, ...profile } = user;
@@ -53,13 +57,22 @@ export class UsersService {
     return this.me(userId);
   }
 
-  /** Deletes the account and everything in it (receipts and their photos, lists, home items). */
+  /**
+   * Deletes the account. The household's receipts (and their photos), lists
+   * and home items go with it when nobody else lives there; otherwise they
+   * stay for the others, and receipts this person scanned no longer say who.
+   */
   async remove(userId: string) {
     const imageKeys = await this.prisma.$transaction(async (tx) => {
       // Holds back uploads in flight, so no photo is added after the keys are read.
       await tx.$queryRaw`SELECT 1 FROM "User" WHERE "id" = ${userId}::uuid FOR UPDATE`;
-      const receipts = await tx.receipt.findMany({ where: { userId }, select: { imageKeys: true } });
+      const { householdId } = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { householdId: true } });
+      // Holds back someone joining meanwhile.
+      await tx.$queryRaw`SELECT 1 FROM "Household" WHERE "id" = ${householdId}::uuid FOR UPDATE`;
       await tx.user.delete({ where: { id: userId } });
+      if ((await tx.user.count({ where: { householdId } })) > 0) return [];
+      const receipts = await tx.receipt.findMany({ where: { householdId }, select: { imageKeys: true } });
+      await tx.household.delete({ where: { id: householdId } });
       return receipts.flatMap((r) => r.imageKeys);
     });
     await this.storage.remove(imageKeys);

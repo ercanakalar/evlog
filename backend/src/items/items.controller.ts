@@ -28,12 +28,12 @@ export class ItemsController {
 
   @Get()
   shelf(@CurrentUser() user: AuthUser, @Query() query: ListItemsQueryDto) {
-    return this.items.shelf(user.id, query);
+    return this.items.shelf(user.householdId, query);
   }
 
   @Get(':itemId')
   get(@CurrentUser() user: AuthUser, @Param('itemId', ParseUUIDPipe) itemId: string) {
-    return this.items.get(itemId, user.id);
+    return this.items.get(itemId, user.householdId);
   }
 
   /** Photo of the pack ("file"): reads the printed use-by / best-before date and uses it. */
@@ -47,7 +47,7 @@ export class ItemsController {
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @UploadedFile(ImageFilePipe) file: Express.Multer.File,
   ) {
-    return this.items.readLabel(itemId, user.id, file.buffer, file.mimetype);
+    return this.items.readLabel(itemId, user, file.buffer, file.mimetype);
   }
 
   @Patch(':itemId')
@@ -56,6 +56,6 @@ export class ItemsController {
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: UpdateItemDto,
   ) {
-    return this.items.update(itemId, user.id, dto);
+    return this.items.update(itemId, user, dto);
   }
 }

@@ -80,6 +80,7 @@ async function main() {
       email: 'demo@raf.app',
       fullName: 'Deniz Yılmaz',
       passwordHash: await argon2.hash('Demo1234', { type: argon2.argon2id }),
+      household: { create: {} },
     },
   });
 
@@ -104,6 +105,7 @@ async function main() {
     });
     await prisma.receipt.create({
       data: {
+        householdId: user.householdId,
         userId: user.id,
         status: 'CONFIRMED',
         // Demo trips did not raise any at-home counts, so deleting one takes nothing back.
@@ -128,7 +130,7 @@ async function main() {
   ];
   await prisma.homeItem.createMany({
     data: home.map(([name, count, unit = 'PIECE']) => ({
-      userId: user.id,
+      householdId: user.householdId,
       name: local(name),
       normalizedName: normalizeProductName(local(name)),
       unit,
@@ -138,7 +140,7 @@ async function main() {
 
   await prisma.shoppingList.create({
     data: {
-      userId: user.id,
+      householdId: user.householdId,
       name: local('Weekend shop'),
       items: {
         create: ['Whole milk', 'Eggs', 'Tomatoes', 'Sourdough bread', 'Pasta'].map(local).map((name) => ({
@@ -150,7 +152,7 @@ async function main() {
   });
   await prisma.shoppingList.create({
     data: {
-      userId: user.id,
+      householdId: user.householdId,
       name: local('Monthly stock'),
       items: { create: ['Rice', 'Toilet paper'].map(local).map((name) => ({ name, normalizedName: normalizeProductName(name) })) },
     },

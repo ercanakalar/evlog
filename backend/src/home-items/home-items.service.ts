@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Member } from '../common/decorators/current-user.decorator';
 import { Prisma } from '../generated/prisma/client';
 import type { HomeUnit } from '../generated/prisma/enums';
 import { normalizeProductName } from '../common/utils/normalize';
@@ -132,8 +133,8 @@ export class HomeItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Every product at home, each with its brands and pack sizes. */
-  async list(userId: string) {
-    const items = await this.prisma.homeItem.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }] });
+  async list(householdId: string) {
+    const items = await this.prisma.homeItem.findMany({ where: { householdId }, orderBy: [{ createdAt: 'desc' }] });
     const changes = await this.prisma.homeItemChange.findMany({
       where: { homeItemId: { in: items.map((i) => i.id) } },
       select: changeSource,
@@ -142,17 +143,17 @@ export class HomeItemsService {
   }
 
   /** One product at home with what it is made of: "Sütaş 1000 ml × 1, Sütaş 250 ml × 1". */
-  async get(itemId: string, userId: string) {
-    const item = await this.own(itemId, userId);
+  async get(itemId: string, householdId: string) {
+    const item = await this.own(itemId, householdId);
     const changes = await this.prisma.homeItemChange.findMany({ where: { homeItemId: itemId }, select: changeSource });
     return toHomeItem(item, variantsOf(changes));
   }
 
   /** Products that are nearly gone, for the market list suggestions. */
-  async runningLow(userId: string) {
+  async runningLow(householdId: string) {
     const items = await this.prisma.homeItem.findMany({
       where: {
-        userId,
+        householdId,
         OR: [
           { unit: 'PIECE', count: { lte: RUNNING_LOW_AT.PIECE } },
           { unit: 'KG', count: { lte: RUNNING_LOW_AT.KG } },
@@ -163,7 +164,7 @@ export class HomeItemsService {
     return items.map((item) => toHomeItem(item));
   }
 
-  async create(userId: string, dto: CreateHomeItemDto) {
+  async create(householdId: string, dto: CreateHomeItemDto) {
     const normalizedName = normalizeProductName(dto.name);
     if (!normalizedName) throw new BadRequestException('Name is empty');
     const unit = dto.unit ?? 'PIECE';
@@ -173,12 +174,12 @@ export class HomeItemsService {
     this.checkCount(unit, count);
     // Duplicate names surface as 409 via PrismaExceptionFilter.
     return toHomeItem(
-      await this.prisma.homeItem.create({ data: { userId, name: dto.name, normalizedName, unit, count } }),
+      await this.prisma.homeItem.create({ data: { householdId, name: dto.name, normalizedName, unit, count } }),
     );
   }
 
-  async update(itemId: string, userId: string, dto: UpdateHomeItemDto) {
-    const item = await this.own(itemId, userId);
+  async update(itemId: string, householdId: string, dto: UpdateHomeItemDto) {
+    const item = await this.own(itemId, householdId);
     const unit = dto.unit ?? item.unit;
     let count = dto.count ?? item.count.toNumber();
     // Pieces are whole: switching from kg rounds the amount.
@@ -193,21 +194,21 @@ export class HomeItemsService {
         ...(dto.name ? { name: dto.name, normalizedName: normalizeProductName(dto.name) } : {}),
       },
     });
-    return this.get(itemId, userId);
+    return this.get(itemId, householdId);
   }
 
   /**
    * Puts the product on the market list, e.g. after the user lowered it to 0
    * and said yes. `addedToList` is null when it is already on a list.
    */
-  async addToList(itemId: string, userId: string, newListName?: string) {
-    const item = await this.own(itemId, userId);
-    const addedToList = await this.prisma.$transaction((tx) => addRunOut(tx, userId, [item.name], newListName));
+  async addToList(itemId: string, householdId: string, newListName?: string) {
+    const item = await this.own(itemId, householdId);
+    const addedToList = await this.prisma.$transaction((tx) => addRunOut(tx, householdId, [item.name], newListName));
     return { addedToList };
   }
 
-  async remove(itemId: string, userId: string) {
-    await this.own(itemId, userId);
+  async remove(itemId: string, householdId: string) {
+    await this.own(itemId, householdId);
     await this.prisma.homeItem.delete({ where: { id: itemId } });
   }
 
@@ -220,8 +221,9 @@ export class HomeItemsService {
    * could not tell what the product is and the user did not confirm it,
    * so raw receipt text never becomes an at-home product.
    */
-  async countReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
+  async countReceipt(tx: Prisma.TransactionClient, { id: userId, householdId }: Member, receiptId: string) {
     await tx.receipt.update({ where: { id: receiptId }, data: { homeCountsRecorded: true } });
+    // The settings of whoever saves the receipt.
     const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
       select: { trackHomeItems: true, countFromReceipts: true },
@@ -230,7 +232,7 @@ export class HomeItemsService {
 
     const receipt = await this.receiptLines(tx, receiptId);
     const lines = receipt.items.filter((line) => line.countAtHome !== false);
-    const homeItems = await tx.homeItem.findMany({ where: { userId } });
+    const homeItems = await tx.homeItem.findMany({ where: { householdId } });
     const missing: Prisma.HomeItemCreateManyInput[] = [];
     for (const line of lines.filter((l) => l.countAtHome === true && !l.needsReview)) {
       const known = [...homeItems, ...missing];
@@ -239,7 +241,7 @@ export class HomeItemsService {
       const normalizedName = normalizeProductName(name);
       if (!normalizedName || known.some((h) => h.normalizedName === normalizedName)) continue;
       const unit: HomeUnit = line.unit?.toLowerCase() === 'kg' ? 'KG' : 'PIECE';
-      missing.push({ userId, name, normalizedName, unit, count: 0 });
+      missing.push({ householdId, name, normalizedName, unit, count: 0 });
     }
     // Together, not one by one: the database can be far away.
     if (missing.length > 0) homeItems.push(...(await tx.homeItem.createManyAndReturn({ data: missing })));
@@ -272,15 +274,16 @@ export class HomeItemsService {
    */
   async useUp(
     tx: Prisma.TransactionClient,
-    userId: string,
+    { id: userId, householdId }: Member,
     line: ReceiptLine & { receiptId: string },
     newListName?: string,
   ) {
+    // The settings of whoever used it up.
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { trackHomeItems: true } });
     if (!user.trackHomeItems) return null;
 
     const empty: HomeItemRow[] = [];
-    for (const { home, amount } of matchLines(await tx.homeItem.findMany({ where: { userId } }), [line])) {
+    for (const { home, amount } of matchLines(await tx.homeItem.findMany({ where: { householdId } }), [line])) {
       const before = home.count.toNumber();
       const after = Math.max(0, round3(before - amount));
       if (after !== before) {
@@ -291,7 +294,7 @@ export class HomeItemsService {
       }
       if (after === 0) empty.push(home);
     }
-    return addRunOut(tx, userId, empty.map((home) => home.name), newListName);
+    return addRunOut(tx, householdId, empty.map((home) => home.name), newListName);
   }
 
   /** Undoes `useUp` for a product marked used up by mistake. */
@@ -311,7 +314,7 @@ export class HomeItemsService {
    * what its products already took away when they were used up. Counts never
    * go below 0, in case the user already lowered them by hand.
    */
-  async uncountReceipt(tx: Prisma.TransactionClient, userId: string, receiptId: string) {
+  async uncountReceipt(tx: Prisma.TransactionClient, householdId: string, receiptId: string) {
     const receipt = await tx.receipt.findUniqueOrThrow({
       where: { id: receiptId },
       select: { status: true, homeCountsRecorded: true, merchantName: true, issuedAt: true },
@@ -321,7 +324,7 @@ export class HomeItemsService {
     // Saved before additions were recorded: match the lines again, as when it was saved.
     const taken = receipt.homeCountsRecorded
       ? new Map<string, number>()
-      : totals(matchLines(await tx.homeItem.findMany({ where: { userId } }), (await this.receiptLines(tx, receiptId)).items));
+      : totals(matchLines(await tx.homeItem.findMany({ where: { householdId } }), (await this.receiptLines(tx, receiptId)).items));
     // Recorded changes: what it added, and (negative) what using its products up took away.
     const changes = await tx.homeItemChange.findMany({ where: { receiptId } });
     for (const c of changes) taken.set(c.homeItemId, round3((taken.get(c.homeItemId) ?? 0) + c.amount.toNumber()));
@@ -371,9 +374,9 @@ export class HomeItemsService {
     }
   }
 
-  private async own(itemId: string, userId: string) {
+  private async own(itemId: string, householdId: string) {
     const item = await this.prisma.homeItem.findUnique({ where: { id: itemId } });
-    if (!item || item.userId !== userId) throw new NotFoundException('Item not found');
+    if (!item || item.householdId !== householdId) throw new NotFoundException('Item not found');
     return item;
   }
 }
