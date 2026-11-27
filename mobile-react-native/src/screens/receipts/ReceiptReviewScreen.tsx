@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { ReceiptHeaderEditor } from '@/components/receipts/ReceiptHeaderEditor';
 import { ReviewLine } from '@/components/receipts/ReviewLine';
+import { ReceiptPhoto } from '@/components/trips/ReceiptPhoto';
 import { Button, Card, ErrorView, FooterBar, Loading, Row, Screen, ScreenHeader, SpaceBetween, Text } from '@/components/ui';
 import { useFormatters } from '@/hooks/common/useFormatters';
 import { useReceiptReview } from '@/hooks/receipts/useReceiptReview';
@@ -20,6 +21,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
   const f = useFormatters();
   const r = useReceiptReview(route.params.receiptId);
   const [editingHeader, setEditingHeader] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   if (r.isLoading) return <Loading />;
   if (!r.receipt) return <ErrorView error={r.error} onRetry={r.refetch} />;
@@ -92,6 +94,7 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
           <Text variant="bodyStrong">{t('review.failedTitle')}</Text>
           <Text variant="small" muted>{t(`review.readError.${readErrorKey(receipt.ocrError)}`)}</Text>
           <Button title={t('common.retry')} compact loading={r.rescanning} onPress={r.rescan} />
+          <Button title={t('review.seePhoto')} variant="outline" compact onPress={() => setPhotoOpen(true)} />
         </Card>
       ) : null}
 
@@ -114,6 +117,13 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
                   {f.upper(`${f.longDate(receipt.issuedAt)} · ${f.time(receipt.issuedAt)}`)}
                 </Text>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('review.seePhoto')}
+                onPress={() => setPhotoOpen(true)}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 'auto' }}>
+                <Feather name="image" size={20} color={colors.onInk} />
+              </Pressable>
               {editable ? (
                 <Pressable
                   accessibilityRole="button"
@@ -147,6 +157,8 @@ export function ReceiptReviewScreen({ route }: RootScreenProps<'ReceiptReview'>)
       ))}
 
       {saved ? <Text variant="small" muted>{t('review.alreadySaved')}</Text> : null}
+
+      <ReceiptPhoto receiptId={receipt.id} parts={receipt.partCount} visible={photoOpen} onClose={() => setPhotoOpen(false)} />
     </Screen>
   );
 }

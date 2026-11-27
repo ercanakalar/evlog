@@ -159,6 +159,7 @@ const en = {
     title: 'Review receipt',
     edit: 'Edit',
     editDetails: 'Edit market, date and total',
+    seePhoto: 'See the photo',
     editHint: 'Opens the name, quantity and category',
     market: 'Market',
     date: 'Date',

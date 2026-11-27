@@ -161,6 +161,7 @@ const tr: Translation = {
     title: 'Fişi kontrol et',
     edit: 'Düzenle',
     editDetails: 'Market, tarih ve toplamı düzenle',
+    seePhoto: 'Fotoğrafı gör',
     editHint: 'Ad, miktar ve kategoriyi açar',
     market: 'Market',
     date: 'Tarih',
