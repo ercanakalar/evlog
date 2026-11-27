@@ -45,6 +45,8 @@ export function useAuthForm() {
     }
   };
 
+  const googleFailed = (reason: string) => setServerError(t('auth.googleFailed', { reason }));
+
   return {
     mode,
     setMode: (next: AuthMode) => {
@@ -57,6 +59,7 @@ export function useAuthForm() {
     isLoading: loginState.isLoading || registerState.isLoading,
     googleLoading: googleState.isLoading,
     signInWithGoogle,
+    googleFailed,
     serverError,
     email: () => form.getValues('email').trim(),
   };

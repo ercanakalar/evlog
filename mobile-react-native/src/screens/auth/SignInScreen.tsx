@@ -41,7 +41,11 @@ export function SignInScreen({ navigation }: RootScreenProps<'SignIn'>) {
 
             {googleAvailable ? (
               <>
-                <GoogleButton loading={auth.googleLoading} onIdToken={(token) => void auth.signInWithGoogle(token)} />
+                <GoogleButton
+                  loading={auth.googleLoading}
+                  onIdToken={(token) => void auth.signInWithGoogle(token)}
+                  onError={auth.googleFailed}
+                />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                   <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
                   <Text variant="caption" muted style={{ fontSize: 12 }}>
