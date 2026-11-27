@@ -10,6 +10,7 @@ import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter'
 import { envSchema } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { HomeItemsModule } from './home-items/home-items.module';
+import { HouseholdsModule } from './households/households.module';
 import { InsightsModule } from './insights/insights.module';
 import { ItemsModule } from './items/items.module';
 import { LegalModule } from './legal/legal.module';
@@ -45,6 +46,7 @@ import { UsersModule } from './users/users.module';
     LegalModule,
     AuthModule,
     UsersModule,
+    HouseholdsModule,
     ReceiptsModule,
     ItemsModule,
     HomeItemsModule,

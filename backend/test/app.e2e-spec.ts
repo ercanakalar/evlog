@@ -787,4 +787,77 @@ describe('Raf API (e2e)', () => {
       expect(await counts()).toEqual({ Kefir: 1, Labneh: 1 });
     });
   });
+
+  describe('a shared household', () => {
+    let ali: string;
+    let ayse: string;
+    const homeItems = async (t: string) =>
+      Object.fromEntries(
+        (await api().get('/api/v1/home-items').set(auth(t)).expect(200)).body.map(
+          (h: { name: string; count: number }) => [h.name, h.count],
+        ),
+      );
+    const inviteCode = async (t: string) =>
+      (await api().post('/api/v1/household/invite').set(auth(t)).expect(200)).body.invite.code as string;
+
+    beforeAll(async () => {
+      ali = await register('ali@example.com');
+      ayse = await register('ayse@example.com');
+      await api().post('/api/v1/home-items').set(auth(ali)).send({ name: 'Yogurt', count: 1 }).expect(201);
+      await api().post('/api/v1/home-items').set(auth(ayse)).send({ name: 'Yogurt', count: 2 }).expect(201);
+      await api().post('/api/v1/home-items').set(auth(ayse)).send({ name: 'Rice', count: 1 }).expect(201);
+      await api().post('/api/v1/lists').set(auth(ayse)).send({ name: 'Ayşe market' }).expect(201);
+    });
+
+    it('lets someone join with an invite code and brings their data along', async () => {
+      const code = await inviteCode(ali);
+      expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      // Typed by hand: lower case, no dash.
+      const joined = await api()
+        .post('/api/v1/household/join')
+        .set(auth(ayse))
+        .send({ code: code.replace('-', '').toLowerCase() })
+        .expect(200);
+      expect(joined.body.members.map((m: { fullName: string }) => m.fullName)).toEqual(['ali', 'ayse']);
+      // At-home counts of the same product are added together.
+      expect(await homeItems(ali)).toEqual({ Yogurt: 3, Rice: 1 });
+      const lists = await api().get('/api/v1/lists').set(auth(ali)).expect(200);
+      expect(lists.body.lists.map((l: { name: string }) => l.name)).toContain('Ayşe market');
+      // One code, one person.
+      await api().post('/api/v1/household/join').set(auth(await register('cem@example.com'))).send({ code }).expect(400);
+    });
+
+    it('shares receipts and at-home counts both ways', async () => {
+      ocr.respond = () => ({ status: 200, body: { ...cityGross, issuedAt: daysAgo(2) } });
+      const scanned = await read(scan(1, ali), ali);
+      expect(scanned.body.scannedBy).toMatchObject({ fullName: 'ali' });
+      // Ayşe sees and saves the receipt Ali scanned; the same photo is the same receipt for her.
+      await api().get(`/api/v1/receipts/${scanned.body.id}`).set(auth(ayse)).expect(200);
+      await api().post(`/api/v1/receipts/${scanned.body.id}/confirm`).set(auth(ayse)).expect(200);
+
+      const yogurt = (await api().get('/api/v1/home-items').set(auth(ayse))).body.find(
+        (h: { name: string }) => h.name === 'Yogurt',
+      );
+      await api().patch(`/api/v1/home-items/${yogurt.id}`).set(auth(ayse)).send({ count: 1 }).expect(200);
+      expect((await homeItems(ali)).Yogurt).toBe(1);
+    });
+
+    it('needs whoever shares a household to leave it before joining another', async () => {
+      const other = await register('deniz2@example.com');
+      await api()
+        .post('/api/v1/household/join')
+        .set(auth(ayse))
+        .send({ code: await inviteCode(other) })
+        .expect(409)
+        .expect((res) => expect(res.body.code).toBe('LEAVE_FIRST'));
+    });
+
+    it('keeps what was shared with the household when someone leaves', async () => {
+      const left = await api().post('/api/v1/household/leave').set(auth(ayse)).expect(200);
+      expect(left.body.members).toHaveLength(1);
+      expect(await homeItems(ayse)).toEqual({});
+      expect(await homeItems(ali)).toMatchObject({ Yogurt: 1, Rice: 1 });
+      await api().post('/api/v1/household/leave').set(auth(ayse)).expect(409);
+    });
+  });
 });
