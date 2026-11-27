@@ -73,6 +73,11 @@ OUTPUT_FORMAT=aab docker compose -f docker-compose.apk.yml run --rm build-apk   
 `bash mobile-react-native/scripts/build-android.sh` does the same: run outside the
 container, it starts it.
 
+`bash mobile-react-native/scripts/install-android.sh` puts the APK on the phone plugged
+in over USB (needs `adb`: `sudo apt install adb`). It updates the installed app and keeps
+its data; only when that copy was signed with another key, which Android refuses to
+update, it uninstalls it first, and the app's data on the phone goes with it.
+
 It builds a copy of the project, so nothing is written into this folder, and fails when
 the output is not signed with the upload key. It prints the key's SHA-1, which Raf's
 Android OAuth client needs for Google sign-in. Without a keystore it makes one: keep it,
