@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useModal } from '@/components/ui';
 import { MAX_RECEIPT_PARTS, RECEIPT_POLL_MS } from '@/constants/domain';
 import { useCameraAccess } from '@/hooks/common/useCameraAccess';
+import * as haptics from '@/services/haptics';
 import { pickImages, prepareImage } from '@/services/media/imageCapture';
 import { uploadReceipt } from '@/store/actions/receiptActions';
 import { describeError } from '@/store/bases/errorMapping';
@@ -60,7 +61,9 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       if (navigation.isFocused()) navigation.dispatch(StackActions.replace('ReceiptReview', { receiptId }));
     };
     // Unreadable or already saved: the review explains it, no need to pause.
+    if (status === 'FAILED') haptics.failed();
     if (status !== 'PARSED') return openReview();
+    haptics.succeeded();
     const timer = setTimeout(openReview, DONE_PAUSE_MS);
     return () => clearTimeout(timer);
   }, [navigation, receiptId, status]);
@@ -83,6 +86,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
       return;
     }
     reset();
+    haptics.failed();
     modal.alert(t('scan.failed'), describeError(result.payload, t));
   };
 
@@ -91,6 +95,7 @@ export function useScanner(camera: RefObject<CameraView | null>) {
     setCapturing(true);
     try {
       const photo = await camera.current.takePictureAsync({ quality: 1, skipProcessing: false });
+      haptics.tapped();
       const frozen = { uri: photo.uri, fit: 'cover' as const };
       const last = !long || parts.length + 1 >= MAX_RECEIPT_PARTS;
       // The last photo freezes on screen straight away, while it is made ready to send.
