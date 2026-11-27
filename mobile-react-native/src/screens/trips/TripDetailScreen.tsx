@@ -113,7 +113,7 @@ export function TripDetailScreen({ route }: RootScreenProps<'TripDetail'>) {
         </View>
       ) : null}
       <Button title={t('trip.delete')} variant="danger" onPress={trip.remove} />
-      <ReceiptPhoto receiptId={receipt.id} visible={trip.photoOpen} onClose={() => trip.setPhotoOpen(false)} />
+      <ReceiptPhoto receiptId={receipt.id} parts={receipt.partCount} visible={trip.photoOpen} onClose={() => trip.setPhotoOpen(false)} />
     </Screen>
   );
 }

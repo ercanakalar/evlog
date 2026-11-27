@@ -324,6 +324,7 @@ const en = {
   },
   trip: {
     originalPhoto: 'Original photo',
+    photoPart: 'Part {{part}} of {{count}}',
     scanPacks_one: 'Scan pack dates · {{count}} product',
     scanPacks_other: 'Scan pack dates · {{count}} products',
     scanPacksHint: 'Use the dates printed on the packs instead of estimates. Fruit and veg keep their averages.',

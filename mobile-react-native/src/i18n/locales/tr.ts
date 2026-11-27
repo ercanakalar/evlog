@@ -326,6 +326,7 @@ const tr: Translation = {
   },
   trip: {
     originalPhoto: 'Orijinal fotoğraf',
+    photoPart: '{{count}} parçadan {{part}}.',
     scanPacks_one: 'Paket tarihlerini tara · {{count}} ürün',
     scanPacks_other: 'Paket tarihlerini tara · {{count}} ürün',
     scanPacksHint: 'Tahmin yerine paketlerde yazan tarihleri kullan. Meyve ve sebzeler ortalamada kalır.',
